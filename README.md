@@ -1,6 +1,6 @@
 # 🌸 NEKO Item & Meseta Tracker (PSO2:NGS)
 
-![Version](https://img.shields.io/badge/Version-6.0.0_(Offline)-FF69B4?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-6.1.0-FF69B4?style=for-the-badge)
 ![Platform](https://img.shields.io/badge/Platform-Windows-blue?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-Non--Commercial-red?style=for-the-badge)
 
@@ -16,7 +16,7 @@ A lightweight, 100% offline real-time tracker for Phantasy Star Online 2: New Ge
 * **100% Offline:** No telemetry, no online leaderboards, and no internet connection required.
 
 ## 🚀 How to Use (วิธีใช้งาน)
-1. Download the latest `NEKO_Item_Meseta_Tracker_V6.0.0.exe` from the Releases page.
+1. Download the latest `NEKO_Item_Meseta_Tracker_V6.1.0.exe` from the Releases page.
 2. Open the application.
 3. Click **"📂 จิ้มเลือกโฟลเดอร์ Log"** and select your PSO2:NGS log folder.
    * *Default path: `Documents\SEGA\PHANTASYSTARONLINE2\log_ngs`*
