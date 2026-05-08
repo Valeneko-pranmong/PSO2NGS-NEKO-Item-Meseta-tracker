@@ -19,7 +19,7 @@ try:
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
 except: pass
 
-APP_VERSION = "V 6.0.0 (Offline Version)" 
+APP_VERSION = "V 6.1.0" 
 
 app_data_dir = os.getenv('APPDATA') 
 config_dir = os.path.join(app_data_dir, "NekoTrackerOffline") 
@@ -78,9 +78,9 @@ class NGSTrackerApp(ctk.CTk):
         BTN_HEIGHT = 35
         BTN_RADIUS = UI_RADIUS 
 
-        self.btn_reset = ctk.CTkButton(self.btn_frame, text="เริ่มนับใหม่ (Reset)", font=("Kanit", 13,), 
-                                       fg_color=COLOR_PINK_HEADER, text_color=COLOR_TEXT_MAIN, 
-                                       hover_color=COLOR_PINK_SOFT, height=BTN_HEIGHT, corner_radius=BTN_RADIUS, command=self.reset_data)
+        self.btn_reset = ctk.CTkButton(self.btn_frame, text="เริ่มนับใหม่ (Reset)", font=("Kanit", 13,),
+                                       fg_color=COLOR_PINK_HEADER, text_color=COLOR_TEXT_MAIN,
+                                       hover_color=COLOR_PINK_SOFT, height=BTN_HEIGHT, corner_radius=BTN_RADIUS, command=self.confirm_reset)
         self.btn_reset.pack(pady=(0, 8), fill="x")
 
         self.btn_watchlist = ctk.CTkButton(self.btn_frame, text="Edit Watch List", font=("Kanit", 13, "bold"), 
@@ -133,7 +133,8 @@ class NGSTrackerApp(ctk.CTk):
         self.monitor_thread.start()
 
         self.overlay_window = None
-        self.watchlist_window = None 
+        self.watchlist_window = None
+        self.confirm_dialog = None
 
         self.load_settings()
         self.update_live_clock()
@@ -190,7 +191,12 @@ class NGSTrackerApp(ctk.CTk):
         close_btn = ctk.CTkButton(self.title_bar, text="✕", width=30, height=30, corner_radius=0,
                                   fg_color="white", text_color="#D81B60", hover_color="#FFE4E1",
                                   font=("Arial", 14, "bold"), command=self.on_close)
-        close_btn.pack(side="right", padx=15, pady=5)
+        close_btn.pack(side="right", padx=(0, 15), pady=5)
+
+        min_btn = ctk.CTkButton(self.title_bar, text="─", width=30, height=30, corner_radius=0,
+                                fg_color="white", text_color="#D81B60", hover_color="#FFE4E1",
+                                font=("Arial", 14, "bold"), command=self.minimize_window)
+        min_btn.pack(side="right", padx=(0, 5), pady=5)
 
         self.title_bar.bind("<ButtonPress-1>", self.start_move)
         self.title_bar.bind("<B1-Motion>", self.do_move)
@@ -200,18 +206,74 @@ class NGSTrackerApp(ctk.CTk):
     def start_move(self, event):
         self.x = event.x
         self.y = event.y
-        
+
     def do_move(self, event):
         x = self.winfo_x() + (event.x - self.x)
         y = self.winfo_y() + (event.y - self.y)
         self.geometry(f"+{x}+{y}")
+
+    def minimize_window(self):
+        self.overrideredirect(False)
+        self.iconify()
+        self.bind("<Map>", self._on_restore_window)
+
+    def _on_restore_window(self, event=None):
+        self.overrideredirect(True)
+        try: self.unbind("<Map>")
+        except: pass
             
+    def confirm_reset(self):
+        if self.confirm_dialog is not None and self.confirm_dialog.winfo_exists():
+            self.confirm_dialog.lift()
+            return
+
+        dlg = ctk.CTkToplevel(self)
+        self.confirm_dialog = dlg
+        dlg.overrideredirect(True)
+        dlg.geometry("360x180")
+        dlg.configure(fg_color="white")
+        dlg.attributes("-topmost", True)
+        dlg.transient(self)
+
+        self.update_idletasks()
+        x = self.winfo_x() + (self.winfo_width() // 2) - 180
+        y = self.winfo_y() + (self.winfo_height() // 2) - 90
+        dlg.geometry(f"+{x}+{y}")
+
+        title_bar = ctk.CTkFrame(dlg, height=36, corner_radius=0, fg_color=COLOR_PINK_HEADER)
+        title_bar.pack(fill="x", side="top")
+        ctk.CTkLabel(title_bar, text="ยืนยันรีเซ็ต", font=("Kanit", 13, "bold"), text_color="#333333").pack(side="left", padx=15, pady=5)
+
+        ctk.CTkLabel(dlg, text="ต้องการรีเซ็ตข้อมูลรอบนี้?\nยอดเงิน เวลา และไอเทมทั้งหมดจะหายไป",
+                     font=("Kanit", 12), text_color=COLOR_TEXT_MAIN, justify="center").pack(pady=(20, 15), padx=20)
+
+        btn_frame = ctk.CTkFrame(dlg, fg_color="transparent")
+        btn_frame.pack(side="bottom", fill="x", padx=20, pady=(0, 15))
+        btn_frame.columnconfigure((0, 1), weight=1, uniform="equal")
+
+        def do_confirm():
+            dlg.destroy()
+            self.reset_data()
+
+        ctk.CTkButton(btn_frame, text="ยกเลิก", font=("Kanit", 12),
+                      fg_color="#F0F0F0", text_color="#333333", hover_color="#E0E0E0",
+                      height=35, corner_radius=UI_RADIUS,
+                      command=dlg.destroy).grid(row=0, column=0, sticky="ew", padx=(0, 5))
+
+        ctk.CTkButton(btn_frame, text="ยืนยันรีเซ็ต", font=("Kanit", 12, "bold"),
+                      fg_color=COLOR_PINK_ACCENT, hover_color="#D81B60", text_color="white",
+                      height=35, corner_radius=UI_RADIUS,
+                      command=do_confirm).grid(row=0, column=1, sticky="ew", padx=(5, 0))
+
+        try: dlg.grab_set()
+        except: pass
+
     def reset_data(self):
         with self.data_lock:
             self.session_meseta = 0
             self.current_wallet = 0
             self.item_counts = {}
-            self.first_drop_time = None 
+            self.first_drop_time = None
             self.last_income_time = None
         
         if self.log_path and os.path.exists(self.log_path):

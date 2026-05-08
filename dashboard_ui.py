@@ -127,7 +127,7 @@ class DashboardFrame(ctk.CTkFrame):
             final_items = {}
             if keyword:
                 for k, v in filtered_items.items():
-                    if keyword in k:
+                    if keyword in k.lower():
                         final_items[k] = v
             else:
                 final_items = filtered_items
@@ -176,4 +176,5 @@ class DashboardFrame(ctk.CTkFrame):
                 
                 for i in range(len(sorted_items), len(self.item_rows)):
                     self.item_rows[i][0].pack_forget()
-        except: pass
+        except tk.TclError:
+            pass
