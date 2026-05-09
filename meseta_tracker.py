@@ -15,7 +15,7 @@ from dashboard_ui import DashboardFrame
 from overlay_ui import OverlayWindow
 
 try:
-    myappid = 'neko.family.shop.tracker.v5.7.4.offline' 
+    myappid = 'neko.family.shop.tracker v6.1.0' 
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
 except: pass
 
