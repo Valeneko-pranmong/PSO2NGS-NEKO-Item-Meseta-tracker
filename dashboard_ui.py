@@ -18,47 +18,47 @@ class DashboardFrame(ctk.CTkFrame):
         self.content_container.grid_columnconfigure(0, weight=1)
 
         self.money_card = ctk.CTkFrame(self.content_container, fg_color=COLOR_PINK_SOFT, corner_radius=UI_RADIUS)
-        self.money_card.grid(row=0, column=0, sticky="ew", pady=(15, 8), padx=15)
+        self.money_card.grid(row=0, column=0, sticky="ew", pady=(8, 5), padx=15)
         self.money_card.columnconfigure((0,1), weight=1)
         
         session_frame = ctk.CTkFrame(self.money_card, fg_color="transparent")
-        session_frame.grid(row=0, column=0, pady=15)
+        session_frame.grid(row=0, column=0, pady=8)
         
-        ctk.CTkLabel(session_frame, text="ยอดเงินรอบนี้ (Session)", font=("Kanit", 13), text_color=COLOR_TEXT_SUB).pack()
+        ctk.CTkLabel(session_frame, text="ยอดเงินรอบนี้ (Session)", font=(FONT_FAMILY, 12), text_color=COLOR_TEXT_SUB).pack()
         self.lbl_session = ctk.CTkLabel(session_frame, text="+0", font=FONT_NUMBER, text_color=COLOR_TEXT_VAL)
-        self.lbl_session.pack(pady=(0, 5))
+        self.lbl_session.pack(pady=(0, 3))
 
         wallet_frame = ctk.CTkFrame(self.money_card, fg_color="transparent")
-        wallet_frame.grid(row=0, column=1, pady=15)
+        wallet_frame.grid(row=0, column=1, pady=8)
 
-        ctk.CTkLabel(wallet_frame, text="เงินที่มีในกระเป๋า", font=("Kanit", 13), text_color=COLOR_TEXT_SUB).pack()
-        self.lbl_wallet = ctk.CTkLabel(wallet_frame, text="---", font=("Impact", 32), text_color=COLOR_TEXT_MAIN)
-        self.lbl_wallet.pack(pady=(0, 5))
+        ctk.CTkLabel(wallet_frame, text="เงินที่มีในกระเป๋า", font=(FONT_FAMILY, 12), text_color=COLOR_TEXT_SUB).pack()
+        self.lbl_wallet = ctk.CTkLabel(wallet_frame, text="---", font=("Impact", 30), text_color=COLOR_TEXT_MAIN)
+        self.lbl_wallet.pack(pady=(0, 3))
 
         self.stats_card = ctk.CTkFrame(self.content_container, fg_color=COLOR_PINK_SOFT, corner_radius=UI_RADIUS)
-        self.stats_card.grid(row=1, column=0, sticky="ew", pady=(0, 15), padx=15)
+        self.stats_card.grid(row=1, column=0, sticky="ew", pady=(0, 8), padx=15)
         self.stats_card.columnconfigure((0,1), weight=1)
 
         time_frame = ctk.CTkFrame(self.stats_card, fg_color="transparent")
-        time_frame.grid(row=0, column=0, pady=12)
-        ctk.CTkLabel(time_frame, text="เวลาที่ใช้ฟาร์ม", font=("Kanit", 13), text_color=COLOR_TEXT_SUB).pack()
+        time_frame.grid(row=0, column=0, pady=6)
+        ctk.CTkLabel(time_frame, text="เวลาที่ใช้ฟาร์ม", font=(FONT_FAMILY, 12), text_color=COLOR_TEXT_SUB).pack()
         self.lbl_time = ctk.CTkLabel(time_frame, text="00:00:00", font=FONT_STATS, text_color=COLOR_PINK_ACCENT)
         self.lbl_time.pack()
 
         mhr_frame = ctk.CTkFrame(self.stats_card, fg_color="transparent")
-        mhr_frame.grid(row=0, column=1, pady=12)
-        ctk.CTkLabel(mhr_frame, text="ความเร็ว (M/hr)", font=("Kanit", 13), text_color=COLOR_TEXT_SUB).pack()
+        mhr_frame.grid(row=0, column=1, pady=6)
+        ctk.CTkLabel(mhr_frame, text="ความเร็ว (M/hr)", font=(FONT_FAMILY, 12), text_color=COLOR_TEXT_SUB).pack()
         self.lbl_mhr = ctk.CTkLabel(mhr_frame, text="0 /hr", font=FONT_STATS, text_color=COLOR_TEXT_VAL)
         self.lbl_mhr.pack()
 
         header_frame = ctk.CTkFrame(self.content_container, fg_color="transparent")
-        header_frame.grid(row=2, column=0, sticky="new", padx=20, pady=(5, 5))
+        header_frame.grid(row=2, column=0, sticky="new", padx=20, pady=(4, 4))
         
-        self.search_var = tk.StringVar()
-        self.search_var.trace_add("write", self.on_search_change) 
+        self.search_var = tk.StringVar(value=getattr(self.controller, "search_keyword", ""))
+        self.search_var.trace_add("write", self.on_search_change)
         
         search_entry = ctk.CTkEntry(header_frame, placeholder_text="🔍 ค้นหาไอเท็ม...", 
-                                   textvariable=self.search_var, width=200, font=("Kanit", 12), 
+                                   textvariable=self.search_var, width=200, font=(FONT_FAMILY, 12), 
                                    border_color=COLOR_PINK_ACCENT, height=32, corner_radius=UI_RADIUS,
                                    fg_color="white", text_color=COLOR_TEXT_MAIN)
         search_entry.pack(side="right")
@@ -70,7 +70,7 @@ class DashboardFrame(ctk.CTkFrame):
 
         
         self.item_rows = []
-        self.empty_msg_lbl = ctk.CTkLabel(self.scroll, text="", font=("Kanit", 13), text_color=COLOR_TEXT_SUB)
+        self.empty_msg_lbl = ctk.CTkLabel(self.scroll, text="", font=(FONT_FAMILY, 13), text_color=COLOR_TEXT_SUB)
 
     def on_search_change(self, *args):
         self.controller.search_keyword = self.search_var.get().strip().lower()
@@ -156,7 +156,7 @@ class DashboardFrame(ctk.CTkFrame):
                     if i >= len(self.item_rows):
                         bg_color = COLOR_BG_MAIN if i % 2 == 0 else COLOR_PINK_SOFT
                         row = ctk.CTkFrame(self.scroll, fg_color=bg_color, corner_radius=6, height=32)
-                        rank_lbl = ctk.CTkLabel(row, text="", width=30, font=("Kanit", 11, "bold"), text_color=COLOR_TEXT_SUB)
+                        rank_lbl = ctk.CTkLabel(row, text="", width=30, font=(FONT_FAMILY, 11, "bold"), text_color=COLOR_TEXT_SUB)
                         rank_lbl.pack(side="left", padx=5)
                         name_lbl = ctk.CTkLabel(row, text="", anchor="w", font=FONT_NORMAL, text_color=COLOR_TEXT_MAIN)
                         name_lbl.pack(side="left", fill="x", expand=True, padx=5)

@@ -114,7 +114,7 @@ class OverlayWindow(ctk.CTkToplevel):
         self.lbl_title = ctk.CTkLabel(
             self.header,
             text=title_text,
-            font=("Kanit", 11, "bold"),
+            font=(FONT_FAMILY, 11, "bold"),
             text_color=COLOR_TEXT_MAIN,
         )
         self.lbl_title.pack(side="left", padx=12)
@@ -171,7 +171,7 @@ class OverlayWindow(ctk.CTkToplevel):
         self.lbl_subtitle = ctk.CTkLabel(
             self.inner_frame,
             text="เงินรอบนี้ (Session)",
-            font=("Kanit", 11),
+            font=(FONT_FAMILY, 11),
             text_color=COLOR_TEXT_SUB,
         )
         self.lbl_subtitle.pack(pady=(0, 4))
@@ -179,7 +179,7 @@ class OverlayWindow(ctk.CTkToplevel):
         self.lbl_wallet_overlay = ctk.CTkLabel(
             self.inner_frame,
             text="กระเป๋า: ---",
-            font=("Kanit", 12, "bold"),
+            font=(FONT_FAMILY, 12, "bold"),
             text_color=COLOR_TEXT_MAIN,
         )
         self.lbl_wallet_overlay.pack(pady=(0, 6))
@@ -197,7 +197,7 @@ class OverlayWindow(ctk.CTkToplevel):
         time_col.grid(row=0, column=0, sticky="nsew", padx=10, pady=6)
         lbl_time_cap = ctk.CTkLabel(
             time_col, text="TIME",
-            font=("Kanit", 9, "bold"), text_color=COLOR_TEXT_SUB,
+            font=(FONT_FAMILY, 9, "bold"), text_color=COLOR_TEXT_SUB,
         )
         lbl_time_cap.pack(anchor="w")
         self.lbl_time_overlay = ctk.CTkLabel(
@@ -210,7 +210,7 @@ class OverlayWindow(ctk.CTkToplevel):
         rate_col.grid(row=0, column=1, sticky="nsew", padx=10, pady=6)
         lbl_rate_cap = ctk.CTkLabel(
             rate_col, text="RATE",
-            font=("Kanit", 9, "bold"), text_color=COLOR_TEXT_SUB,
+            font=(FONT_FAMILY, 9, "bold"), text_color=COLOR_TEXT_SUB,
         )
         lbl_rate_cap.pack(anchor="e")
         self.lbl_mhr_overlay = ctk.CTkLabel(
@@ -230,12 +230,12 @@ class OverlayWindow(ctk.CTkToplevel):
         head.pack(fill="x", padx=16, pady=(0, 2))
         lbl_drops = ctk.CTkLabel(
             head, text="DROPS",
-            font=("Kanit", 10, "bold"), text_color=COLOR_TEXT_SUB,
+            font=(FONT_FAMILY, 10, "bold"), text_color=COLOR_TEXT_SUB,
         )
         lbl_drops.pack(side="left")
         self.lbl_filter_badge = ctk.CTkLabel(
             head, text="",
-            font=("Kanit", 10, "bold"), text_color=COLOR_WATCHLIST,
+            font=(FONT_FAMILY, 10, "bold"), text_color=COLOR_WATCHLIST,
         )
         self.lbl_filter_badge.pack(side="right")
 
@@ -246,7 +246,7 @@ class OverlayWindow(ctk.CTkToplevel):
 
         self.empty_label = ctk.CTkLabel(
             self.list_frame, text="รอของเข้า…",
-            font=("Kanit", 12), text_color=COLOR_TEXT_SUB,
+            font=(FONT_FAMILY, 12), text_color=COLOR_TEXT_SUB,
         )
 
         self._make_draggable(head, lbl_drops, self.lbl_filter_badge)
@@ -345,14 +345,14 @@ class OverlayWindow(ctk.CTkToplevel):
         frame = ctk.CTkFrame(self.list_frame, fg_color="transparent",
                              height=24, corner_radius=6)
         idx = ctk.CTkLabel(frame, text="", width=24,
-                           font=("Kanit", 10, "bold"),
+                           font=(FONT_FAMILY, 10, "bold"),
                            text_color=COLOR_TEXT_SUB)
         idx.pack(side="left")
-        name = ctk.CTkLabel(frame, text="", font=("Kanit", 11),
+        name = ctk.CTkLabel(frame, text="", font=(FONT_FAMILY, 11),
                             anchor="w", justify="left",
                             text_color=COLOR_TEXT_MAIN)
         name.pack(side="left", padx=2, fill="x", expand=True)
-        count = ctk.CTkLabel(frame, text="", font=("Kanit", 11, "bold"),
+        count = ctk.CTkLabel(frame, text="", font=(FONT_FAMILY, 11, "bold"),
                              text_color=COLOR_PINK_ACCENT)
         count.pack(side="right", padx=6)
 
