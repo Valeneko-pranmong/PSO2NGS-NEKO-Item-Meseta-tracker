@@ -1,0 +1,36 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net6.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    
+    <!-- Versioning System (v7 alpha) -->
+    <Version>7.0.0-alpha</Version>
+    <AssemblyVersion>7.0.0.0</AssemblyVersion>
+    <FileVersion>7.0.0.0</FileVersion>
+    <InformationalVersion>7.0.0-alpha</InformationalVersion>
+    
+    <!-- Metadata -->
+    <Product>NEKO Item &amp; Meseta Tracker</Product>
+    <Title>NEKO Item &amp; Meseta Tracker</Title>
+    <Company>NEKO FAMILY TEAM SHIP 4 JP</Company>
+    <Authors>Vale3neko</Authors>
+    <Description>Lightweight real-time offline tracker for Phantasy Star Online 2: New Genesis (PSO2:NGS)</Description>
+    <Copyright>Copyright © 2026 NEKO FAMILY TEAM SHIP 4 JP</Copyright>
+    <ApplicationIcon>icon.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="icon.ico" />
+    <Resource Include="logo.png" />
+    <None Remove="Localization\Strings.en.json" />
+    <None Remove="Localization\Strings.th.json" />
+    <None Remove="Localization\Strings.ja.json" />
+    <EmbeddedResource Include="Localization\Strings.en.json" />
+    <EmbeddedResource Include="Localization\Strings.th.json" />
+    <EmbeddedResource Include="Localization\Strings.ja.json" />
+  </ItemGroup>
+
+</Project>

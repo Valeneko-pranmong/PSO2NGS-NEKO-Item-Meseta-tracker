@@ -1,0 +1,30 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Color Palette -->
+    <Color x:Key="ColorBgMain">#FFFFFF</Color>
+    <Color x:Key="ColorPinkSoft">#FFF5F8</Color>
+    <Color x:Key="ColorPinkHeader">#FFC0CB</Color>
+    <Color x:Key="ColorPinkAccent">#FF69B4</Color>
+    <Color x:Key="ColorTextMain">#2C2C2C</Color>
+    <Color x:Key="ColorTextSub">#888888</Color>
+    <Color x:Key="ColorTextVal">#D81B60</Color>
+    <Color x:Key="ColorGreenSafe">#2E7D32</Color>
+    <Color x:Key="ColorRedWarning">#C2185B</Color>
+
+    <!-- Solid Brushes -->
+    <SolidColorBrush x:Key="BrushBgMain" Color="{StaticResource ColorBgMain}" />
+    <SolidColorBrush x:Key="BrushPinkSoft" Color="{StaticResource ColorPinkSoft}" />
+    <SolidColorBrush x:Key="BrushPinkHeader" Color="{StaticResource ColorPinkHeader}" />
+    <SolidColorBrush x:Key="BrushPinkAccent" Color="{StaticResource ColorPinkAccent}" />
+    <SolidColorBrush x:Key="BrushTextMain" Color="{StaticResource ColorTextMain}" />
+    <SolidColorBrush x:Key="BrushTextSub" Color="{StaticResource ColorTextSub}" />
+    <SolidColorBrush x:Key="BrushTextVal" Color="{StaticResource ColorTextVal}" />
+    <SolidColorBrush x:Key="BrushGreenSafe" Color="{StaticResource ColorGreenSafe}" />
+    <SolidColorBrush x:Key="BrushRedWarning" Color="{StaticResource ColorRedWarning}" />
+
+    <!-- Typography: Windows Native Fallback Chain (EN / JA / TH) -->
+    <FontFamily x:Key="DefaultFontFamily">Segoe UI, Yu Gothic UI, Leelawadee UI</FontFamily>
+    <FontFamily x:Key="NumberFontFamily">Impact, Segoe UI, Leelawadee UI</FontFamily>
+
+</ResourceDictionary>

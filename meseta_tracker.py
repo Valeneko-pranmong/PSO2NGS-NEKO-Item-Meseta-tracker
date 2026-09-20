@@ -2,6 +2,7 @@ import customtkinter as ctk
 import tkinter as tk
 from tkinter import filedialog
 import os
+import sys
 import time
 import threading
 import re
@@ -17,19 +18,21 @@ from overlay_ui import OverlayWindow
 from modules.event_bus import event_bus
 from modules.war_mode.war_service import WarService
 from modules.war_mode.war_view import WarDashboardFrame
+from modules.utils import extract_character_info
 
 try:
     myappid = 'neko.family.shop.tracker v6.1.0' 
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
-except: pass
+except Exception:
+    pass
 
-APP_VERSION = "V 6.1.0" 
-
-app_data_dir = os.getenv('APPDATA') 
+app_data_dir = os.getenv('APPDATA') or os.path.expanduser('~')
 config_dir = os.path.join(app_data_dir, "NekoTrackerOffline") 
 if not os.path.exists(config_dir):
-    try: os.makedirs(config_dir) 
-    except: pass
+    try:
+        os.makedirs(config_dir) 
+    except OSError:
+        pass
 CONFIG_FILE = os.path.join(config_dir, "ngs_tracker_config.json")
 
 class NGSTrackerApp(ctk.CTk):
@@ -180,7 +183,8 @@ class NGSTrackerApp(ctk.CTk):
                 self.lbl_file_status.configure(text=self.pending_status_text, text_color=getattr(self, 'pending_status_color', "black"))
                 if hasattr(self, "war_view") and hasattr(self.war_view, "lbl_file_status"):
                     self.war_view.lbl_file_status.configure(text=self.pending_status_text, text_color=getattr(self, 'pending_status_color', "black"))
-            except: pass
+            except Exception:
+                pass
             self.pending_status_text = None
 
         if getattr(self, 'needs_ui_update', False):
@@ -190,7 +194,8 @@ class NGSTrackerApp(ctk.CTk):
                     self.war_view.dashboard_area.update_display()
                 if getattr(self, 'overlay_window', None) and self.overlay_window.winfo_exists():
                     self.overlay_window.update_data()
-            except: pass
+            except Exception:
+                pass
             self.needs_ui_update = False 
 
         if self.first_drop_time is not None:
@@ -200,12 +205,14 @@ class NGSTrackerApp(ctk.CTk):
                     self.war_view.dashboard_area.update_live_stats()
                 if getattr(self, 'overlay_window', None) and self.overlay_window.winfo_exists():
                     self.overlay_window.update_data()
-            except: pass
+            except Exception:
+                pass
 
         if getattr(self, "current_view", "offline") == "war" and hasattr(self, "war_view") and self.war_view.winfo_ismapped():
             try:
                 self.war_view.update_view()
-            except: pass
+            except Exception:
+                pass
             
         self.after(1000, self.update_live_clock)
 
@@ -213,7 +220,8 @@ class NGSTrackerApp(ctk.CTk):
         try:
             if os.path.exists(ICON_FILENAME):
                 self.iconbitmap(default=ICON_FILENAME)
-        except: pass
+        except Exception:
+            pass
 
     def build_title_bar(self):
         self.title_bar = ctk.CTkFrame(self.main_container, height=40, corner_radius=0, fg_color="transparent")
@@ -226,7 +234,8 @@ class NGSTrackerApp(ctk.CTk):
                 icon_lbl.pack(side="left", padx=(15, 5), pady=5)
                 icon_lbl.bind("<ButtonPress-1>", self.start_move)
                 icon_lbl.bind("<B1-Motion>", self.do_move)
-            except: pass
+            except Exception:
+                pass
 
         title_text = "NEKO FAMILY TEAM SHOP - Item & Meseta tracker"
         self.title_label = ctk.CTkLabel(
@@ -278,7 +287,8 @@ class NGSTrackerApp(ctk.CTk):
                     self.war_service.set_operative(character_name)
                 if getattr(self, "current_view", "") == "war" and hasattr(self, "war_view") and self.war_view.winfo_ismapped():
                     self.war_view.update_view()
-        except: pass
+        except Exception:
+            pass
 
     def enter_war_mode(self):
         self.show_war_view()
@@ -287,7 +297,8 @@ class NGSTrackerApp(ctk.CTk):
         self.current_view = "offline"
         try:
             self.title_label.configure(text="NEKO FAMILY TEAM SHOP - Item & Meseta tracker")
-        except: pass
+        except Exception:
+            pass
         if hasattr(self, "war_view"):
             self.war_view.grid_remove()
         self.offline_container.grid(row=1, column=0, sticky="nsew")
@@ -297,7 +308,8 @@ class NGSTrackerApp(ctk.CTk):
         self.current_view = "war"
         try:
             self.title_label.configure(text="NEKO FAMILY — ARKS War Room Realtime Meseta Tracker")
-        except: pass
+        except Exception:
+            pass
         self.offline_container.grid_remove()
 
         if not hasattr(self, "war_view"):
@@ -326,8 +338,11 @@ class NGSTrackerApp(ctk.CTk):
 
     def _on_restore_window(self, event=None):
         self.overrideredirect(True)
-        try: self.unbind("<Map>")
-        except: pass
+        try:
+            self.unbind("<Map>")
+        except Exception:
+            pass
+        self.after(50, self.force_taskbar_icon)
             
     def confirm_reset(self):
         if self.confirm_dialog is not None and self.confirm_dialog.winfo_exists():
@@ -372,8 +387,10 @@ class NGSTrackerApp(ctk.CTk):
                       height=35, corner_radius=UI_RADIUS,
                       command=do_confirm).grid(row=0, column=1, sticky="ew", padx=(5, 0))
 
-        try: dlg.grab_set()
-        except: pass
+        try:
+            dlg.grab_set()
+        except Exception:
+            pass
 
     def reset_data(self):
         with self.data_lock:
@@ -388,7 +405,8 @@ class NGSTrackerApp(ctk.CTk):
                 with open(self.log_path, 'r', encoding=self.active_encoding, errors='replace') as f:
                     f.seek(0, 2)
                     self.last_file_pos = f.tell()
-            except: pass
+            except OSError:
+                pass
         self.event_bus.emit("tracker_reset")
         self.trigger_update_ui()
 
@@ -396,11 +414,15 @@ class NGSTrackerApp(ctk.CTk):
         self.is_running = False
         self.stop_event.set()
         if hasattr(self, "war_service") and hasattr(self.war_service, "stop"):
-            try: self.war_service.stop()
-            except: pass
-        try: self.destroy()
-        except: pass
-        os._exit(0)
+            try:
+                self.war_service.stop()
+            except Exception:
+                pass
+        try:
+            self.destroy()
+        except Exception:
+            pass
+        sys.exit(0)
 
     def open_discord(self):
         webbrowser.open("https://discord.gg/fkjXW9AJ6a")
@@ -439,7 +461,8 @@ class NGSTrackerApp(ctk.CTk):
                     self.watchlist_items = data.get("watchlist", [])
                     self.log_folder = data.get("log_folder", "")
                     self.board_coord = data.get("board_coord", "0, 0, 1")
-            except: pass
+            except (OSError, json.JSONDecodeError):
+                pass
 
         if hasattr(self, "war_service"):
             self.war_service.set_target_coord(self.board_coord)
@@ -465,8 +488,10 @@ class NGSTrackerApp(ctk.CTk):
             "board_coord": self.board_coord,
         }
         try:
-            with open(CONFIG_FILE, 'w', encoding='utf-8') as f: json.dump(data, f, indent=4) 
-        except: pass
+            with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=4) 
+        except OSError:
+            pass
 
     def select_log_folder(self):
         folder_path = filedialog.askdirectory()
@@ -482,7 +507,8 @@ class NGSTrackerApp(ctk.CTk):
             for f in os.listdir(self.log_folder):
                 if f.startswith("ActionLog") and f.endswith(".txt"):
                     target_files.append(os.path.join(self.log_folder, f))
-        except: return 
+        except OSError:
+            return
         
         if not target_files:
             self.pending_status_text = "หาไฟล์ Log ไม่เจออะ"
@@ -506,14 +532,13 @@ class NGSTrackerApp(ctk.CTk):
                     line = f.readline()
                     if not line:
                         break
-                    parts = line.strip().split('\t')
-                    if len(parts) >= 5 and parts[3].strip().isdigit():
-                        cname = parts[4].strip()
-                        if cname and not cname.startswith('[') and 'Num(' not in cname:
-                            self.character_name = cname
-                            self.player_id = parts[3].strip()
-                            self.event_bus.emit("character_detected", character_name=cname, player_id=self.player_id)
-                            return cname
+                    char_info = extract_character_info(line)
+                    if char_info:
+                        cname, pid = char_info
+                        self.character_name = cname
+                        self.player_id = pid
+                        self.event_bus.emit("character_detected", character_name=cname, player_id=self.player_id)
+                        return cname
         except Exception:
             pass
         return self.character_name or ""
@@ -552,7 +577,8 @@ class NGSTrackerApp(ctk.CTk):
                     icon_ctk = ctk.CTkImage(img, size=(20, 20))
                     icon_lbl = ctk.CTkLabel(title_bar, text="", image=icon_ctk)
                     icon_lbl.pack(side="left", padx=(15, 5), pady=5)
-                except: pass
+                except Exception:
+                    pass
 
             title_label = ctk.CTkLabel(title_bar, text="Watch List Editor", font=(FONT_FAMILY, 14, "bold"), text_color="#333333")
             title_label.pack(side="left", padx=5, pady=5)
@@ -600,7 +626,8 @@ class NGSTrackerApp(ctk.CTk):
                 target_h = int(h * (target_w / w))
                 self.logo_img_obj = ctk.CTkImage(img, size=(target_w, target_h))
                 ctk.CTkLabel(self.sidebar, text="", image=self.logo_img_obj).pack(pady=(20, 5))
-            except: pass
+            except Exception:
+                pass
 
     def design_brand_text(self):
         brand_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
@@ -621,14 +648,20 @@ class NGSTrackerApp(ctk.CTk):
             elif raw.startswith(b'\xfe\xff'): self.active_encoding = 'utf-16-be'
             elif raw.startswith(b'\xef\xbb\xbf'): self.active_encoding = 'utf-8-sig'
             else: self.active_encoding = 'utf-8'
-        except: self.active_encoding = 'utf-16'
+        except Exception:
+            self.active_encoding = 'utf-16'
 
     def monitor_log_file(self):
+        check_counter = 0
         while not self.stop_event.is_set():
             if not self.is_running: break
-            if self.log_folder: 
-                try: self.find_latest_log_file()
-                except: pass
+            check_counter += 1
+            if self.log_folder and (not self.log_path or check_counter >= 5):
+                check_counter = 0
+                try:
+                    self.find_latest_log_file()
+                except Exception:
+                    pass
             
             if self.log_path and os.path.exists(self.log_path):
                 try:
@@ -644,21 +677,20 @@ class NGSTrackerApp(ctk.CTk):
                                         self.process_log_line(line)
                                         data_changed = True
                             if data_changed: self.trigger_update_ui()
-                except: pass
+                except Exception:
+                    pass
             time.sleep(1)
 
     def process_log_line(self, line):
         try:
             # Extract in-game character name (not ID) from ActionLog:
-            # Format: Timestamp \t Seq \t [Action] \t PlayerID \t CharacterName \t ...
-            parts = line.strip().split('\t')
-            if len(parts) >= 5 and parts[3].strip().isdigit():
-                cname = parts[4].strip()
-                if cname and not cname.startswith('[') and 'Num(' not in cname:
-                    if self.character_name != cname:
-                        self.character_name = cname
-                        self.player_id = parts[3].strip()
-                        self.event_bus.emit("character_detected", character_name=cname, player_id=self.player_id)
+            char_info = extract_character_info(line)
+            if char_info:
+                cname, pid = char_info
+                if self.character_name != cname:
+                    self.character_name = cname
+                    self.player_id = pid
+                    self.event_bus.emit("character_detected", character_name=cname, player_id=self.player_id)
 
             meseta_match = re.search(r'\t(?:N-)?Meseta\s*\(\s*(\d+)\s*\)', line, re.IGNORECASE)
             wallet_match = re.search(r'\tCurrent(?:N-)?Meseta\s*\(\s*(\d+)\s*\)', line, re.IGNORECASE)
@@ -698,7 +730,8 @@ class NGSTrackerApp(ctk.CTk):
                     if item_name:
                         self.item_counts[item_name] = self.item_counts.get(item_name, 0) + count
 
-        except: pass
+        except Exception:
+            pass
 
     def trigger_update_ui(self):
         self.needs_ui_update = True
@@ -717,7 +750,8 @@ class NGSTrackerApp(ctk.CTk):
             ctypes.windll.user32.SetWindowLongW(hwnd, -20, style)
             self.withdraw()
             self.deiconify()
-        except: pass
+        except Exception:
+            pass
 
     def summon_main_window(self):
         self.deiconify()

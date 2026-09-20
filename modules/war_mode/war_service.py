@@ -135,11 +135,12 @@ class TargetCoord(tuple):
 
     def __eq__(self, other: Any) -> bool:
         if isinstance(other, (tuple, list)):
-            if len(other) == 2:
-                return (self[0], self[1]) == (other[0], other[1])
             if len(other) == 3:
                 return (self[0], self[1], self[2]) == (other[0], other[1], other[2])
+            return False
         return super().__eq__(other)
+
+    __hash__ = tuple.__hash__
 
 
 class WarService:
@@ -169,6 +170,7 @@ class WarService:
         self.total_farmed = 0
         self.session_start_time = time.time()
         self.war_logs: List[Dict[str, Any]] = []
+        self._logs_lock = threading.Lock()
 
         # Realtime Sync Architecture
         self.realtime_sync_enabled: bool = realtime_sync
@@ -363,9 +365,14 @@ class WarService:
             "type": log_type,
             "timestamp": time.time(),
         }
-        self.war_logs.insert(0, entry)
-        if len(self.war_logs) > 50:
-            self.war_logs.pop()
+        with self._logs_lock:
+            self.war_logs.insert(0, entry)
+            if len(self.war_logs) > 50:
+                self.war_logs.pop()
+
+    def get_recent_logs(self, limit: int = 10) -> List[Dict[str, Any]]:
+        with self._logs_lock:
+            return list(self.war_logs[:limit])
 
     def get_live_rate(self) -> float:
         """Calculate live M/hr for the current war session."""
@@ -640,7 +647,7 @@ class WarService:
                 "totalFarmed": self.total_farmed,
                 "farmingRateMhr": round(self.get_live_rate()),
             },
-            "recentLogs": self.war_logs[:10],
+            "recentLogs": self.get_recent_logs(10),
         }
 
         # 1. Save to ARKS War Room data directory if available

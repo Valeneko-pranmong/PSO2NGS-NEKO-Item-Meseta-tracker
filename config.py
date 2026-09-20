@@ -67,7 +67,13 @@ ICON_FILENAME = resource_path("icon.ico")
 APP_VERSION = "V 6.1.0"
 
 # Firebase Realtime Database
-DEFAULT_FIREBASE_RTDB_URL = "https://arks-war-room-default-rtdb.asia-southeast1.firebasedatabase.app"
+DEFAULT_FIREBASE_RTDB_URL = os.getenv(
+    "FIREBASE_RTDB_URL",
+    os.getenv(
+        "ARKS_FIREBASE_RTDB_URL",
+        "https://arks-war-room-default-rtdb.asia-southeast1.firebasedatabase.app",
+    ),
+)
 
 # Coordinate Grid & Sub-Cell Defaults (Sector + 4 Slots)
 SECTOR_X_MIN = -12

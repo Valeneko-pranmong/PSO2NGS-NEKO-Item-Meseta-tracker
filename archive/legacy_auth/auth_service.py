@@ -1,3 +1,8 @@
+"""
+ARCHIVED / DEPRECATED — DO NOT USE FOR ACTIVE DEVELOPMENT (ห้ามใช้ในงานพัฒนาปัจจุบัน)
+Superseded by: Zero-Login Operative Identity (modules/war_mode/war_service.py)
+Status: RETIRED / ARCHIVED. Authentication credentials are no longer required.
+"""
 from __future__ import annotations
 
 import json

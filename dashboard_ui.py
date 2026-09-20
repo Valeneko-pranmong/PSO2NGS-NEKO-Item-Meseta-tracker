@@ -2,6 +2,7 @@ import customtkinter as ctk
 import tkinter as tk
 import time
 from config import *
+from modules.utils import format_duration, format_rate, filter_and_sort_items
 
 class DashboardFrame(ctk.CTkFrame):
     def __init__(self, parent, controller):
@@ -79,20 +80,13 @@ class DashboardFrame(ctk.CTkFrame):
     def update_live_stats(self):
         duration_secs = 0
         if hasattr(self.controller, 'first_drop_time') and self.controller.first_drop_time is not None:
-            duration_secs = time.time() - self.controller.first_drop_time
-            
-        if duration_secs < 0: duration_secs = 0
-        
-        hours = int(duration_secs // 3600)
-        mins = int((duration_secs % 3600) // 60)
-        secs = int(duration_secs % 60)
-        self.lbl_time.configure(text=f"{hours:02d}:{mins:02d}:{secs:02d}")
+            duration_secs = max(0, time.time() - self.controller.first_drop_time)
+
+        self.lbl_time.configure(text=format_duration(duration_secs))
 
         if duration_secs >= 1 and self.controller.session_meseta > 0:
             m_hr = (self.controller.session_meseta / duration_secs) * 3600
-            if m_hr >= 1000000: m_hr_str = f"{m_hr/1000000:.2f} M/hr"
-            elif m_hr >= 1000: m_hr_str = f"{m_hr/1000:.1f} k/hr"
-            else: m_hr_str = f"{int(m_hr)} /hr"
+            m_hr_str = format_rate(m_hr)
         else:
             m_hr_str = "0 /hr"
         self.lbl_mhr.configure(text=m_hr_str)
@@ -114,25 +108,13 @@ class DashboardFrame(ctk.CTkFrame):
             keyword = self.controller.search_keyword
             filter_enabled = self.controller.is_filter_active 
 
-            filtered_items = {}
-            if filter_enabled and watchlist:
-                for k, v in items_snapshot.items():
-                    for watch_item in watchlist:
-                        if watch_item.lower() in k.lower():
-                            filtered_items[k] = v
-                            break
-            else:
-                filtered_items = items_snapshot
-
-            final_items = {}
-            if keyword:
-                for k, v in filtered_items.items():
-                    if keyword in k.lower():
-                        final_items[k] = v
-            else:
-                final_items = filtered_items
-
-            sorted_items = sorted(final_items.items(), key=lambda x: x[1], reverse=True)[:50] 
+            sorted_items = filter_and_sort_items(
+                items_snapshot,
+                watchlist=watchlist,
+                keyword=keyword,
+                filter_enabled=filter_enabled,
+                max_items=50,
+            )
             
             
             if not sorted_items:

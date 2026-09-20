@@ -219,3 +219,12 @@ __marimo__/
 
 # Claude Code
 .claude/
+
+# Visual Studio / .NET / C# build outputs
+bin/
+obj/
+*.user
+*.userosscache
+*.sln.docstates
+.vs/
+*.suo

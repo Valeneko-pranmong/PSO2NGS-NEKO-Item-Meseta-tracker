@@ -3,35 +3,17 @@ import tkinter as tk
 import time
 import os
 from config import *
+from modules.utils import (
+    format_compact,
+    format_rate,
+    format_duration,
+    filter_and_sort_items,
+)
 
-
-def _format_compact(value):
-    av = abs(value)
-    sign = "-" if value < 0 else ""
-    if av >= 1_000_000:
-        return f"{sign}{av/1_000_000:.2f}M"
-    if av >= 10_000:
-        return f"{sign}{av/1_000:.1f}k"
-    return f"{sign}{av:,}"
-
-
-def _format_rate(meseta_per_hour):
-    if meseta_per_hour <= 0:
-        return "0 /hr"
-    if meseta_per_hour >= 1_000_000:
-        return f"{meseta_per_hour/1_000_000:.2f} M/hr"
-    if meseta_per_hour >= 1_000:
-        return f"{meseta_per_hour/1_000:.1f} k/hr"
-    return f"{int(meseta_per_hour)} /hr"
-
-
-def _format_duration(seconds):
-    if seconds < 0:
-        seconds = 0
-    h = int(seconds // 3600)
-    m = int((seconds % 3600) // 60)
-    s = int(seconds % 60)
-    return f"{h:02d}:{m:02d}:{s:02d}"
+# Backward-compatible aliases
+_format_compact = format_compact
+_format_rate = format_rate
+_format_duration = format_duration
 
 
 class OverlayWindow(ctk.CTkToplevel):
@@ -296,19 +278,13 @@ class OverlayWindow(ctk.CTkToplevel):
         keyword = self.controller.search_keyword
         filter_enabled = self.controller.is_filter_active
 
-        if filter_enabled and watchlist:
-            wl_lower = [w.lower() for w in watchlist]
-            filtered = {
-                k: v for k, v in snapshot.items()
-                if any(w in k.lower() for w in wl_lower)
-            }
-        else:
-            filtered = snapshot
-
-        if keyword:
-            filtered = {k: v for k, v in filtered.items() if keyword in k.lower()}
-
-        items = sorted(filtered.items(), key=lambda kv: kv[1], reverse=True)[: self.MAX_ITEMS]
+        items = filter_and_sort_items(
+            snapshot,
+            watchlist=watchlist,
+            keyword=keyword,
+            filter_enabled=filter_enabled,
+            max_items=self.MAX_ITEMS,
+        )
         return items, filter_enabled
 
     def redraw_items(self):

@@ -1,3 +1,8 @@
+"""
+ARCHIVED / DEPRECATED — DO NOT USE FOR ACTIVE DEVELOPMENT (ห้ามใช้ในงานพัฒนาปัจจุบัน)
+Superseded by: Direct War Mode entry with Zero-Login Operative Auto-Detection (modules/war_mode/war_view.py)
+Status: RETIRED / ARCHIVED. Login UI is no longer displayed.
+"""
 from __future__ import annotations
 
 import os

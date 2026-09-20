@@ -497,3 +497,109 @@ def test_font_registration_and_config(shared_app):
         assert FONT_FAMILY == "Sarabun"
     assert FONT_HEADER[0] == FONT_FAMILY
     assert FONT_NORMAL[0] == FONT_FAMILY
+
+
+def test_utils_formatting():
+    """Verify shared formatting functions in modules.utils."""
+    from modules.utils import format_compact, format_rate, format_duration
+
+    assert format_compact(500) == "500"
+    assert format_compact(15000) == "15.0k"
+    assert format_compact(25000000) == "25.00M"
+    assert format_compact(-1200000) == "-1.20M"
+
+    assert format_rate(0) == "0 /hr"
+    assert format_rate(-100) == "0 /hr"
+    assert format_rate(500) == "500 /hr"
+    assert format_rate(50000) == "50.0 k/hr"
+    assert format_rate(2500000) == "2.50 M/hr"
+
+    assert format_duration(-5) == "00:00:00"
+    assert format_duration(65) == "00:01:05"
+    assert format_duration(3665) == "01:01:05"
+
+
+def test_utils_item_filtering():
+    """Verify shared item filtering and sorting in modules.utils."""
+    from modules.utils import filter_and_sort_items
+
+    items = {
+        "N-Grinder": 150,
+        "Alpha Reactor": 14,
+        "Photon Chunk": 80,
+        "Arms Refiner": 5,
+    }
+
+    # All items sorted descending
+    all_sorted = filter_and_sort_items(items)
+    assert [name for name, _ in all_sorted] == [
+        "N-Grinder",
+        "Photon Chunk",
+        "Alpha Reactor",
+        "Arms Refiner",
+    ]
+
+    # Watchlist filtering
+    wl_filtered = filter_and_sort_items(
+        items, watchlist=["Reactor", "Refiner"], filter_enabled=True
+    )
+    assert set(name for name, _ in wl_filtered) == {"Alpha Reactor", "Arms Refiner"}
+
+    # Empty watchlist when filter enabled returns empty list
+    empty_wl = filter_and_sort_items(items, watchlist=[], filter_enabled=True)
+    assert empty_wl == []
+
+    # Keyword search
+    kw_filtered = filter_and_sort_items(items, keyword="photon")
+    assert [name for name, _ in kw_filtered] == ["Photon Chunk"]
+
+    # Max items limit
+    capped = filter_and_sort_items(items, max_items=2)
+    assert len(capped) == 2
+
+
+def test_utils_character_extraction():
+    """Verify ActionLog character extraction helper in modules.utils."""
+    from modules.utils import extract_character_info
+
+    valid_line = "2026-09-20T12:00:00\t001\t[Pickup]\t10023456\tNekoHero\tMeseta(1000)"
+    assert extract_character_info(valid_line) == ("NekoHero", "10023456")
+
+    invalid_line = "2026-09-20T12:00:00\t001\t[Notice]\tSystem"
+    assert extract_character_info(invalid_line) is None
+
+    no_digit_id = "2026-09-20T12:00:00\t001\t[Pickup]\tABCDEF\tNekoHero"
+    assert extract_character_info(no_digit_id) is None
+
+
+def test_target_coord_hash_and_dict_consistency():
+    """Verify TargetCoord hash consistency and correct dict/set lookup behavior."""
+    from modules.war_mode.war_service import TargetCoord
+
+    tc = TargetCoord(3, -2, 1)
+    # TargetCoord equals identical 3-part tuple
+    assert tc == (3, -2, 1)
+    # Does NOT equal 2-part tuple, avoiding hash divergence
+    assert tc != (3, -2)
+    assert hash(tc) == hash((3, -2, 1))
+
+    # Dict lookup works with both TargetCoord and equivalent tuple
+    d = {tc: "active_mission"}
+    assert d[(3, -2, 1)] == "active_mission"
+    assert (3, -2, 1) in {tc}
+
+
+def test_war_logs_thread_safety_and_limit():
+    """Verify war_logs thread safety lock and bounding to 50 items."""
+    from modules.war_mode.war_service import WarService
+
+    war = WarService()
+    for i in range(60):
+        war.add_log(f"Test log entry {i}", "info")
+
+    assert len(war.war_logs) == 50
+    recent = war.get_recent_logs(5)
+    assert len(recent) == 5
+    assert recent[0]["text"] == "Test log entry 59"
+    war.stop()
+

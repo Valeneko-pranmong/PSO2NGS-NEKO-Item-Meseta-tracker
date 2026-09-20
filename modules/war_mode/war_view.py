@@ -5,7 +5,7 @@ import sys
 import time
 import webbrowser
 import tkinter as tk
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 import customtkinter as ctk
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
