@@ -23,8 +23,8 @@ def isolate_test_environment(tmp_path, monkeypatch):
 
     orig_ws_init = WarService.__init__
     def patched_ws_init(self, war_room_path=str(test_war_room), **kwargs):
+        kwargs["stats_file"] = str(test_appdata / "war_stats.json")
         orig_ws_init(self, war_room_path=war_room_path, **kwargs)
-        self.stats_file = str(test_appdata / "war_stats.json")
     monkeypatch.setattr(WarService, "__init__", patched_ws_init)
 
     yield

@@ -264,7 +264,7 @@ class WarService:
         self._stop_event = threading.Event()
 
         app_data = os.getenv("APPDATA") or os.path.expanduser("~")
-        self.stats_file = os.path.join(app_data, "NekoTrackerOffline", "war_stats.json")
+        self.stats_file = kwargs.get("stats_file") or os.path.join(app_data, "NekoTrackerOffline", "war_stats.json")
 
         self._load_saved_stats()
         self._subscribe_events()
@@ -989,6 +989,11 @@ class WarService:
                 data = json.load(f)
                 if data.get("operative_name") == self.operative_name:
                     self.total_farmed = data.get("total_farmed", 0)
+                    saved_session = data.get("session_contribution", 0)
+                    if saved_session > 0:
+                        self.session_contribution = saved_session
+                    elif self.session_contribution == 0 and self.total_farmed > 0:
+                        self.session_contribution = self.total_farmed
                 if "target_coord" in data:
                     self.target_coord = self.parse_coordinate(data.get("target_coord"))
         except Exception as exc:

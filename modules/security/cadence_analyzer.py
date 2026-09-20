@@ -32,8 +32,9 @@ class CadenceAnalyzer:
         """
         if self._last_event_time is not None:
             interval = event_time - self._last_event_time
-            # Ignore huge pauses (> 60s) where player was AFK or traveling
-            if 0.0 <= interval <= 60.0:
+            # Ignore simultaneous batch drops (interval == 0.0) from the same mob/encounter
+            # and ignore huge pauses (> 60s) where player was AFK or traveling
+            if 0.0 < interval <= 60.0:
                 self._intervals.append(interval)
 
         self._last_event_time = event_time
@@ -58,7 +59,11 @@ class CadenceAnalyzer:
         if stddev is None:
             return False, None
 
-        if stddev < self.min_stddev_threshold:
+        n = len(self._intervals)
+        mean = sum(self._intervals) / n if n > 0 else 0.0
+        # Rapid combat drops (mean <= 1.0s) have naturally low integer-second variance.
+        # Only flag when drops are periodically spaced (mean > 1.0s) with unnaturally rigid zero jitter.
+        if mean > 1.0 and stddev < self.min_stddev_threshold:
             return True, stddev
 
         return False, stddev
