@@ -68,3 +68,14 @@ APP_VERSION = "V 6.1.0"
 
 # Firebase Realtime Database
 DEFAULT_FIREBASE_RTDB_URL = "https://arks-war-room-default-rtdb.asia-southeast1.firebasedatabase.app"
+
+# Coordinate Grid & Sub-Cell Defaults (Sector + 4 Slots)
+SECTOR_X_MIN = -12
+SECTOR_X_MAX = 25
+SECTOR_Y_MIN = -11
+SECTOR_Y_MAX = 9
+SLOT_MIN = 1
+SLOT_MAX = 4
+SLOT_TARGET_MESETA = 25_000_000    # 25M per sub-cell
+SECTOR_TARGET_MESETA = 100_000_000 # 100M total per sector (4 slots)
+

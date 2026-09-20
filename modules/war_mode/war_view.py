@@ -138,25 +138,28 @@ class WarDashboardFrame(ctk.CTkFrame):
 
         ctk.CTkLabel(
             self.coord_frame,
-            text="🎯 พิกัดกระดาน [X, Y]:",
+            text="🎯 พิกัด [X, Y]:",
             font=(FONT_FAMILY, 11, "bold"),
             text_color=COLOR_TEXT_MAIN,
-        ).pack(side="left", padx=(0, 6))
+        ).pack(side="left", padx=(0, 4))
 
-        init_coord = "0, 0"
+        init_coord = "0, 0, 1"
         if hasattr(self.war_service, "target_coord"):
-            gx, gy = self.war_service.target_coord
-            init_coord = f"{gx}, {gy}"
+            tc = self.war_service.target_coord
+            gx = getattr(tc, "x", tc[0])
+            gy = getattr(tc, "y", tc[1])
+            cslot = getattr(tc, "slot", tc[2] if len(tc) >= 3 else 1)
+            init_coord = f"{gx}, {gy}, {cslot}"
         elif hasattr(self.controller, "board_coord"):
-            init_coord = self.controller.board_coord
+            init_coord = str(self.controller.board_coord)
 
         self.coord_var = tk.StringVar(value=init_coord)
         self.entry_coord = ctk.CTkEntry(
             self.coord_frame,
             textvariable=self.coord_var,
-            width=85,
+            width=88,
             height=28,
-            font=(FONT_FAMILY, 12, "bold"),
+            font=(FONT_FAMILY, 11, "bold"),
             justify="center",
             fg_color="white",
             text_color="#1E293B",
@@ -164,13 +167,61 @@ class WarDashboardFrame(ctk.CTkFrame):
             border_width=2,
             corner_radius=6,
         )
-        self.entry_coord.pack(side="left", padx=(0, 6))
+        self.entry_coord.pack(side="left", padx=(0, 4))
         self.entry_coord.bind("<Return>", lambda e: self._on_coord_submit())
+
+        # 4 Quadrant Slot Buttons (NW: 1, NE: 2, SW: 3, SE: 4)
+        self.slot_buttons: Dict[int, ctk.CTkButton] = {}
+        slot_names = {1: "NW", 2: "NE", 3: "SW", 4: "SE"}
+        for s_idx in (1, 2, 3, 4):
+            btn_s = ctk.CTkButton(
+                self.coord_frame,
+                text=f"#{s_idx} {slot_names[s_idx]}",
+                width=44,
+                height=28,
+                font=(FONT_FAMILY, 9, "bold"),
+                fg_color="#E2E8F0",
+                hover_color="#CBD5E1",
+                text_color="#475569",
+                corner_radius=6,
+                command=lambda s=s_idx: self._on_slot_button_clicked(s),
+            )
+            btn_s.pack(side="left", padx=(0, 2))
+            self.slot_buttons[s_idx] = btn_s
+
+        # Preset Landmarks Dropdown
+        landmark_options = [
+            "🪐 พิกัดสำคัญ...",
+            "🌌 Core [0, 0]",
+            "🏙️ NGS [3, 3]",
+            "🌍 Earth [9, -3]",
+            "☀️ Sun [8, -3]",
+            "🔴 Mars [9, -4]",
+            "🌲 Naberius [-2, -2]",
+            "🌋 Amduskia [-3, -3]",
+            "🏜️ Lillipa [-1, -3]",
+            "🚀 Hail Mary [20, 7]",
+        ]
+        self.opt_landmark = ctk.CTkOptionMenu(
+            self.coord_frame,
+            values=landmark_options,
+            width=100,
+            height=28,
+            font=(FONT_FAMILY, 10, "bold"),
+            dropdown_font=(FONT_FAMILY, 10),
+            fg_color="#F1F5F9",
+            text_color="#334155",
+            button_color="#E2E8F0",
+            button_hover_color="#CBD5E1",
+            corner_radius=6,
+            command=self._on_landmark_selected,
+        )
+        self.opt_landmark.pack(side="left", padx=(0, 4))
 
         self.btn_paste_coord = ctk.CTkButton(
             self.coord_frame,
             text="📋 วาง",
-            width=54,
+            width=48,
             height=28,
             font=(FONT_FAMILY, 11, "bold"),
             fg_color="#2563EB",
@@ -179,12 +230,12 @@ class WarDashboardFrame(ctk.CTkFrame):
             corner_radius=6,
             command=self._on_paste_coord_clicked,
         )
-        self.btn_paste_coord.pack(side="left", padx=(0, 6))
+        self.btn_paste_coord.pack(side="left", padx=(0, 4))
 
         self.btn_save_coord = ctk.CTkButton(
             self.coord_frame,
             text="💾 บันทึก",
-            width=62,
+            width=54,
             height=28,
             font=(FONT_FAMILY, 11, "bold"),
             fg_color="#D81B60",
@@ -196,6 +247,8 @@ class WarDashboardFrame(ctk.CTkFrame):
         self.btn_save_coord.pack(side="left")
 
         self._setup_coord_entry_support()
+        if hasattr(self.war_service, "target_coord"):
+            self.set_active_slot_ui(getattr(self.war_service.target_coord, "slot", 1))
 
         # Top Right: Realtime Status & Sync Status
         top_right = ctk.CTkFrame(self.top_banner, fg_color="transparent")
@@ -288,14 +341,64 @@ class WarDashboardFrame(ctk.CTkFrame):
         )
         self.btn_back_offline.pack(side="right", padx=(0, 10), pady=7)
 
+    def set_active_slot_ui(self, active_slot: int) -> None:
+        slot_colors = {
+            1: ("#2563EB", "#1D4ED8"),  # NW Blue
+            2: ("#059669", "#047857"),  # NE Green
+            3: ("#D97706", "#B45309"),  # SW Amber
+            4: ("#7C3AED", "#6D28D9"),  # SE Purple
+        }
+        for slot_num, btn in getattr(self, "slot_buttons", {}).items():
+            try:
+                if slot_num == active_slot:
+                    fg, hov = slot_colors.get(slot_num, ("#D81B60", "#BE185D"))
+                    btn.configure(fg_color=fg, hover_color=hov, text_color="white")
+                else:
+                    btn.configure(fg_color="#E2E8F0", hover_color="#CBD5E1", text_color="#475569")
+            except Exception:
+                pass
+
+    def _on_slot_button_clicked(self, slot: int) -> None:
+        val = self.coord_var.get().strip()
+        if hasattr(self.war_service, "parse_coordinate"):
+            parsed = self.war_service.parse_coordinate(val, default_slot=slot)
+            new_val = f"{parsed.x}, {parsed.y}, {slot}"
+        else:
+            new_val = f"{val}, {slot}"
+        self.coord_var.set(new_val)
+        self._on_coord_submit()
+
+    def _on_landmark_selected(self, choice: str) -> None:
+        landmarks_map = {
+            "Core": (0, 0),
+            "NGS": (3, 3),
+            "Earth": (9, -3),
+            "Sun": (8, -3),
+            "Mars": (9, -4),
+            "Naberius": (-2, -2),
+            "Amduskia": (-3, -3),
+            "Lillipa": (-1, -3),
+            "Hail Mary": (20, 7),
+        }
+        for key, (lx, ly) in landmarks_map.items():
+            if key in choice:
+                current_slot = getattr(self.war_service.target_coord, "slot", 1)
+                self.coord_var.set(f"{lx}, {ly}, {current_slot}")
+                self._on_coord_submit()
+                break
+        if hasattr(self, "opt_landmark"):
+            self.opt_landmark.set("🪐 พิกัดสำคัญ...")
+
     def _on_coord_submit(self) -> None:
         val = self.coord_var.get().strip()
         if hasattr(self.controller, "update_board_coordinate"):
             norm = self.controller.update_board_coordinate(val)
             self.coord_var.set(norm)
         elif hasattr(self.war_service, "set_target_coord"):
-            gx, gy = self.war_service.set_target_coord(val)
-            self.coord_var.set(f"{gx}, {gy}")
+            parsed = self.war_service.set_target_coord(val)
+            self.coord_var.set(f"{parsed.x}, {parsed.y}, {parsed.slot}")
+        if hasattr(self.war_service, "target_coord"):
+            self.set_active_slot_ui(getattr(self.war_service.target_coord, "slot", 1))
 
     def _on_paste_coord_clicked(self) -> None:
         """Paste coordinate from clipboard directly, auto-parse format, and submit."""
@@ -306,8 +409,8 @@ class WarDashboardFrame(ctk.CTkFrame):
         if not clip_text:
             return
         if hasattr(self.war_service, "parse_coordinate"):
-            gx, gy = self.war_service.parse_coordinate(clip_text)
-            norm = f"{gx}, {gy}"
+            parsed = self.war_service.parse_coordinate(clip_text)
+            norm = f"{parsed.x}, {parsed.y}, {parsed.slot}"
         else:
             norm = clip_text.strip()
         self.coord_var.set(norm)
@@ -327,8 +430,8 @@ class WarDashboardFrame(ctk.CTkFrame):
             clip_text = ""
         if clip_text:
             if hasattr(self.war_service, "parse_coordinate"):
-                gx, gy = self.war_service.parse_coordinate(clip_text)
-                norm = f"{gx}, {gy}"
+                parsed = self.war_service.parse_coordinate(clip_text)
+                norm = f"{parsed.x}, {parsed.y}, {parsed.slot}"
             else:
                 norm = clip_text.strip()
             self.coord_var.set(norm)
@@ -338,6 +441,9 @@ class WarDashboardFrame(ctk.CTkFrame):
                 inner.icursor(tk.END)
             except Exception:
                 pass
+            if hasattr(self.war_service, "parse_coordinate"):
+                parsed = self.war_service.parse_coordinate(norm)
+                self.set_active_slot_ui(parsed.slot)
         return "break"
 
     def _setup_coord_entry_support(self) -> None:
@@ -589,8 +695,11 @@ class WarDashboardFrame(ctk.CTkFrame):
             self.lbl_op_name.configure(text=f"👤 ชื่อในเกม: {op_name}")
 
         if hasattr(self, "entry_coord"):
-            gx, gy = getattr(self.war_service, "target_coord", (0, 0))
-            current_str = f"{gx}, {gy}"
+            tc = getattr(self.war_service, "target_coord", (0, 0, 1))
+            gx = getattr(tc, "x", tc[0])
+            gy = getattr(tc, "y", tc[1])
+            cslot = getattr(tc, "slot", tc[2] if len(tc) >= 3 else 1)
+            current_str = f"{gx}, {gy}, {cslot}"
             focused_w = self.focus_get()
             is_entry_focused = focused_w in (
                 self.entry_coord,
@@ -598,6 +707,7 @@ class WarDashboardFrame(ctk.CTkFrame):
             )
             if self.coord_var.get() != current_str and not is_entry_focused:
                 self.coord_var.set(current_str)
+            self.set_active_slot_ui(cslot)
 
         if hasattr(self, "dashboard_area"):
             try:

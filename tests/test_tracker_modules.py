@@ -103,17 +103,30 @@ def test_war_service_telemetry_and_board_coord():
     assert war.operative_name == "TestHero"
 
     # Test coordinate parsing
-    assert war.parse_coordinate("0, 0") == (0, 0)
-    assert war.parse_coordinate("[15, -8]") == (15, -8)
-    assert war.parse_coordinate("(4, 9)") == (4, 9)
-    assert war.parse_coordinate("X: 12, Y: -5") == (12, -5)
-    assert war.parse_coordinate({"x": -3, "y": 7}) == (-3, 7)
-    assert war.parse_coordinate([2, 6]) == (2, 6)
+    assert war.parse_coordinate("0, 0") == (0, 0, 1)
+    assert war.parse_coordinate("0, 0, 1") == (0, 0, 1)
+    assert war.parse_coordinate("0,0#1") == (0, 0, 1)
+    assert war.parse_coordinate("3, 3, 4") == (3, 3, 4)
+    assert war.parse_coordinate("[0, 0, 1]") == (0, 0, 1)
+    assert war.parse_coordinate('{"x": 0, "y": 0, "slot": 1}') == (0, 0, 1)
+    assert war.parse_coordinate("[15, -8]") == (15, -8, 1)
+    assert war.parse_coordinate("(4, 9)") == (4, 9, 1)
+    assert war.parse_coordinate("X: 12, Y: -5") == (12, -5, 1)
+    assert war.parse_coordinate({"x": -3, "y": 7}) == (-3, 7, 1)
+    assert war.parse_coordinate([2, 6]) == (2, 6, 1)
+    assert war.parse_coordinate("0, 0 NW") == (0, 0, 1)
+    assert war.parse_coordinate("0, 0 SE") == (0, 0, 4)
+    assert war.parse_coordinate("คัดลอกพิกัด [8, -2] ช่อง #3 ไปใส่ในโปรแกรม") == (8, -2, 3)
+
+    # Test clamping bounds (-12..25, -11..9, 1..4)
+    clamped = war.parse_coordinate("[-99, 99, 9]")
+    assert (clamped.x, clamped.y, clamped.slot) == (-12, 9, 4)
 
     # Test setting target board coordinate
-    gx, gy = war.set_target_coord("10, -4")
-    assert (gx, gy) == (10, -4)
-    assert war.target_coord == (10, -4)
+    parsed = war.set_target_coord("10, -4, 2")
+    assert (parsed.x, parsed.y, parsed.slot) == (10, -4, 2)
+    assert war.target_coord == (10, -4, 2)
+    assert war.target_coord.slot == 2
 
     # Test earning Meseta
     start_contrib = war.session_contribution
@@ -158,25 +171,33 @@ def test_board_coordinate_entry_and_synchronization(shared_app):
     app = shared_app
     app.update_idletasks()
 
-    # User enters a coordinate
-    norm = app.update_board_coordinate("15, -6")
-    assert norm == "15, -6"
-    assert app.board_coord == "15, -6"
-    assert app.war_service.target_coord == (15, -6)
+    # User enters a coordinate with slot
+    norm = app.update_board_coordinate("15, -6, 2")
+    assert norm == "15, -6, 2"
+    assert app.board_coord == "15, -6, 2"
+    assert app.war_service.target_coord == (15, -6, 2)
+    assert app.war_service.target_coord.slot == 2
 
     # Open war view and verify coordinate is displayed in banner entry
     app.show_war_view()
     app.update_idletasks()
     assert hasattr(app.war_view, "entry_coord")
-    assert app.war_view.coord_var.get() == "15, -6"
+    assert app.war_view.coord_var.get() == "15, -6, 2"
+
+    # User clicks slot button #4
+    app.war_view._on_slot_button_clicked(4)
+    app.update_idletasks()
+    assert app.board_coord == "15, -6, 4"
+    assert app.war_service.target_coord == (15, -6, 4)
+    assert app.war_view.coord_var.get() == "15, -6, 4"
 
     # User updates coordinate from war view
-    app.war_view.coord_var.set("2, 8")
+    app.war_view.coord_var.set("2, 8, 3")
     app.war_view._on_coord_submit()
     app.update_idletasks()
-    assert app.board_coord == "2, 8"
-    assert app.war_service.target_coord == (2, 8)
-    assert app.war_view.coord_var.get() == "2, 8"
+    assert app.board_coord == "2, 8, 3"
+    assert app.war_service.target_coord == (2, 8, 3)
+    assert app.war_view.coord_var.get() == "2, 8, 3"
 
     app.show_offline_view()
 
@@ -186,24 +207,28 @@ def test_database_payload_strictly_character_meseta_coord():
     Verify database record payload contains strictly:
     - character_name: in-game name read from log (Primary Key, NOT ID)
     - meseta: meseta amount
-    - sector_coord: board coordinate string "X, Y"
-    - target_coord: board coordinate object {"x": X, "y": Y}
+    - sector_coord: board coordinate object {"x": X, "y": Y, "slot": Slot}
+    - target_coord: board coordinate object {"x": X, "y": Y, "slot": Slot}
     - coord_key: "X,Y"
+    - slot: 1-4
+    - lastUpdated: integer timestamp in ms
     And does NOT contain team_name or team_id.
     """
     war = WarService()
     war.set_operative("Vale3neko")
-    war.set_target_coord("5, -3")
-    war.session_contribution = 2500000
+    war.set_target_coord("5, -3, 2")
+    war.session_contribution = 25000000
 
     payload = war.get_database_payload()
 
     assert payload["character_name"] == "Vale3neko"
     assert payload["character_name"] != "14743890"
-    assert payload["meseta"] == 2500000
-    assert payload["sector_coord"] == "5, -3"
-    assert payload["target_coord"] == {"x": 5, "y": -3}
+    assert payload["meseta"] == 25000000
+    assert payload["sector_coord"] == {"x": 5, "y": -3, "slot": 2}
+    assert payload["target_coord"] == {"x": 5, "y": -3, "slot": 2}
     assert payload["coord_key"] == "5,-3"
+    assert payload["slot"] == 2
+    assert isinstance(payload["lastUpdated"], int)
     assert "team_name" not in payload
     assert "team_id" not in payload
 
@@ -264,7 +289,7 @@ def test_realtime_sync_event_triggers_and_db_flow():
     """Verify that earning meseta and resets automatically trigger realtime sync with board coordinate."""
     war = WarService()
     war.set_operative("RealtimeHero")
-    war.set_target_coord("3, -2")
+    war.set_target_coord("3, -2, 1")
 
     assert war.realtime_sync_enabled is True
     war._is_dirty = False
@@ -296,8 +321,10 @@ def test_realtime_sync_event_triggers_and_db_flow():
     tel_payload = next(p for p in reversed(events_received) if isinstance(p, dict) and p.get("character_name") == "RealtimeHero")
     assert tel_payload["character_name"] == "RealtimeHero"
     assert tel_payload["meseta"] == 250000
-    assert tel_payload["sector_coord"] == "3, -2"
-    assert tel_payload["target_coord"] == {"x": 3, "y": -2}
+    assert tel_payload["sector_coord"] == {"x": 3, "y": -2, "slot": 1}
+    assert tel_payload["target_coord"] == {"x": 3, "y": -2, "slot": 1}
+    assert tel_payload["coord_key"] == "3,-2"
+    assert tel_payload["slot"] == 1
     assert "team_name" not in tel_payload
     assert "team_id" not in tel_payload
 
@@ -350,7 +377,7 @@ def test_coordinate_paste_support_and_focus(shared_app, monkeypatch):
     """
     Verify coordinate paste support:
     - Dedicated paste button reads clipboard and auto-parses format
-    - _handle_coord_paste handles dirty formats ([2, 8], web text, etc.)
+    - _handle_coord_paste handles dirty formats ([2, 8, 3], web text, etc.)
     - update_view preserves in-progress coordinate input when entry is focused
     """
     app = shared_app
@@ -363,27 +390,29 @@ def test_coordinate_paste_support_and_focus(shared_app, monkeypatch):
     assert hasattr(wv, "_on_paste_coord_clicked")
     assert hasattr(wv, "_handle_coord_paste")
 
-    # 1. Test clicking paste button with "[3, 7]" in clipboard
-    monkeypatch.setattr(wv, "clipboard_get", lambda: " [3, 7] ")
+    # 1. Test clicking paste button with "[3, 7, 2]" in clipboard
+    monkeypatch.setattr(wv, "clipboard_get", lambda: " [3, 7, 2] ")
     wv._on_paste_coord_clicked()
     app.update_idletasks()
-    assert wv.coord_var.get() == "3, 7"
-    assert app.board_coord == "3, 7"
-    assert app.war_service.target_coord == (3, 7)
+    assert wv.coord_var.get() == "3, 7, 2"
+    assert app.board_coord == "3, 7, 2"
+    assert app.war_service.target_coord == (3, 7, 2)
+    assert app.war_service.target_coord.slot == 2
 
-    # 2. Test clicking paste button with web copy button label text
-    monkeypatch.setattr(wv, "clipboard_get", lambda: "คัดลอกพิกัด [8, -2] ไปใส่ในโปรแกรม")
+    # 2. Test clicking paste button with web copy button label text with slot
+    monkeypatch.setattr(wv, "clipboard_get", lambda: "คัดลอกพิกัด [8, -2] ช่อง #3 ไปใส่ในโปรแกรม")
     wv._on_paste_coord_clicked()
     app.update_idletasks()
-    assert wv.coord_var.get() == "8, -2"
-    assert app.board_coord == "8, -2"
-    assert app.war_service.target_coord == (8, -2)
+    assert wv.coord_var.get() == "8, -2, 3"
+    assert app.board_coord == "8, -2, 3"
+    assert app.war_service.target_coord == (8, -2, 3)
+    assert app.war_service.target_coord.slot == 3
 
     # 3. Test _handle_coord_paste (Ctrl+V / context menu paste)
-    monkeypatch.setattr(wv, "clipboard_get", lambda: "(-4, 11)")
+    monkeypatch.setattr(wv, "clipboard_get", lambda: "(-4, 9, 4)")
     res = wv._handle_coord_paste()
     assert res == "break"
-    assert wv.coord_var.get() == "-4, 11"
+    assert wv.coord_var.get() == "-4, 9, 4"
 
     # 4. Test focus preservation: when entry is focused, update_view does NOT overwrite typed text
     wv.coord_var.set("typing_new_val")
@@ -395,10 +424,65 @@ def test_coordinate_paste_support_and_focus(shared_app, monkeypatch):
     # When NOT focused, update_view syncs with war_service target_coord
     monkeypatch.setattr(wv, "focus_get", lambda: None)
     wv.update_view()
-    gx, gy = app.war_service.target_coord
-    assert wv.coord_var.get() == f"{gx}, {gy}"
+    tc = app.war_service.target_coord
+    assert wv.coord_var.get() == f"{tc.x}, {tc.y}, {tc.slot}"
 
     app.show_offline_view()
+
+
+def test_firebase_war_sync_broadcaster():
+    """Verify ARKSFirebaseBroadcaster in tools.firebase_war_sync can be imported and executed."""
+    from tools.firebase_war_sync import ARKSFirebaseBroadcaster
+
+    # Test initialization with None key (REST mode)
+    broadcaster = ARKSFirebaseBroadcaster(
+        service_account_key_path=None,
+        database_url="https://mock-test-default-rtdb.firebaseio.com",
+    )
+    # Test method call signature
+    broadcaster.sync_operative_sector(
+        character_name="Vale3neko",
+        meseta=25000000,
+        sector_x=0,
+        sector_y=0,
+        slot=1,
+    )
+
+    # Test file not found error if bad path is passed
+    with pytest.raises(FileNotFoundError):
+        ARKSFirebaseBroadcaster(service_account_key_path="non_existent_key_12345.json")
+
+
+def test_canonical_landmarks():
+    """Verify landmark presets from Section 6 exist and match coordinates."""
+    from modules.war_mode.war_service import LANDMARK_COORDINATES
+
+    assert LANDMARK_COORDINATES["oracle_fleet"]["x"] == 0
+    assert LANDMARK_COORDINATES["oracle_fleet"]["y"] == 0
+
+    assert LANDMARK_COORDINATES["central_city"]["x"] == 3
+    assert LANDMARK_COORDINATES["central_city"]["y"] == 3
+
+    assert LANDMARK_COORDINATES["earth"]["x"] == 9
+    assert LANDMARK_COORDINATES["earth"]["y"] == -3
+
+    assert LANDMARK_COORDINATES["sun"]["x"] == 8
+    assert LANDMARK_COORDINATES["sun"]["y"] == -3
+
+    assert LANDMARK_COORDINATES["mars"]["x"] == 9
+    assert LANDMARK_COORDINATES["mars"]["y"] == -4
+
+    assert LANDMARK_COORDINATES["naberius"]["x"] == -2
+    assert LANDMARK_COORDINATES["naberius"]["y"] == -2
+
+    assert LANDMARK_COORDINATES["amduskia"]["x"] == -3
+    assert LANDMARK_COORDINATES["amduskia"]["y"] == -3
+
+    assert LANDMARK_COORDINATES["lillipa"]["x"] == -1
+    assert LANDMARK_COORDINATES["lillipa"]["y"] == -3
+
+    assert LANDMARK_COORDINATES["project_hail_mary"]["x"] == 20
+    assert LANDMARK_COORDINATES["project_hail_mary"]["y"] == 7
 
 
 def test_font_registration_and_config(shared_app):

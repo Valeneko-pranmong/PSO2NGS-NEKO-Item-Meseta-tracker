@@ -5,7 +5,7 @@ import os
 import re
 import time
 import threading
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 import urllib.request
 import urllib.parse
 import urllib.error
@@ -20,9 +20,126 @@ except (ImportError, ValueError):
 TEAMS_DATA: Dict[str, Dict[str, Any]] = {}
 
 try:
-    from config import DEFAULT_FIREBASE_RTDB_URL
+    from config import (
+        DEFAULT_FIREBASE_RTDB_URL,
+        SECTOR_X_MIN,
+        SECTOR_X_MAX,
+        SECTOR_Y_MIN,
+        SECTOR_Y_MAX,
+        SLOT_MIN,
+        SLOT_MAX,
+        SLOT_TARGET_MESETA,
+        SECTOR_TARGET_MESETA,
+    )
 except Exception:
     DEFAULT_FIREBASE_RTDB_URL = "https://arks-war-room-default-rtdb.asia-southeast1.firebasedatabase.app"
+    SECTOR_X_MIN = -12
+    SECTOR_X_MAX = 25
+    SECTOR_Y_MIN = -11
+    SECTOR_Y_MAX = 9
+    SLOT_MIN = 1
+    SLOT_MAX = 4
+    SLOT_TARGET_MESETA = 25_000_000
+    SECTOR_TARGET_MESETA = 100_000_000
+
+# Canonical landmark coordinates for ARKS galaxy presets
+LANDMARK_COORDINATES: Dict[str, Dict[str, Any]] = {
+    "oracle_fleet": {"name": "Galactic Core / Oracle Fleet", "x": 0, "y": 0, "desc": "ใจกลางจักรวาล"},
+    "central_city": {"name": "Halpha / Central City (PSO2: NGS)", "x": 3, "y": 3, "desc": "เมืองศูนย์กลาง NGS"},
+    "earth": {"name": "Solar System (โลก / Earth)", "x": 9, "y": -3, "desc": "ดาวโลก"},
+    "sun": {"name": "Solar System (ดวงอาทิตย์ / Sun)", "x": 8, "y": -3, "desc": "ดวงอาทิตย์"},
+    "mars": {"name": "Mars (ดาวอังคาร)", "x": 9, "y": -4, "desc": "ดาวอังคาร"},
+    "naberius": {"name": "Naberius (PSO2: Base)", "x": -2, "y": -2, "desc": "ดาวนาเบเรียส"},
+    "amduskia": {"name": "Amduskia", "x": -3, "y": -3, "desc": "ดาวอัมดุสเกีย"},
+    "lillipa": {"name": "Lillipa", "x": -1, "y": -3, "desc": "ดาวลิลลิปา"},
+    "project_hail_mary": {"name": "Project Hail Mary (Deep Space Outpost)", "x": 20, "y": 7, "desc": "ฐานอวกาศลึก"},
+}
+
+
+class TargetCoord(tuple):
+    """
+    Represents a discrete 3-part coordinate: (sector_x, sector_y, slot).
+    - sector_x: int between -12 and +25 (inclusive)
+    - sector_y: int between -11 and +9 (inclusive)
+    - slot: int between 1 and 4 (inclusive: 1=NW, 2=NE, 3=SW, 4=SE)
+    Supports:
+    - Indexing: coord[0], coord[1], coord[2]
+    - Unpacking: gx, gy, slot = coord
+    - Properties: coord.x, coord.y, coord.sector_x, coord.sector_y, coord.slot, coord.slot_label
+    - Equality: (x, y, slot) == (x, y, slot); also (x, y) == (x, y) for backward compatibility
+    """
+    SECTOR_X_MIN = SECTOR_X_MIN
+    SECTOR_X_MAX = SECTOR_X_MAX
+    SECTOR_Y_MIN = SECTOR_Y_MIN
+    SECTOR_Y_MAX = SECTOR_Y_MAX
+    SLOT_MIN = SLOT_MIN
+    SLOT_MAX = SLOT_MAX
+
+    SLOT_INFO = {
+        1: {"name": "NW", "th": "บนซ้าย", "target": SLOT_TARGET_MESETA},
+        2: {"name": "NE", "th": "บนขวา", "target": SLOT_TARGET_MESETA},
+        3: {"name": "SW", "th": "ล่างซ้าย", "target": SLOT_TARGET_MESETA},
+        4: {"name": "SE", "th": "ล่างขวา", "target": SLOT_TARGET_MESETA},
+    }
+
+    def __new__(cls, x: Any, y: Any, slot: Any = 1):
+        cx = max(cls.SECTOR_X_MIN, min(cls.SECTOR_X_MAX, int(x)))
+        cy = max(cls.SECTOR_Y_MIN, min(cls.SECTOR_Y_MAX, int(y)))
+        cslot = max(cls.SLOT_MIN, min(cls.SLOT_MAX, int(slot) if slot is not None else 1))
+        return super().__new__(cls, (cx, cy, cslot))
+
+    @property
+    def x(self) -> int:
+        return self[0]
+
+    @property
+    def y(self) -> int:
+        return self[1]
+
+    @property
+    def sector_x(self) -> int:
+        return self[0]
+
+    @property
+    def sector_y(self) -> int:
+        return self[1]
+
+    @property
+    def slot(self) -> int:
+        return self[2]
+
+    @property
+    def slot_name(self) -> str:
+        return self.SLOT_INFO.get(self[2], {}).get("name", f"Slot {self[2]}")
+
+    @property
+    def slot_label(self) -> str:
+        info = self.SLOT_INFO.get(self[2], {"name": f"Slot #{self[2]}", "th": ""})
+        return f"#{self[2]} {info['name']} ({info['th']})"
+
+    @property
+    def coord_key(self) -> str:
+        return f"{self[0]},{self[1]}"
+
+    def to_dict(self) -> Dict[str, int]:
+        return {"x": self[0], "y": self[1], "slot": self[2]}
+
+    def to_str(self) -> str:
+        return f"{self[0]}, {self[1]}, {self[2]}"
+
+    def __str__(self) -> str:
+        return self.to_str()
+
+    def __repr__(self) -> str:
+        return f"TargetCoord(x={self[0]}, y={self[1]}, slot={self[2]})"
+
+    def __eq__(self, other: Any) -> bool:
+        if isinstance(other, (tuple, list)):
+            if len(other) == 2:
+                return (self[0], self[1]) == (other[0], other[1])
+            if len(other) == 3:
+                return (self[0], self[1], self[2]) == (other[0], other[1], other[2])
+        return super().__eq__(other)
 
 
 class WarService:
@@ -45,7 +162,7 @@ class WarService:
         self.war_room_path = war_room_path
         self.firebase_url = firebase_url
         self.operative_name = "Operative"
-        self.target_coord: Tuple[int, int] = (0, 0)
+        self.target_coord: TargetCoord = TargetCoord(0, 0, 1)
 
         self.team_id = ""
         self.session_contribution = 0
@@ -91,49 +208,105 @@ class WarService:
             self._save_stats()
             self.trigger_realtime_sync()
 
-    def on_board_coord_changed(self, coord: Any = None, **kwargs) -> None:
+    def on_board_coord_changed(self, coord: Any = None, slot: Optional[int] = None, **kwargs) -> None:
         if coord is not None:
-            self.set_target_coord(coord)
+            self.set_target_coord(coord, slot=slot)
 
-    @staticmethod
-    def parse_coordinate(coord_input: Any) -> Tuple[int, int]:
+    @classmethod
+    def parse_coordinate(cls, coord_input: Any, default_slot: int = 1) -> TargetCoord:
         """
-        Parse various coordinate representations into an integer (x, y) tuple:
-        Accepts: "0, 0", "[0, 0]", "(0, 0)", "0 0", "X: 5, Y: -3", dict {"x": 5, "y": -3}, tuple/list.
-        Defaults to (0, 0) on failure.
+        Parse various coordinate representations into TargetCoord(sector_x, sector_y, slot).
+        Ranges supported:
+          sector_x: -12 to +25
+          sector_y: -11 to +9
+          slot: 1 to 4 (1: NW บนซ้าย, 2: NE บนขวา, 3: SW ล่างซ้าย, 4: SE ล่างขวา)
+
+        Formats supported:
+          1. 3-number string: "0, 0, 1", "0,0,1", "3, 3, 4"
+          2. Hash format: "0,0#1", "3, 3 # 4"
+          3. Bracket format: "[0, 0, 1]", "[3, 3, 4]"
+          4. JSON dict or string: {"x": 0, "y": 0, "slot": 1}, {"sector_x": 3, "sector_y": 3, "slot": 4}
+          5. Web copy text: "คัดลอกพิกัด [8, -2] ช่อง #3 ไปใส่ในโปรแกรม", "Sector [0, 0] · ช่อง #2"
+          6. Quadrant text: "0, 0 NW", "0, 0 บนซ้าย"
+          7. 2-number fallback: "0, 0", "[15, -8]", "(4, 9)", "X: 12, Y: -5" (defaults slot to default_slot)
         """
-        if isinstance(coord_input, (list, tuple)) and len(coord_input) >= 2:
+        if isinstance(coord_input, TargetCoord):
+            return coord_input
+
+        # Dict input
+        if isinstance(coord_input, dict):
             try:
-                return (int(coord_input[0]), int(coord_input[1]))
+                gx = coord_input.get("sector_x", coord_input.get("x", coord_input.get("X", 0)))
+                gy = coord_input.get("sector_y", coord_input.get("y", coord_input.get("Y", 0)))
+                slot = coord_input.get("slot", coord_input.get("Slot", default_slot))
+                return TargetCoord(gx, gy, slot)
             except (ValueError, TypeError):
                 pass
-        elif isinstance(coord_input, dict):
+
+        # List or tuple input
+        if isinstance(coord_input, (list, tuple)):
             try:
-                gx = coord_input.get("x", coord_input.get("X", 0))
-                gy = coord_input.get("y", coord_input.get("Y", 0))
-                return (int(gx), int(gy))
-            except (ValueError, TypeError):
+                gx = coord_input[0]
+                gy = coord_input[1]
+                slot = coord_input[2] if len(coord_input) >= 3 else default_slot
+                return TargetCoord(gx, gy, slot)
+            except (ValueError, TypeError, IndexError):
                 pass
-        elif isinstance(coord_input, str):
-            cleaned = re.sub(r'[^0-9\-,\s]', '', coord_input).strip()
-            if ',' in cleaned:
-                parts = [p.strip() for p in cleaned.split(',') if p.strip()]
-            else:
-                parts = cleaned.split()
-            if len(parts) >= 2:
+
+        # String input
+        if isinstance(coord_input, str):
+            s = coord_input.strip()
+            if s.startswith("{") and s.endswith("}"):
                 try:
-                    return (int(parts[0]), int(parts[1]))
+                    data = json.loads(s)
+                    return cls.parse_coordinate(data, default_slot=default_slot)
+                except Exception:
+                    pass
+
+            slot_val = None
+            slot_match = re.search(r'(?:slot|ช่อง|\#)\s*[:=]?\s*([1-4])\b', s, re.IGNORECASE)
+            if slot_match:
+                slot_val = int(slot_match.group(1))
+            else:
+                if re.search(r'\b(?:NW|บนซ้าย|บนตก)\b', s, re.IGNORECASE):
+                    slot_val = 1
+                elif re.search(r'\b(?:NE|บนขวา|บนออก)\b', s, re.IGNORECASE):
+                    slot_val = 2
+                elif re.search(r'\b(?:SW|ล่างซ้าย|ใต้ตก)\b', s, re.IGNORECASE):
+                    slot_val = 3
+                elif re.search(r'\b(?:SE|ล่างขวา|ใต้ออก)\b', s, re.IGNORECASE):
+                    slot_val = 4
+
+            nums = re.findall(r'[-+]?\d+', s)
+            if len(nums) >= 3:
+                try:
+                    x, y = int(nums[0]), int(nums[1])
+                    slot = slot_val if slot_val is not None else int(nums[2])
+                    return TargetCoord(x, y, slot)
                 except ValueError:
                     pass
-        return (0, 0)
+            elif len(nums) >= 2:
+                try:
+                    x, y = int(nums[0]), int(nums[1])
+                    slot = slot_val if slot_val is not None else default_slot
+                    return TargetCoord(x, y, slot)
+                except ValueError:
+                    pass
 
-    def set_target_coord(self, coord_input: Any) -> Tuple[int, int]:
-        """Update active board coordinate, log change, and trigger realtime Firebase sync."""
-        parsed = self.parse_coordinate(coord_input)
+        return TargetCoord(0, 0, default_slot)
+
+    def set_target_coord(self, coord_input: Any, slot: Optional[int] = None) -> TargetCoord:
+        """Update active board coordinate (sector_x, sector_y, slot), log change, and trigger sync."""
+        default_slot = slot if slot is not None else getattr(self.target_coord, "slot", 1)
+        parsed = self.parse_coordinate(coord_input, default_slot=default_slot)
+        if slot is not None and 1 <= slot <= 4:
+            parsed = TargetCoord(parsed.x, parsed.y, slot)
+
         if parsed != self.target_coord:
             self.target_coord = parsed
-            gx, gy = parsed
-            self.add_log(f"อัปเดตพิกัดบนกระดานเป็น [{gx}, {gy}]", "info")
+            gx, gy, cslot = parsed.x, parsed.y, parsed.slot
+            slot_label = parsed.slot_label
+            self.add_log(f"อัปเดตพิกัดบนกระดานเป็น [{gx}, {gy}] ช่อง #{cslot} ({slot_label})", "info")
             self._save_stats()
             self.trigger_realtime_sync()
         return self.target_coord
@@ -158,7 +331,6 @@ class WarService:
         }
 
     def on_auth_state_changed(self, user: Optional[Dict[str, Any]]) -> None:
-        # Backward compatibility: sync if user info passed
         if user:
             name = user.get("character_name") or user.get("callsign") or user.get("username") or "Operative"
             self.set_operative(name)
@@ -168,9 +340,9 @@ class WarService:
         if amount > 0:
             self.session_contribution += amount
             self.total_farmed += amount
-            gx, gy = self.target_coord
+            gx, gy, slot = self.target_coord.x, self.target_coord.y, self.target_coord.slot
             self.add_log(
-                f"+{amount:,} ℳ พิกัด [{gx}, {gy}] (ยอดสะสม: {self.session_contribution:,} ℳ)",
+                f"+{amount:,} ℳ พิกัด [{gx}, {gy}] #{slot} (ยอดสะสม: {self.session_contribution:,} ℳ)",
                 "income",
             )
             self._save_stats()
@@ -207,18 +379,25 @@ class WarService:
         Produce database record storing:
         - character_name: In-game name read from log (Primary Key, NOT ID)
         - meseta: Farmed meseta
-        - sector_coord / target_coord: Board coordinate entered by user
+        - sector_coord: dict {"x": X, "y": Y, "slot": Slot}
+        - target_coord: dict {"x": X, "y": Y, "slot": Slot}
+        - coord_key: "X,Y"
+        - slot: 1-4
+        - lastUpdated: Unix timestamp in ms
         """
-        gx, gy = self.target_coord
+        gx, gy, slot = self.target_coord.x, self.target_coord.y, self.target_coord.slot
+        now_ms = int(time.time() * 1000)
         return {
             "character_name": self.operative_name,
             "meseta": self.session_contribution,
-            "sector_coord": f"{gx}, {gy}",
-            "target_coord": {"x": gx, "y": gy},
+            "sector_coord": {"x": gx, "y": gy, "slot": slot},
+            "target_coord": {"x": gx, "y": gy, "slot": slot},
             "coord_key": f"{gx},{gy}",
+            "slot": slot,
+            "lastUpdated": now_ms,
             "farming_rate_mhr": round(self.get_live_rate()),
             "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "timestamp": int(time.time() * 1000),
+            "timestamp": now_ms,
         }
 
     def trigger_realtime_sync(self, force: bool = False) -> None:
@@ -237,7 +416,6 @@ class WarService:
 
             if woken_by_event:
                 self._sync_event.clear()
-                # Micro-debounce to batch rapid successive drops (e.g. PSE burst)
                 time.sleep(self.sync_debounce_seconds)
                 self._sync_event.clear()
 
@@ -291,6 +469,10 @@ class WarService:
         """
         Synchronize live character_name, farmed meseta, and board coordinates to Firebase Realtime Database.
         Uses character_name from log as Primary Key.
+        Updates 3 paths matching Firebase Schema:
+          1. arks_war_room/operatives/{character_name}
+          2. arks_war_room/sectors/{coord_key}/challengers/{character_name}
+          3. arks_war_room/sectors/{coord_key}/sub_cells/{slot}/challengers/{character_name}
         Uses pure Python standard library (urllib.request) for zero dependencies & offline resilience.
         """
         if not self.firebase_url:
@@ -298,32 +480,52 @@ class WarService:
 
         base_url = self.firebase_url.rstrip("/")
         db_payload = self.get_database_payload()
-        now = time.time()
+        now_ms = db_payload["lastUpdated"]
 
         char_name = self.operative_name or "Operative"
-        # Sanitize key for Firebase RTDB (disallows ., $, #, [, ], /, and control characters)
         safe_key = "".join(
             c for c in char_name
             if c not in '.$#[]/\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f\x7f'
         ).strip() or "Operative"
 
-        telemetry_payload = {
-            "character_name": db_payload["character_name"],
+        coord_key = db_payload["coord_key"]
+        slot = db_payload["slot"]
+
+        # Path 1: Operative record
+        op_payload = {
+            "character_name": char_name,
             "meseta": db_payload["meseta"],
             "sector_coord": db_payload["sector_coord"],
-            "target_coord": db_payload["target_coord"],
             "coord_key": db_payload["coord_key"],
+            "slot": slot,
+            "lastUpdated": now_ms,
+            "target_coord": db_payload["target_coord"],
             "farming_rate_mhr": db_payload["farming_rate_mhr"],
             "updated_at": db_payload["updated_at"],
             "timestamp": db_payload["timestamp"],
         }
 
+        # Path 2: Sector challengers
+        sec_payload = {
+            "character_name": char_name,
+            "meseta": db_payload["meseta"],
+            "slot": slot,
+            "lastUpdated": now_ms,
+        }
+
+        # Path 3: Sub-cell challengers
+        sub_payload = {
+            "character_name": char_name,
+            "meseta": db_payload["meseta"],
+            "lastUpdated": now_ms,
+        }
+
         try:
-            # 1. Update individual operative record with character_name as primary key
+            # 1. Update individual operative record
             url_op = f"{base_url}/arks_war_room/operatives/{urllib.parse.quote(safe_key)}.json"
             req_op = urllib.request.Request(
                 url_op,
-                data=json.dumps(telemetry_payload).encode("utf-8"),
+                data=json.dumps(op_payload).encode("utf-8"),
                 headers={"Content-Type": "application/json"},
                 method="PUT",
             )
@@ -331,11 +533,10 @@ class WarService:
                 pass
 
             # 2. Update sector challenger record
-            coord_key = db_payload["coord_key"]
             url_sec = f"{base_url}/arks_war_room/sectors/{urllib.parse.quote(coord_key)}/challengers/{urllib.parse.quote(safe_key)}.json"
             req_sec = urllib.request.Request(
                 url_sec,
-                data=json.dumps(telemetry_payload).encode("utf-8"),
+                data=json.dumps(sec_payload).encode("utf-8"),
                 headers={"Content-Type": "application/json"},
                 method="PUT",
             )
@@ -345,11 +546,25 @@ class WarService:
             except Exception:
                 pass
 
-            # 3. Update global latest telemetry
+            # 3. Update sub-cell challenger record
+            url_sub = f"{base_url}/arks_war_room/sectors/{urllib.parse.quote(coord_key)}/sub_cells/{slot}/challengers/{urllib.parse.quote(safe_key)}.json"
+            req_sub = urllib.request.Request(
+                url_sub,
+                data=json.dumps(sub_payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="PUT",
+            )
+            try:
+                with urllib.request.urlopen(req_sub, timeout=timeout) as resp:
+                    pass
+            except Exception:
+                pass
+
+            # 4. Update global latest telemetry
             url_tel = f"{base_url}/arks_war_room/latest_telemetry.json"
             req_tel = urllib.request.Request(
                 url_tel,
-                data=json.dumps(telemetry_payload).encode("utf-8"),
+                data=json.dumps(op_payload).encode("utf-8"),
                 headers={"Content-Type": "application/json"},
                 method="PUT",
             )
@@ -359,11 +574,11 @@ class WarService:
             except Exception:
                 pass
 
-            # 4. Add to live war logs when contribution increases
+            # 5. Add to live war logs when contribution increases
             if self.session_contribution > self._last_logged_contribution:
                 gain = self.session_contribution - self._last_logged_contribution
                 self._last_logged_contribution = self.session_contribution
-                gx, gy = self.target_coord
+                gx, gy, cslot = self.target_coord.x, self.target_coord.y, self.target_coord.slot
                 log_entry = {
                     "time": time.strftime("%H:%M:%S"),
                     "day": 1,
@@ -371,9 +586,11 @@ class WarService:
                     "character_name": char_name,
                     "meseta": self.session_contribution,
                     "gain": gain,
-                    "coord": f"{gx}, {gy}",
-                    "message": f"{char_name} เก็บเกี่ยว +{gain:,} ℳ พิกัด [{gx}, {gy}] (ยอดสะสม: {self.session_contribution:,} ℳ)",
-                    "timestamp": int(now * 1000),
+                    "coord": f"{gx}, {gy}, {cslot}",
+                    "slot": cslot,
+                    "message": f"{char_name} เก็บเกี่ยว +{gain:,} ℳ พิกัด [{gx}, {gy}] ช่อง #{cslot} (ยอดสะสม: {self.session_contribution:,} ℳ)",
+                    "timestamp": now_ms,
+                    "lastUpdated": now_ms,
                 }
                 url_log = f"{base_url}/arks_war_room/war_logs.json"
                 req_log = urllib.request.Request(
@@ -401,21 +618,24 @@ class WarService:
         db_payload = self.get_database_payload()
 
         payload = {
-            "version": "1.0",
+            "version": "2.0",
             "lastSync": time.strftime("%Y-%m-%d %H:%M:%S"),
             "timestamp": int(now * 1000),
+            "lastUpdated": int(now * 1000),
             # Core database fields
             "character_name": db_payload["character_name"],
             "meseta": db_payload["meseta"],
             "sector_coord": db_payload["sector_coord"],
             "target_coord": db_payload["target_coord"],
             "coord_key": db_payload["coord_key"],
+            "slot": db_payload["slot"],
             "farmingRateMhr": round(self.get_live_rate()),
             "operative": {
                 "name": self.operative_name,
                 "character_name": self.operative_name,
                 "targetSector": db_payload["target_coord"],
                 "sectorCoord": db_payload["sector_coord"],
+                "slot": db_payload["slot"],
                 "sessionContribution": self.session_contribution,
                 "totalFarmed": self.total_farmed,
                 "farmingRateMhr": round(self.get_live_rate()),
@@ -434,7 +654,6 @@ class WarService:
                     json.dump(payload, f, ensure_ascii=False, indent=2)
                 saved_paths.append(sync_file)
 
-                # Save standalone database table format
                 db_file = os.path.join(telemetry_dir, "database_meseta_records.json")
                 with open(db_file, "w", encoding="utf-8") as f:
                     json.dump(db_payload, f, ensure_ascii=False, indent=2)
@@ -463,8 +682,8 @@ class WarService:
 
         self._last_sync_time = now
         if saved_paths or cloud_ok:
-            gx, gy = self.target_coord
-            self.add_log(f"ซิงค์ข้อมูลสำเร็จ: ส่งยอด {self.session_contribution:,} ℳ พิกัด [{gx}, {gy}] ({self.operative_name})", "sync")
+            gx, gy, slot = self.target_coord.x, self.target_coord.y, self.target_coord.slot
+            self.add_log(f"ซิงค์ข้อมูลสำเร็จ: ส่งยอด {self.session_contribution:,} ℳ พิกัด [{gx}, {gy}] ช่อง #{slot} ({self.operative_name})", "sync")
             event_bus.emit("war_telemetry_synced", payload=payload)
             if cloud_ok:
                 return True, f"ซิงค์ข้อมูลเรียลไทม์สำเร็จ (+{self.session_contribution:,} ℳ)"
@@ -506,6 +725,6 @@ if __name__ == "__main__":
     print("=" * 60)
     service = WarService()
     print(f" [✓] Operative: {service.operative_name}")
-    print(f" [✓] Target Coord: {service.target_coord}")
+    print(f" [✓] Target Coord: {service.target_coord} (Slot #{service.target_coord.slot})")
     print(" [✓] WarService initialized cleanly without login!")
     print("=" * 60)

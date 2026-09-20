@@ -9,6 +9,7 @@ import json
 import ctypes
 import webbrowser
 from PIL import Image
+from typing import Any, Optional, Tuple, Dict, List
 
 from config import * 
 from dashboard_ui import DashboardFrame 
@@ -62,7 +63,7 @@ class NGSTrackerApp(ctk.CTk):
         
         self.character_name = ""
         self.player_id = ""
-        self.board_coord = "0, 0"
+        self.board_coord = "0, 0, 1"
         self.needs_ui_update = False 
 
         # Modular Subsystems
@@ -251,16 +252,20 @@ class NGSTrackerApp(ctk.CTk):
         self.title_label.bind("<ButtonPress-1>", self.start_move)
         self.title_label.bind("<B1-Motion>", self.do_move)
 
-    def update_board_coordinate(self, new_coord: str) -> str:
-        gx, gy = self.war_service.set_target_coord(new_coord)
-        norm = f"{gx}, {gy}"
+    def update_board_coordinate(self, new_coord: Any, slot: Optional[int] = None) -> str:
+        parsed = self.war_service.set_target_coord(new_coord, slot=slot)
+        gx, gy, cslot = parsed.x, parsed.y, parsed.slot
+        norm = f"{gx}, {gy}, {cslot}"
         self.board_coord = norm
         self.save_settings()
         if hasattr(self, "coord_var"):
             self.coord_var.set(norm)
-        if hasattr(self, "war_view") and hasattr(self.war_view, "coord_var"):
-            self.war_view.coord_var.set(norm)
-        self.event_bus.emit("board_coord_changed", coord=norm)
+        if hasattr(self, "war_view"):
+            if hasattr(self.war_view, "coord_var"):
+                self.war_view.coord_var.set(norm)
+            if hasattr(self.war_view, "set_active_slot_ui"):
+                self.war_view.set_active_slot_ui(cslot)
+        self.event_bus.emit("board_coord_changed", coord=norm, sector_x=gx, sector_y=gy, slot=cslot)
         return norm
 
     def _on_character_detected(self, character_name="", **kwargs):
@@ -433,7 +438,7 @@ class NGSTrackerApp(ctk.CTk):
                     data = json.load(f)
                     self.watchlist_items = data.get("watchlist", [])
                     self.log_folder = data.get("log_folder", "")
-                    self.board_coord = data.get("board_coord", "0, 0")
+                    self.board_coord = data.get("board_coord", "0, 0, 1")
             except: pass
 
         if hasattr(self, "war_service"):
