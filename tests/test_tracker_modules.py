@@ -353,12 +353,12 @@ def test_war_view_realtime_sync_ui_labels(shared_app):
 
     wv = app.war_view
 
-    # Top right labels
-    assert "REALTIME" in wv.lbl_war_status.cget("text")
+    # Top right labels: lbl_war_status removed, lbl_sync_time remains
+    assert getattr(wv, "lbl_war_status", None) is None
     assert hasattr(wv, "lbl_sync_time")
 
-    # Button text
-    assert "เรียลไทม์" in wv.btn_sync.cget("text") or "Realtime" in wv.btn_sync.cget("text")
+    # Button: btn_sync removed (sync is handled automatically in background)
+    assert getattr(wv, "btn_sync", None) is None
 
     # Trigger events to verify dynamic updates
     event_bus.emit("realtime_sync_started")
@@ -603,3 +603,181 @@ def test_war_logs_thread_safety_and_limit():
     assert recent[0]["text"] == "Test log entry 59"
     war.stop()
 
+
+def test_version_security_semver_helpers():
+    """Verify semantic version parsing, comparison, and security verification."""
+    from modules.war_mode.war_service import parse_semver, compare_semver, is_version_secure
+
+    # 1. Parsing
+    assert parse_semver("7.1.0") == (7, 1, 0, "")
+    assert parse_semver("V 7.1.0") == (7, 1, 0, "")
+    assert parse_semver("7.0.0-alpha") == (7, 0, 0, "alpha")
+
+    # 2. Comparisons
+    assert compare_semver("7.1.0", "7.0.0") == 1
+    assert compare_semver("7.0.0-alpha", "7.0.0") == -1
+    assert compare_semver("7.0.0-alpha", "7.1.0") == -1
+    assert compare_semver("7.1.0", "7.1.0") == 0
+    assert compare_semver("7.2.0", "7.1.0") == 1
+
+    # 3. Security verification
+    assert is_version_secure("7.1.0") is True
+    assert is_version_secure("7.2.0") is True
+    # Insecure / revoked versions: 7.0.0-alpha, 7.0.0, 6.1.0
+    assert is_version_secure("7.0.0-alpha") is False
+    assert is_version_secure("7.0.0") is False
+    assert is_version_secure("6.1.0") is False
+    assert is_version_secure("") is False
+
+
+def test_database_payload_contains_version_and_security_status():
+    """Verify that database payload sends client_version, version, and security_status."""
+    from modules.war_mode.war_service import WarService
+
+    war = WarService(client_version="7.1.0")
+    war.set_operative("SecurityTester")
+    war.set_target_coord("3, 3, 1")
+    war.session_contribution = 10_000_000
+
+    payload = war.get_database_payload()
+    assert payload["client_version"] == "7.1.0"
+    assert payload["version"] == "7.1.0"
+    assert payload["security_status"] == "SECURE"
+    assert payload["version_security_valid"] is True
+    assert payload["meseta"] == 10_000_000
+    war.stop()
+
+
+def test_insecure_version_7_0_0_alpha_uncounted_in_database():
+    """
+    Verify that if a client uses 7.0.0-alpha (which was revoked due to security bugs),
+    the meseta sent to database records is NOT counted (meseta=0), security_status is flagged,
+    and cloud sync refuses to credit the sector.
+    """
+    from modules.war_mode.war_service import WarService
+
+    war = WarService(client_version="7.0.0-alpha")
+    war.set_operative("VulnerablePlayer")
+    war.set_target_coord("0, 0, 1")
+    war.session_contribution = 25_000_000
+
+    assert war.is_version_secure() is False
+
+    payload = war.get_database_payload()
+    assert payload["client_version"] == "7.0.0-alpha"
+    assert payload["version_security_valid"] is False
+    assert payload["security_status"] == "REVOKED_VERSION_INSECURE"
+    # CRITICAL: Money must NOT be counted into database records!
+    assert payload["meseta"] == 0
+    assert payload["raw_meseta"] == 25_000_000
+    assert payload["farming_rate_mhr"] == 0
+
+    # Sync to cloud database must reject unsecure client
+    ok, msg = war.sync_to_cloud_database()
+    assert ok is False
+    assert "7.0.0-alpha" in msg
+    assert ("ความปลอดภัย" in msg or "security" in msg.lower())
+    war.stop()
+
+
+def test_firebase_war_sync_broadcaster_version_security():
+    """Verify ARKSFirebaseBroadcaster validates client_version and rejects insecure versions."""
+    from tools.firebase_war_sync import ARKSFirebaseBroadcaster
+
+    broadcaster = ARKSFirebaseBroadcaster(
+        database_url="https://mock-test-default-rtdb.firebaseio.com"
+    )
+
+    assert broadcaster.is_version_secure("7.1.0") is True
+    assert broadcaster.is_version_secure("7.0.0-alpha") is False
+    assert broadcaster.is_version_secure("6.1.0") is False
+
+
+def test_remote_version_control_policy_and_check():
+    """Verify fetching and evaluating dynamic version control policy."""
+    from modules.war_mode.war_service import WarService
+
+    # 1. Test evaluation with mocked policy (Latest secure version)
+    war = WarService(client_version="7.1.0")
+    war.remote_policy = {
+        "latest_version": "7.2.0",
+        "min_secure_version": "7.1.0",
+        "revoked_versions": {"7_0_0-alpha": True, "7_0_0": True},
+        "announcement": "New update 7.2.0 available",
+        "download_url": "https://example.com/dl",
+    }
+    war.latest_version = "7.2.0"
+    war.min_secure_version = "7.1.0"
+    war.revoked_versions = ["7.0.0-alpha", "7.0.0"]
+    war.remote_policy_fetched = True
+
+    status = war.check_version_status()
+    assert status["current_version"] == "7.1.0"
+    assert status["latest_version"] == "7.2.0"
+    assert status["is_secure"] is True
+    assert status["is_latest"] is False
+    assert status["status"] == "UPDATE_AVAILABLE"
+    assert "7.2.0" in status["message"]
+
+    # 2. Test when client is latest
+    war.client_version = "7.2.0"
+    status_latest = war.check_version_status()
+    assert status_latest["is_secure"] is True
+    assert status_latest["is_latest"] is True
+    assert status_latest["status"] == "SECURE_LATEST"
+
+    # 3. Test when client is revoked
+    war.client_version = "7.0.0-alpha"
+    status_revoked = war.check_version_status()
+    assert status_revoked["is_secure"] is False
+    assert status_revoked["status"] == "REVOKED_INSECURE"
+    assert "เพิกถอน" in status_revoked["message"]
+
+    # 4. Test when client is outdated below min_secure_version
+    war.client_version = "6.1.0"
+    status_outdated = war.check_version_status()
+    assert status_outdated["is_secure"] is False
+    assert status_outdated["status"] == "OUTDATED_INSECURE"
+
+    war.stop()
+
+
+def test_broadcaster_version_control_policy_methods(monkeypatch):
+    """Verify ARKSFirebaseBroadcaster fetch and update version policy methods."""
+    from tools.firebase_war_sync import ARKSFirebaseBroadcaster
+
+    broadcaster = ARKSFirebaseBroadcaster(
+        database_url="https://mock-rtdb.firebaseio.com"
+    )
+
+    fake_json = json.dumps({
+        "latest_version": "7.1.0",
+        "min_secure_version": "7.1.0",
+        "revoked_versions": {"7_0_0-alpha": True},
+    }).encode("utf-8")
+
+    class FakeResponse:
+        def __init__(self, data):
+            self.data = data
+        def read(self):
+            return self.data
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            pass
+
+    monkeypatch.setattr(
+        "urllib.request.urlopen",
+        lambda req, timeout=5.0: FakeResponse(fake_json),
+    )
+
+    policy = broadcaster.fetch_version_control_policy()
+    assert policy["latest_version"] == "7.1.0"
+    assert policy["min_secure_version"] == "7.1.0"
+
+    ok = broadcaster.update_version_control_policy(
+        latest_version="7.1.0",
+        min_secure_version="7.1.0",
+        announcement="System OK",
+    )
+    assert ok is True

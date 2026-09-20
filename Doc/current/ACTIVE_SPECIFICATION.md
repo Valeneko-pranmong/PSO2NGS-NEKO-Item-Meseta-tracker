@@ -1,18 +1,18 @@
 # 🌸 NEKO Item & Meseta Tracker — Active System Specification (สเปคระบบปัจจุบัน)
 
 > **สถานะ:** `[CURRENT]` 🟢 — เอกสารสเปคทางเทคนิคหลักของระบบ (Active Production Source of Truth)  
-> **รุ่นปัจจุบัน:** Python Version `6.1.0` / C# WPF Version `7.0.0-alpha`  
+> **รุ่นปัจจุบัน:** Python Version `7.1.0` (Modular Engine with CustomTkinter, EventBus, ARKS War Room & Firebase Realtime Telemetry)  
 > **ทีมพัฒนา:** NEKO FAMILY TEAM SHIP 4 JP / Vale3neko  
 
 ---
 
 ## 1. ภาพรวมระบบ (System Overview)
 
-NEKO Item & Meseta Tracker เป็นเครื่องมือติดตามข้อมูลการฟาร์ม N-Meseta และไอเทมดรอปแบบ Real-time สำหรับเกม **Phantasy Star Online 2: New Genesis (PSO2:NGS)** โดยเฉพาะช่วง PSE Burst ฟาร์มเงินและแคปซูล 
+NEKO Item & Meseta Tracker เป็นเครื่องมือติดตามข้อมูลการฟาร์ม N-Meseta และไอเทมดรอปแบบ Real-time สำหรับเกม **Phantasy Star Online 2: New Genesis (PSO2:NGS)** โดยเฉพาะช่วง PSE Burst ฟาร์มเงินและแคปซูล
 
-ระบบถูกแบ่งออกเป็น 2 สถาปัตยกรรมหลัก:
-1. **Python Tracker (V6.1.0):** สถาปัตยกรรม Modular ระบบเดิมที่ขับเคลื่อนด้วย CustomTkinter, EventBus และผสานเข้ากับโหมด **ARKS War Room** ส่ง Telemetry แบบสดขึ้น Google Firebase Realtime Database
-2. **C# WPF Native Tracker (V7.0.0-alpha):** สถาปัตยกรรมเนทีฟ Windows .NET 6 WPF ที่เน้นประสิทธิภาพระดับสูง การเรนเดอร์กราฟิกฮาร์ดแวร์เร่งความเร็ว และมีระบบความปลอดภัย **AntiTamperGuard**
+ระบบพัฒนาด้วย **Python 3.11** เป็นแกนหลักเพียงระบบเดียว (Pure Python Architecture):
+* **Python Tracker (V7.1.0):** สถาปัตยกรรม Modular ขับเคลื่อนด้วย CustomTkinter, EventBus ภายใน, ระบบ Telemetry สดของ **ARKS War Room**, และการซิงค์ข้อมูลแบบ Real-time เข้าสู่ Google Firebase Realtime Database
+* *(หมายเหตุ: โครงการเนทีฟ C# WPF เดิมถูกยกเลิกและย้ายไปเก็บรักษาใน `archive/legacy_wpf/` ตามบันทึกการตัดสินใจทางสถาปัตยกรรม)*
 
 ---
 
@@ -82,14 +82,12 @@ NEKO Item & Meseta Tracker เป็นเครื่องมือติด�
 
 ---
 
-## 3. สถาปัตยกรรม C# WPF Native Tracker (V7.0.0-alpha)
+## 3. การปลดระวางเวอร์ชัน C# WPF (Retirement of WPF Architecture)
 
-ไดเรกทอรี [`NekoTracker-WPF/`](../../NekoTracker-WPF/) และ [`NekoTracker.Tests/`](../../NekoTracker.Tests/) บรรจุซอร์สโค้ดของเนทีฟแอปพลิเคชัน Windows .NET 6 WPF:
-* **AntiTamperGuard (`Security/AntiTamperGuard.cs`):** ตรวจจับการแทรกแซงตัวโปรแกรม, การดัดแปลงตัวแปรในหน่วยความจำ, และตรวจสอบความถูกต้องของ Process
-* **ActionLogParser (`Core/ActionLogParser.cs`):** ตัวอ่าน ActionLog ประสิทธิภาพสูง แปลงข้อมูลเป็น `ActionLogRecord` โครงสร้าง Strong-typed
-* **LogWatcher (`Core/LogWatcher.cs`):** เฝ้ามองการเปลี่ยนแปลงของไฟล์ Log ในเครื่องแบบ Event-driven
-* **LanguageManager (`Localization/LanguageManager.cs`):** ระบบรองรับหลายภาษา (อังกฤษ `en`, ญี่ปุ่น `ja`, ไทย `th`) โดยโหลดจาก JSON Embedded Resource
-* **PastelTheme (`Themes/PastelTheme.xaml`):** สไตล์หน้าตา UI มินิมอล โทนสีชมพูพาสเทลเอกลักษณ์ของ NEKO Family
+โครงการเนทีฟแอปพลิเคชัน C# .NET 6 WPF (`NekoTracker-WPF/` และ `NekoTracker.Tests/`) ถูกยกเลิกและปลดระวางอย่างเป็นทางการ:
+* **เหตุผล:** รวมศูนย์การพัฒนา (Consolidation) กลับมายัง Python Tracker เพียงระบบเดียว เพื่อลดความซ้ำซ้อนของโค้ดเบส เพิ่มความคล่องตัวในการอัปเดตฟีเจอร์ ARKS War Room และระบบซิงค์ข้อมูล
+* **สถานที่จัดเก็บ:** ซอร์สโค้ดและชุดทดสอบถูกย้ายไปยัง [`archive/legacy_wpf/`](../../archive/legacy_wpf/) และเอกสารสเปคเดิมถูกเก็บไว้ที่ [`Doc/archive/WPF_NATIVE_SPEC.md`](../archive/WPF_NATIVE_SPEC.md)
+* **ข้อกำหนด:** ตัวติดตั้งทางการและไปป์ไลน์การบิลด์จะไม่คอมไพล์หรือแพ็กเกจไฟล์จาก WPF อีกต่อไป
 
 ---
 
@@ -98,3 +96,19 @@ NEKO Item & Meseta Tracker เป็นเครื่องมือติด�
 1. **100% TOS Safe (เป็นไปตามข้อตกลงผู้ใช้งาน):** อ่านเฉพาะไฟล์ Text Log ที่ตัวเกมสร้างขึ้นในโฟลเดอร์ Documents เท่านั้น ไม่มีการยุ่งเกี่ยวกับหน่วยความจำเกม (RAM) ไม่มีการ Hook API หรือฉีด DLL ใดๆ
 2. **Zero-Login Architecture:** ปลอดภัยสูงสุดด้วยการไม่ร้องขอ ไม่จัดเก็บ และไม่ส่งรหัสผ่านใดๆ ตัวตน Operative ผูกกับชื่อตัวละครที่ตรวจพบจาก Log โดยตรง
 3. **Fail-Safe Offline Mode:** หากไม่มีการเชื่อมต่ออินเทอร์เน็ต ระบบจะยังคงทำหน้าที่เป็น Offline Tracker ที่สมบูรณ์แบบได้ 100% โดยไม่มีข้อจำกัด
+4. **Version Security & Database Meseta Gating:** ส่งเลขเวอร์ชันไคลเอนต์ (`client_version`) ขึ้น Firebase RTDB ในทุก Payload เพื่อตรวจสอบความถูกต้อง หากพบว่ายังใช้เวอร์ชันที่มีช่องโหว่ความปลอดภัย เช่น `7.0.0-alpha` (ซึ่งถูกแก้ไขเป็น `7.1.0`) ยอดเงิน Meseta จะถูกปรับเป็น 0 และไม่ถูกนับเข้าสู่ฐานข้อมูลเด็ดขาด
+
+---
+
+## 5. มาตรฐานกลางระบบตัวติดตั้ง Windows (NEKO Installer Standard)
+
+ระบบสร้างชุดติดตั้ง Windows ยึดตามมาตรฐานกลางของ **NEKO FAMILY** (ถอดแบบจาก `Neko-Family-Proxy` ตาม [`Doc/reference/INSTALLER_STANDARD.md`](../reference/INSTALLER_STANDARD.md)):
+1. **ตำแหน่งติดตั้งระดับผู้ใช้ (Per-User Topology):** ติดตั้งลงที่ `%LOCALAPPDATA%\NEKO FAMILY\NekoTracker` โดยใช้ `PrivilegesRequired=lowest` ทำให้ไม่ต้องขอสิทธิ์ Administrator (Zero UAC) และป้องกันปัญหา Permission Denied
+2. **ความถูกต้องของโปรแกรมหลัก (Primary Application):** ตัวโปรแกรมหลักที่เปิดใช้งานจากชอร์ตคัต Desktop และ Start Menu คือ **Python Tracker (พร้อมโหมด ARKS War Room & Firebase Sync)** เสมอ บรรจุฟอนต์ Sarabun/Kanit, โลโก้, และไอคอนครบถ้วนในตัวติดตั้งเดี่ยว
+3. **การจำกัดสถาปัตยกรรม (Architecture Restriction):** กำหนด `ArchitecturesAllowed=x64compatible` และ `ArchitecturesInstallIn64BitMode=x64compatible` บล็อกระบบที่ไม่ใช่ 64-bit เพื่อความเสถียรของไบนารีและ DLLs
+4. **ไปป์ไลน์ตรวจสอบแบบ Fail-Closed:**
+   - Pre-flight automated tests (100% ผ่านก่อนเริ่มคอมไพล์)
+   - PyInstaller packaging พร้อม Bundled Fonts (`fonts/`), โลโก้ (`logo.png`), และไอคอน (`icon.ico`)
+   - Inno Setup 6 compilation ด้วยการบีบอัด LZMA2/Ultra64 Solid Compression
+   - คำนวณค่าแฮช SHA-256 บันทึกสู่ `SHA256SUMS.txt`
+   - Automated Lifecycle Smoke Test: จำลองการติดตั้งเงียบใน Sandbox, รัน Process Smoke ของ `NekoTracker.exe` ตรวจจับ PID ไม่ให้แครช, และทดสอบการถอนการติดตั้งอย่างหมดจด

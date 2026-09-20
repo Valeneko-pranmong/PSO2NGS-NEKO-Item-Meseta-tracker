@@ -1,0 +1,27 @@
+================================================================================
+                    NEKO Item & Meseta Tracker (PSO2:NGS)
+================================================================================
+Developer: Vale3neko / NEKO FAMILY TEAM SHIP 4 JP
+Project: Phantasy Star Online 2: New Genesis (PSO2:NGS) Item & Meseta Tracker
+Version: 6.1.0 (with WPF Native v7.0.0-alpha Preview)
+
+[EN] TERMS OF USE & LICENSE:
+This software is created for the public benefit of the PSO2:NGS gaming community.
+It is completely free to use, share, and modify for personal non-commercial use.
+
+STRICTLY NO COMMERCIAL USE:
+- You may NOT sell, resell, bundle for commercial gain, monetize, or charge fees
+  for this software or any modified versions thereof.
+- You may NOT claim exclusive ownership or restrict access to other community members.
+- 100% TOS Safe: This application operates solely by reading text logs generated
+  by the game on disk. It does not inject DLLs, modify game memory, or alter game files.
+
+[TH] เงื่อนไขการใช้งานและสิทธิ์การใช้งาน:
+โปรแกรมนี้จัดทำขึ้นเพื่อประโยชน์สาธารณะแก่คอมมูนิตี้ผู้เล่น Phantasy Star Online 2: New Genesis
+ผู้ใช้สามารถนำไปใช้งาน แจกจ่าย และพัฒนาต่อยอดได้อย่างอิสระโดยไม่มีค่าใช้จ่าย
+
+ข้อห้ามเด็ดขาด (ห้ามใช้ในเชิงพาณิชย์):
+- ห้ามนำโปรแกรมนี้ไปจำหน่าย แสวงหาผลกำไร หรือเรียกเก็บค่าบริการใดๆ ทั้งสิ้น
+- ปลอดภัยตามกฎเกม 100%: อ่านเฉพาะ Text Log ที่ตัวเกมสร้างขึ้นในเครื่องเท่านั้น
+  ไม่มีการอ่าน Memory, ไม่มีการดัดแปลงไฟล์เกม และไม่มีการฉีด DLL
+================================================================================

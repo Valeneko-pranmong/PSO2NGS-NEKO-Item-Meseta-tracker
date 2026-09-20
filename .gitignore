@@ -228,3 +228,8 @@ obj/
 *.sln.docstates
 .vs/
 *.suo
+
+# Release artifacts (ignore compiled binaries, keep manifests and documentation)
+artifacts/**/*.exe
+artifacts/**/*.zip
+artifacts/**/NekoTracker/

@@ -123,5 +123,35 @@ namespace NekoTracker.Tests
             Assert.False(guard.ValidateStream(1500, 1500));
             Assert.Contains(guard.Violations, v => v.Type == TamperViolationType.FileStreamTruncated);
         }
+
+        [Fact]
+        public void Layer6_VersionSecurity_ShouldRejectInsecureAndRevokedVersions()
+        {
+            var mockProcess = new MockProcessValidator { IsRunning = true };
+            var guard = new AntiTamperGuard(mockProcess)
+            {
+                EnforceTimestampValidation = false,
+                ActiveVersion = "7.0.0-alpha" // Insecure revoked version
+            };
+
+            var record = new ActionLogRecord
+            {
+                Action = "[Pickup]",
+                MesetaDrop = 5000,
+                RawLine = "2026-09-20T12:00:00\t100\t[Pickup]\t12345\tHero\tMeseta(5000)"
+            };
+
+            // 1. Should reject record and flag InsecureClientVersion violation
+            bool isValid = guard.ValidateRecord(record);
+            Assert.False(isValid);
+            Assert.True(guard.IsCompromised);
+            Assert.Contains(guard.Violations, v => v.Type == TamperViolationType.InsecureClientVersion);
+
+            // 2. Switching to secure 7.1.0 should pass
+            guard.Reset();
+            guard.ActiveVersion = "7.1.0";
+            Assert.True(guard.ValidateRecord(record));
+            Assert.False(guard.IsCompromised);
+        }
     }
 }

@@ -64,7 +64,10 @@ FONT_STATS = ("Impact", 22)
 
 LOGO_FILENAME = resource_path("logo.png")
 ICON_FILENAME = resource_path("icon.ico")
-APP_VERSION = "V 6.1.0"
+APP_VERSION = "V 7.1.0"
+CLIENT_VERSION = "7.1.0"
+MIN_SECURE_VERSION = "7.1.0"
+REVOKED_VERSIONS = ["7.0.0-alpha", "7.0.0"]
 
 # Firebase Realtime Database
 DEFAULT_FIREBASE_RTDB_URL = os.getenv(
@@ -84,4 +87,18 @@ SLOT_MIN = 1
 SLOT_MAX = 4
 SLOT_TARGET_MESETA = 25_000_000    # 25M per sub-cell
 SECTOR_TARGET_MESETA = 100_000_000 # 100M total per sector (4 slots)
+
+# Anti-Tamper & Security Heuristic Thresholds
+MAX_SINGLE_MESETA_DROP = 300_000          # Maximum realistic single drop
+MAX_MESETA_PER_MINUTE = 250_000           # ~15M/hr ceiling (physically impossible in NGS)
+MAX_FUTURE_TIMESTAMP_SKEW_SEC = 60.0      # Max allowable future clock skew (seconds)
+MAX_PAST_TIMESTAMP_SKEW_SEC = 300.0       # 5 minutes max historical replay (seconds)
+MAX_SEQUENCE_JUMP_ALERT = 5000            # Sequence jump threshold for anomaly warning
+ENFORCE_PROCESS_VALIDATION = os.getenv("NEKO_PROCESS_VALIDATION", "1").lower() not in ("0", "false", "no")
+ENFORCE_FILE_HANDLE_VALIDATION = os.getenv("NEKO_FILE_HANDLE_VALIDATION", "1").lower() not in ("0", "false", "no")
+ENFORCE_CANONICAL_PATH_GATING = os.getenv("NEKO_CANONICAL_PATH_GATING", "0").lower() in ("1", "true", "yes")
+ENFORCE_CADENCE_VALIDATION = os.getenv("NEKO_CADENCE_VALIDATION", "1").lower() not in ("0", "false", "no")
+MIN_CADENCE_SAMPLE_SIZE = 10
+MIN_CADENCE_STDDEV_SEC = 0.05
+
 

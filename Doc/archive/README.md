@@ -13,6 +13,7 @@
 | :--- | :--- | :--- | :--- | :--- |
 | [`LEGACY_LOGIN_SPEC.md`](LEGACY_LOGIN_SPEC.md) | ข้อกำหนดระบบ Authentication เดิม | 2026-09 | ยกเลิกระบบล็อกอินด้วย Supabase / บัญชีรหัสผ่าน เปลี่ยนเป็นระบบ **Zero-Login Operative Auto-Detection** ที่อ่านชื่อตัวละครจาก Log โดยตรง | [`Doc/reference/SECURITY_ANTITAMPER.md`](../reference/SECURITY_ANTITAMPER.md)<br>[`Doc/current/ACTIVE_SPECIFICATION.md`](../current/ACTIVE_SPECIFICATION.md) |
 | [`V6_OFFLINE_TRACKER_SPEC.md`](V6_OFFLINE_TRACKER_SPEC.md) | ข้อกำหนดสถาปัตยกรรม Offline Tracker ดั้งเดิม | 2026-09 | ระบบเดิมรองรับเฉพาะการนับเงินออฟไลน์ ได้รับการอัปเกรดเป็นระบบ **ARKS War Room + Sector/4 Slots + Firebase Realtime Telemetry** | [`Doc/current/ACTIVE_SPECIFICATION.md`](../current/ACTIVE_SPECIFICATION.md) |
+| [`WPF_NATIVE_SPEC.md`](WPF_NATIVE_SPEC.md) | ข้อกำหนดโปรเจกต์เนทีฟ C# .NET 6 WPF | 2026-09 | ยกเลิกโครงการเวอร์ชัน C# WPF เพื่อรวมศูนย์การพัฒนาทั้งหมดกลับสู่ **Python Tracker** เพียงระบบเดียว | [`Doc/current/ACTIVE_SPECIFICATION.md`](../current/ACTIVE_SPECIFICATION.md)<br>[`archive/legacy_wpf/`](../../archive/legacy_wpf/) |
 
 ---
 

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using NekoTracker.Core;
+using NekoTracker.Common;
 
 namespace NekoTracker.Security
 {
@@ -15,6 +16,8 @@ namespace NekoTracker.Security
         public TimeSpan MaxPastTimestampSkew { get; set; } = TimeSpan.FromMinutes(5);
         public bool EnforceProcessValidation { get; set; } = true;
         public bool EnforceTimestampValidation { get; set; } = true;
+        public bool EnforceVersionValidation { get; set; } = true;
+        public string ActiveVersion { get; set; } = AppVersion.SemVer;
 
         // Tracking state
         private long _lastSequence = -1;
@@ -94,6 +97,17 @@ namespace NekoTracker.Security
         public bool ValidateRecord(ActionLogRecord record, DateTime? referenceTime = null)
         {
             var now = referenceTime ?? DateTime.Now;
+
+            // 0. Client Version Security Gate
+            if (EnforceVersionValidation && !AppVersion.IsVersionSecure(ActiveVersion))
+            {
+                RecordViolation(new TamperViolation(
+                    TamperViolationType.InsecureClientVersion,
+                    $"Client version '{ActiveVersion}' is revoked due to security vulnerabilities. Meseta income will not be counted.",
+                    record.RawLine
+                ));
+                return false;
+            }
 
             // 1. Game Process Verification
             if (EnforceProcessValidation && (record.HasMesetaDrop || record.HasItemDrop))

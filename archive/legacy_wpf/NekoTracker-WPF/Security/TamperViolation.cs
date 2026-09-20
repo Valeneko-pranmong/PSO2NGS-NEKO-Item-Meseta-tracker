@@ -14,7 +14,8 @@ namespace NekoTracker.Security
         DropAmountExceedsCeiling,
         VelocityExceedsPhysicalLimit,
         FileStreamTruncated,
-        FileStreamTampered
+        FileStreamTampered,
+        InsecureClientVersion
     }
 
     public class TamperViolation

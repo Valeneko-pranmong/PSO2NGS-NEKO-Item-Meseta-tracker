@@ -38,6 +38,54 @@ try:
 except ImportError:
     FIREBASE_ADMIN_AVAILABLE = False
 
+MIN_SECURE_VERSION = "7.1.0"
+REVOKED_VERSIONS = {"7.0.0-alpha", "7.0.0"}
+
+
+def parse_semver(v: str):
+    if not v or not isinstance(v, str):
+        return (0, 0, 0, "")
+    clean = v.strip().lstrip("vV").strip()
+    pre = ""
+    if "-" in clean:
+        parts_pre = clean.split("-", 1)
+        clean = parts_pre[0].strip()
+        pre = parts_pre[1].strip()
+    nums = clean.split(".")
+    major = int(nums[0]) if len(nums) > 0 and nums[0].isdigit() else 0
+    minor = int(nums[1]) if len(nums) > 1 and nums[1].isdigit() else 0
+    patch = int(nums[2]) if len(nums) > 2 and nums[2].isdigit() else 0
+    return (major, minor, patch, pre)
+
+
+def compare_semver(v1: str, v2: str) -> int:
+    p1 = parse_semver(v1)
+    p2 = parse_semver(v2)
+    if p1[:3] > p2[:3]:
+        return 1
+    if p1[:3] < p2[:3]:
+        return -1
+    if p1[3] and not p2[3]:
+        return -1
+    if not p1[3] and p2[3]:
+        return 1
+    if p1[3] and p2[3]:
+        if p1[3] < p2[3]:
+            return -1
+        if p1[3] > p2[3]:
+            return 1
+    return 0
+
+
+def is_version_secure(version: str, min_version: str = MIN_SECURE_VERSION) -> bool:
+    if not version or not isinstance(version, str):
+        return False
+    v_clean = version.strip().lower().lstrip("v").strip()
+    for rev in REVOKED_VERSIONS:
+        if v_clean == rev.lower().lstrip("v").strip():
+            return False
+    return compare_semver(version, min_version) >= 0
+
 
 class ARKSFirebaseBroadcaster:
     def __init__(
@@ -79,6 +127,75 @@ class ARKSFirebaseBroadcaster:
         elif self.database_url:
             print(f"[✓] เชื่อมต่อ Firebase REST RTDB สำเร็จ (Base path: {self.base_path})")
 
+    @staticmethod
+    def is_version_secure(version: str) -> bool:
+        """Verify client version against security policy."""
+        return is_version_secure(version)
+
+    def fetch_version_control_policy(self, timeout: float = 5.0) -> Dict[str, Any]:
+        """
+        อ่านนโยบายเวอร์ชันล่าสุดจาก Firebase RTDB (/arks_war_room/version_control)
+        """
+        if self.rtdb:
+            ref = self.rtdb.reference(f"{self.base_path}/version_control")
+            val = ref.get()
+            return val if isinstance(val, dict) else {}
+        elif self.database_url:
+            try:
+                url = f"{self.database_url}/{self.base_path}/version_control.json"
+                req = urllib.request.Request(url, headers={"User-Agent": "NEKOTracker/7.1.0"})
+                with urllib.request.urlopen(req, timeout=timeout) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    return data if isinstance(data, dict) else {}
+            except Exception as e:
+                print(f"[!] ไม่สามารถอ่าน version_control จาก Firebase: {e}")
+                return {}
+        return {}
+
+    def update_version_control_policy(
+        self,
+        latest_version: str,
+        min_secure_version: str = "7.1.0",
+        revoked_versions: Optional[Dict[str, bool]] = None,
+        announcement: str = "",
+        download_url: str = "",
+        timeout: float = 5.0,
+    ) -> bool:
+        """
+        อัปเดตนโยบายเวอร์ชันล่าสุดขึ้น Firebase RTDB (/arks_war_room/version_control)
+        """
+        if revoked_versions is None:
+            revoked_versions = {"7_0_0-alpha": True, "7_0_0": True}
+        payload = {
+            "latest_version": latest_version,
+            "min_secure_version": min_secure_version,
+            "revoked_versions": revoked_versions,
+            "announcement": announcement,
+            "download_url": download_url,
+            "last_updated": int(time.time() * 1000),
+        }
+        if self.rtdb:
+            ref = self.rtdb.reference(f"{self.base_path}/version_control")
+            ref.set(payload)
+            print(f"[✓] อัปเดตนโยบายเวอร์ชันสำเร็จ: latest={latest_version}, min={min_secure_version}")
+            return True
+        elif self.database_url:
+            try:
+                url = f"{self.database_url}/{self.base_path}/version_control.json"
+                req = urllib.request.Request(
+                    url,
+                    data=json.dumps(payload).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                    method="PUT",
+                )
+                with urllib.request.urlopen(req, timeout=timeout) as resp:
+                    print(f"[✓] อัปเดตนโยบายเวอร์ชันสำเร็จ: latest={latest_version}, min={min_secure_version}")
+                    return True
+            except Exception as e:
+                print(f"[!] ไม่สามารถอัปเดต version_control: {e}")
+                return False
+        return False
+
     # -------------------------------------------------------------
     # SECTOR WAR — OPERATIVE FARMING (4 SLOTS PER SECTOR)
     # -------------------------------------------------------------
@@ -89,7 +206,8 @@ class ARKSFirebaseBroadcaster:
         sector_x: int,
         sector_y: int,
         slot: int = 1,
-    ) -> None:
+        client_version: str = "7.1.0",
+    ) -> bool:
         """
         ซิงค์พิกัดและยอดเงินของตัวละครเข้าสู่ระบบ Sector + 4 ช่องย่อย (NW: 1, NE: 2, SW: 3, SE: 4)
         :param character_name: ชื่อตัวละคร (Primary Key) เช่น "Vale3neko"
@@ -97,6 +215,7 @@ class ARKSFirebaseBroadcaster:
         :param sector_x: พิกัด X ของ Sector ที่ต้องการฟาร์ม (-12 ถึง +25)
         :param sector_y: พิกัด Y ของ Sector ที่ต้องการฟาร์ม (-11 ถึง +9)
         :param slot: ช่องย่อย (1: NW บนซ้าย, 2: NE บนขวา, 3: SW ล่างซ้าย, 4: SE ล่างขวา)
+        :param client_version: เลขเวอร์ชันไคลเอนต์ที่ส่งเพื่อตรวจความปลอดภัย (ค่าเริ่มต้น: 7.1.0)
         """
         now_ms = int(time.time() * 1000)
         # Clamping
@@ -105,10 +224,19 @@ class ARKSFirebaseBroadcaster:
         slot = max(1, min(4, int(slot)))
         coord_key = f"{sector_x},{sector_y}"
 
+        is_secure = is_version_secure(client_version)
+        counted_meseta = meseta if is_secure else 0
+        sec_status = "SECURE" if is_secure else "REVOKED_VERSION_INSECURE"
+
         # 1. ข้อมูล Operative
         op_payload = {
             "character_name": character_name,
-            "meseta": meseta,
+            "meseta": counted_meseta,
+            "raw_meseta": meseta,
+            "client_version": client_version,
+            "version": client_version,
+            "security_status": sec_status,
+            "version_security_valid": is_secure,
             "sector_coord": {"x": sector_x, "y": sector_y, "slot": slot},
             "coord_key": coord_key,
             "slot": slot,
@@ -118,7 +246,10 @@ class ARKSFirebaseBroadcaster:
         # 2. ข้อมูล Challenger ใน Sector รวม
         sec_payload = {
             "character_name": character_name,
-            "meseta": meseta,
+            "meseta": counted_meseta,
+            "client_version": client_version,
+            "security_status": sec_status,
+            "status": "claimed" if (is_secure and counted_meseta >= 25_000_000) else ("BLOCKED_INSECURE_VERSION" if not is_secure else "contributing"),
             "slot": slot,
             "lastUpdated": now_ms,
         }
@@ -126,7 +257,9 @@ class ARKSFirebaseBroadcaster:
         # 3. ข้อมูล Challenger ใน Sub-Cell รายช่องย่อย
         sub_payload = {
             "character_name": character_name,
-            "meseta": meseta,
+            "meseta": counted_meseta,
+            "client_version": client_version,
+            "security_status": sec_status,
             "lastUpdated": now_ms,
         }
 
@@ -151,7 +284,12 @@ class ARKSFirebaseBroadcaster:
             self._rest_put(f"{base}/{self.base_path}/sectors/{safe_coord}/challengers/{safe_char}.json", sec_payload)
             self._rest_put(f"{base}/{self.base_path}/sectors/{safe_coord}/sub_cells/{slot}/challengers/{safe_char}.json", sub_payload)
 
-        print(f"[✓] ซิงค์ Sector: ตัวละคร {character_name} ➔ พิกัด [{sector_x}, {sector_y}] ช่อง #{slot} | เงินสะสม {meseta:,} ℳ")
+        if not is_secure:
+            print(f"[!] คำเตือนความปลอดภัย: ไคลเอนต์เวอร์ชัน {client_version} ไม่ปลอดภัย (ถูกแก้เป็น 7.1.0) ยอดเงินจะไม่ถูกนับเข้าสู่ฐานข้อมูล (บันทึก meseta = 0)")
+            return False
+        else:
+            print(f"[✓] ซิงค์ Sector: ตัวละคร {character_name} (v{client_version}) ➔ พิกัด [{sector_x}, {sector_y}] ช่อง #{slot} | เงินสะสม {counted_meseta:,} ℳ")
+            return True
 
     def _rest_put(self, url: str, data: Dict[str, Any], timeout: float = 3.5) -> bool:
         try:

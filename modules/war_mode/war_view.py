@@ -57,6 +57,8 @@ class WarDashboardFrame(ctk.CTkFrame):
         self.controller = controller
         self.war_service = war_service
         self.auth_service = auth_service
+        self.lbl_war_status = None
+        self.btn_sync = None
 
         self._build_ui()
         self._subscribe_events()
@@ -90,7 +92,7 @@ class WarDashboardFrame(ctk.CTkFrame):
                     )
                 else:
                     self.lbl_sync_time.configure(
-                        text=f"⚡ ซิงค์เรียลไทม์ (รอการเชื่อมต่อ)",
+                        text=f"⚡ รอการเชื่อมต่อ...",
                         text_color="#F59E0B",
                     )
         except Exception:
@@ -250,25 +252,17 @@ class WarDashboardFrame(ctk.CTkFrame):
         if hasattr(self.war_service, "target_coord"):
             self.set_active_slot_ui(getattr(self.war_service.target_coord, "slot", 1))
 
-        # Top Right: Realtime Status & Sync Status
+        # Top Right: Firebase Sync Status
         top_right = ctk.CTkFrame(self.top_banner, fg_color="transparent")
         top_right.pack(side="right", padx=15, pady=4)
 
-        self.lbl_war_status = ctk.CTkLabel(
-            top_right,
-            text="🟢 ประจำการรบ (REALTIME ONLINE)",
-            font=(FONT_FAMILY, 11, "bold"),
-            text_color="#10B981",
-        )
-        self.lbl_war_status.pack(anchor="e")
-
         self.lbl_sync_time = ctk.CTkLabel(
             top_right,
-            text="⚡ ระบบซิงค์เรียลไทม์พร้อมทำงาน",
-            font=(FONT_FAMILY, 10),
+            text="⚡ ซิงค์อัตโนมัติพร้อมทำงาน",
+            font=(FONT_FAMILY, 10, "bold"),
             text_color=COLOR_TEXT_SUB,
         )
-        self.lbl_sync_time.pack(anchor="e")
+        self.lbl_sync_time.pack(anchor="e", pady=8)
 
         # 2. Main Content Grid (Left: Sidebar Menu, Right: Full Tracker Dashboard)
         self.main_split = ctk.CTkFrame(self, fg_color="transparent")
@@ -312,20 +306,6 @@ class WarDashboardFrame(ctk.CTkFrame):
             command=self._open_web_war_room,
         )
         self.btn_open_web.pack(side="left", padx=(10, 6), pady=7)
-
-        # Sync Button
-        self.btn_sync = ctk.CTkButton(
-            btn_bar,
-            text="⚡ ซิงค์เรียลไทม์ (ซิงค์ทันที)",
-            font=(FONT_FAMILY, 11, "bold"),
-            fg_color="#10B981",
-            hover_color="#059669",
-            text_color="white",
-            height=32,
-            corner_radius=UI_RADIUS,
-            command=self._do_sync,
-        )
-        self.btn_sync.pack(side="left", padx=(0, 6), pady=7)
 
         # Right Action: Back to Main Offline View (No login / logout needed!)
         self.btn_back_offline = ctk.CTkButton(

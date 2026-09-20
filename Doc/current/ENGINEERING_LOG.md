@@ -63,4 +63,78 @@
   - ย้ายโมดูลการพิสูจน์ตัวตนเดิมที่ไม่ใช้งานแล้วไปยัง `archive/legacy_auth/` พร้อม Deprecation Banners
   - สร้างเอกสารทางเทคนิคและคู่มือการส่งต่องาน (`ACTIVE_SPECIFICATION.md`, `ARCHITECTURE.md`, `COORDINATE_SYSTEM.md`, `FIREBASE_WIRE_SCHEMA.md`, `AI_HANDOFF.md`)
   - อัปเดต `.gitignore` ป้องกันไม่ให้ Artifact คอมไพล์ของ .NET (`bin/`, `obj/`) เข้าสู่ระบบ Version Control
-  - ตรวจสอบความถูกต้องของชุดทดสอบทั้ง Python (13/13 ผ่าน) และ C# (27/27 ผ่าน) โดยไม่มีข้อผิดพลาดถดถอย
+  - ตรวจสอบความถูกต้องของชุดทดสอบทั้ง Python (18/18 ผ่าน) และ C# (27/27 ผ่าน) โดยไม่มีข้อผิดพลาดถดถอย
+
+### Milestone 7: การสร้างระบบ Installer และไปป์ไลน์กระจายซอฟต์แวร์ (Automated Installer & Packaging Pipeline)
+* **ขอบเขต:** สร้างชุดติดตั้ง Windows มาตรฐาน (.exe Installer) สำหรับรุ่น **V7.0.0-alpha** (WPF Native) และไปป์ไลน์คอมไพล์/ตรวจสอบความสมบูรณ์อัตโนมัติ
+* **การดำเนินการ:**
+  - พัฒนา Inno Setup 6 Script (`installer/NekoTracker.iss`) รองรับ 64-bit Windows พร้อม LZMA2 Solid Compression สำหรับรุ่น V7.0.0-alpha
+  - ยึดตัวโปรแกรมเนทีฟ C# .NET 6 WPF (`NekoTracker.exe`) เป็นแอปพลิเคชันหลักของ V7.0.0-alpha พร้อมระบบ AntiTamperGuard และฮาร์ดแวร์เร่งความเร็ว
+  - บรรจุ Companion Engine (Python Tracker V6.1.0 พร้อม ARKS War Room & Firebase Sync) ไว้ในไดเรกทอรีย่อย `python-v6/`
+  - สร้างสคริปต์อัตโนมัติ `installer/build_installer.py` และ Batch Script `build_installer.bat`
+  - เพิ่มขั้นตอนการตรวจสอบก่อนบิลด์ (Pre-flight Tests): 18 Python tests + 27 C# tests (รวม 45 การทดสอบ)
+  - ติดตั้งและทำ Process Smoke Test ใน Sandbox อัตโนมัติ: ติดตั้งเงียบ ตรวจสอบว่า Process ทั้งสองตัวรันได้โดยไม่แคช และลบออกอย่างหมดจด
+  - สร้างไฟล์อาร์ติแฟกต์ทางการ `artifacts/release-v7.0.0-alpha/NekoTracker-Setup-v7.0.0-alpha.exe` พร้อม `SHA256SUMS.txt` และเอกสารกำกับ `README.md` ตามมาตรฐาน Repository Artifact Governance
+
+### Milestone 8: ระบบตรวจสอบความปลอดภัยของเลขเวอร์ชันและการควบคุมยอดเงินบน Firebase (Version Security & Firebase Meseta Gating)
+* **ขอบเขต:** อัปเกรดเวอร์ชันระบบเป็น **7.1.0** (แก้ไขช่องโหว่ความปลอดภัยจากรุ่น `7.0.0-alpha`), ส่งเลขเวอร์ชันไคลเอนต์ (`client_version`) ขึ้น Firebase RTDB และปฏิเสธไม่นับยอดเงินเข้าฐานข้อมูลสำหรับไคลเอนต์เวอร์ชันเก่า/ไม่ปลอดภัย
+* **การดำเนินการ:**
+  - อัปเกรดเวอร์ชันใน C# WPF (`AppVersion.cs`, `NekoTracker.csproj`) และ Python (`config.py`) เป็น `7.1.0`
+  - เพิ่มฟังก์ชัน `parse_semver`, `compare_semver`, `is_version_secure` เพื่อเปรียบเทียบ Semantic Version และตรวจสอบสิทธิ์ความปลอดภัย
+  - ปรับปรุง `WarService` ให้ส่ง `client_version`, `version`, `security_status`, `version_security_valid` ในทุก Payload (`operatives`, `sectors`, `sub_cells`, `latest_telemetry`, `war_logs`)
+  - ติดตั้งเกตความปลอดภัย: หากไคลเอนต์ยังใช้ `7.0.0-alpha` (หรือเวอร์ชันที่ถูกเพิกถอน) ฟิลด์ `meseta` จะถูกปรับเป็น 0 ไม่ถูกนับเข้าฐานข้อมูล และบันทึกคำเตือนความปลอดภัย
+  - ปรับปรุง `tools/firebase_war_sync.py` ให้ตรวจสอบ `client_version` และตัดยอดเงินเป็น 0 สำหรับเวอร์ชันที่ไม่ปลอดภัย
+  - เพิ่ม `TamperViolationType.InsecureClientVersion` ใน `AntiTamperGuard` และป้องกันไม่ให้ `TrackerStats` นับเงินเข้ากระเป๋าเมื่อเวอร์ชันไม่ปลอดภัย
+  - สร้างข้อกำหนด Firebase RTDB Security Rules (`database.rules.json`) บังคับตรวจ `client_version`
+  - เพิ่มชุดทดสอบครอบคลุมทั้ง Python (22 รายการ ผ่าน 100%) และ C# (39 รายการ ผ่าน 100%) รวม 61 รายการทดสอบ
+
+### Milestone 9: การกำหนดมาตรฐานกลางระบบติดตั้งซอฟต์แวร์ Windows (NEKO FAMILY Installer Standard)
+* **ขอบเขต:** จัดทำมาตรฐานกลางระบบตัวติดตั้ง Windows สำหรับคลังโค้ดในเครือ NEKO FAMILY โดยถอดแบบความสำเร็จจากสถาปัตยกรรม `Neko-Family-Proxy` และปรับแก้ตัวติดตั้งของโปรเจกต์นี้ให้ใช้โปรแกรมหลักที่ถูกต้อง
+* **การดำเนินการ:**
+  - สร้างเอกสารข้อกำหนดมาตรฐานกลาง [`Doc/reference/INSTALLER_STANDARD.md`](../reference/INSTALLER_STANDARD.md) และคู่มือโฟลเดอร์ [`installer/README.md`](../../installer/README.md)
+  - ปรับปรุง `installer/NekoTracker.iss`:
+    - ย้ายตำแหน่งติดตั้งมายัง `%LOCALAPPDATA%\NEKO FAMILY\NekoTracker` (Per-User Local AppData topology)
+    - ตั้งค่า `PrivilegesRequired=lowest` เพื่อให้ติดตั้งได้ทันทีโดยไม่ต้องใช้สิทธิ์ Administrator (Zero UAC elevation)
+    - กำหนด `ArchitecturesAllowed=x64compatible` บล็อกระบบที่ไม่ใช่ 64-bit อย่างเด็ดขาด
+    - คืนสิทธิ์การเป็นโปรแกรมหลัก (`{app}\NekoTracker.exe`, ชอร์ตคัต Desktop และ Start Menu) ให้กับ **Python Tracker V6.1.0 (พร้อมโหมด ARKS War Room & Firebase Sync)** ตรงตามที่ผู้ใช้งานคาดหวัง 100%
+    - ย้ายตัวทดลอง C# WPF ไปไว้ในโฟลเดอร์พรีวิว `{app}\wpf-preview\` พร้อมชอร์ตคัตเฉพาะทาง
+  - ปรับปรุงสคริปต์ไปป์ไลน์ `installer/build_installer.py`:
+    - รัน Pre-flight Test Suites ทั้งหมดก่อนเสมอ (Fail-Closed)
+    - แพ็กเกจไบนารี Python ด้วย PyInstaller Onedir รวมฟอนต์, โลโก้, และโมดูลครบถ้วน
+    - คอมไพล์ตัวติดตั้ง Single-EXE ด้วย Inno Setup 6 (`ISCC.exe`) และคำนวณแฮช SHA-256 สู่ `artifacts/release-v6.1.0/SHA256SUMS.txt`
+    - รัน Automated Lifecycle & Process Smoke Test ทดสอบการติดตั้งเงียบใน Sandbox, รัน Process Smoke ยืนยันว่า `NekoTracker.exe` (Python Tracker) เปิดติดและทำงานได้ต่อเนื่อง ไม่แครช และทดสอบการถอนการติดตั้งอย่างหมดจด
+  - บันทึกและทดสอบกระบวนการทั้งหมดผ่าน `build_installer.bat` และ `python installer/build_installer.py` สำเร็จ 100% (ไฟล์ติดตั้งขนาด ~105.40 MB)
+
+### Milestone 10: การยกเลิกเวอร์ชัน C# WPF และรวมศูนย์การพัฒนาสู่ Python Tracker (WPF Cancellation & Python Consolidation)
+* **ขอบเขต:** ยกเลิกการพัฒนาเวอร์ชัน C# .NET 6 WPF อย่างเป็นทางการ และนำโค้ดเบสทั้งหมดกลับสู่สถาปัตยกรรม Python Tracker เพียงระบบเดียวตามคำสั่งและทิศทางของผู้ใช้
+* **เหตุผลการตัดสินใจ:**
+  - ลดภาระในการดูแลระบบสองภาษาคู่ขนาน (Dual-stack Maintenance Overhead)
+  - รวมศูนย์ฟีเจอร์ โลจิก และความสามารถทั้งหมด (UI CustomTkinter, ARKS War Room, EventBus, ระบบพิกัด Sector + 4 Slots, การส่ง Telemetry สดขึ้น Firebase RTDB, และการตรวจจับ Log แบบเรียลไทม์) ให้อยู่บน Python Tracker ซึ่งมีความคล่องตัวสูง
+* **การดำเนินการ:**
+  - ย้ายโครงการเนทีฟ C# WPF ทั้งหมด (`NekoTracker-WPF/` และ `NekoTracker.Tests/`) ไปยัง `archive/legacy_wpf/` ตามหลักธรรมาภิบาล พร้อมเอกสาร `archive/legacy_wpf/README.md`
+  - จัดทำเอกสารข้อกำหนดอดีต `Doc/archive/WPF_NATIVE_SPEC.md` และอัปเดตสารบัญเอกสารใน `Doc/archive/README.md` และ `archive/README.md`
+  - ปรับปรุงเอกสารสเปคหลัก `Doc/current/ACTIVE_SPECIFICATION.md` และคู่มือส่งต่องาน `Doc/current/AI_HANDOFF.md` ให้เป็น Pure Python Toolchain ตัด .NET 6 SDK ออก
+  - ปรับปรุงไปป์ไลน์ตัวติดตั้ง `installer/build_installer.py` และ Inno Setup Script `installer/NekoTracker.iss` ให้คอมไพล์และบรรจุเฉพาะ Python Tracker แบบเดี่ยว (ไม่มี `wpf-preview`)
+  - อัปเดต `tools/package_test_build.py` และสคริปต์ทดสอบให้รองรับเฉพาะโมเดล Python
+  - รันการทดสอบ Python Unit & Integration Tests ยืนยันผลการทำงานผ่านครบถ้วน 24 / 24 รายการ (100% Passed)
+
+### Milestone 11: การพอร์ตระบบความปลอดภัย AntiTamperGuard สู่ Python Tracker (Native 7-Layer Anti-Tamper & Data Integrity)
+* **ขอบเขต:** พอร์ตสถาปัตยกรรมป้องกันการโกงและการแทรกแซงข้อมูล `AntiTamperGuard` จาก C# Legacy มาเป็นโมดูลเนทีฟของ Python Tracker (`modules/security/`) เพื่อปิดช่องโหว่การตัดต่อและปลอมแปลง ActionLog ภายในเครื่องอย่างสมบูรณ์
+* **การดำเนินการ:**
+  - สร้างโมดูลความปลอดภัยเนทีฟ `modules/security/`:
+    - `tamper_violation.py`: บรรจุ `TamperViolationType` (12 ประเภทการละเมิด) และคลาส `TamperViolation`
+    - `process_validator.py`: ตรวจสอบ Process `pso2.exe` ผ่าน Windows Toolhelp32Snapshot (`IProcessValidator`, `WindowsProcessValidator`, `MockProcessValidator`)
+    - `action_log_record.py`: ตัวแปลง `ActionLogParser` และคลาส `ActionLogRecord`
+    - `file_handle_validator.py`: ตรวจสอบการถือครอง Write Handle บนไฟล์ Log ผ่าน Windows Restart Manager API (`rstrtmgr.dll`) เพื่อยืนยันว่า `pso2.exe` เป็นผู้เปิดไฟล์จริงและตรวจจับ Concurrent Writer ผิดปกติ
+    - `path_validator.py`: ตรวจสอบ Path ไดเรกทอรีทางการของ SEGA และตรวจจับการใช้ Reparse Point / NTFS Symlink ปลอมแปลง
+    - `cadence_analyzer.py`: วิเคราะห์ความสม่ำเสมอทางสถิติ (Entropy & Jitter) ตรวจจับบอทที่ส่งเงินดรอปเป็นจังหวะตายตัว (StdDev < 0.05s)
+    - `anti_tamper.py`: คลาสหลัก `AntiTamperGuard` รวมศูนย์การตรวจสอบ 9 เกราะป้องกันระดับสูง
+  - ผสานรวมเข้ากับ `meseta_tracker.py`:
+    - ตรวจสอบความต่อเนื่องของขนาดไฟล์และสถานะ File Handle ใน `monitor_log_file` ก่อนอ่าน
+    - ตรวจสอบ `validate_record` พร้อมตรวจจับ Bot Cadence ใน `process_log_line` ก่อนสะสมเงิน `session_meseta` และไอเทมดรอป
+    - เชื่อมโยง Event `tamper_violation` เข้ากับ `EventBus`
+  - ผสานรวมเข้ากับ `WarService`:
+    - ดักจับ Event `tamper_violation` และบันทึกลง `war_logs`
+    - หากเกิดการละเมิดร้ายแรง ปรับ `is_tamper_compromised = True`, ปรับ `meseta = 0`, สแตมป์สถานะ `"TAMPER_COMPROMISED"`, และตัดสิทธิ์การซิงค์ขึ้น Firebase RTDB
+  - เพิ่มชุดทดสอบเฉพาะทาง `tests/test_anti_tamper.py` (16 รายการทดสอบ)
+  - รันการทดสอบ Unit Tests ทั้งหมดในคลังโค้ดผ่านสมบูรณ์ 100% (40 / 40 รายการทดสอบ)

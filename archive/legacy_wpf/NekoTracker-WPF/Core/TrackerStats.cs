@@ -83,17 +83,23 @@ namespace NekoTracker.Core
 
                     if (income > 0)
                     {
-                        FirstDropTime ??= DateTime.Now;
-                        SessionMeseta += income;
-                        LastIncomeTime = DateTime.Now;
+                        if (NekoTracker.Common.AppVersion.IsVersionSecure(NekoTracker.Common.AppVersion.SemVer))
+                        {
+                            FirstDropTime ??= DateTime.Now;
+                            SessionMeseta += income;
+                            LastIncomeTime = DateTime.Now;
+                        }
                         changed = true;
                     }
                 }
                 else if (record.HasMesetaDrop)
                 {
-                    FirstDropTime ??= DateTime.Now;
-                    SessionMeseta += record.MesetaDrop;
-                    LastIncomeTime = DateTime.Now;
+                    if (NekoTracker.Common.AppVersion.IsVersionSecure(NekoTracker.Common.AppVersion.SemVer))
+                    {
+                        FirstDropTime ??= DateTime.Now;
+                        SessionMeseta += record.MesetaDrop;
+                        LastIncomeTime = DateTime.Now;
+                    }
                     changed = true;
                 }
 

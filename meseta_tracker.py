@@ -19,9 +19,16 @@ from modules.event_bus import event_bus
 from modules.war_mode.war_service import WarService
 from modules.war_mode.war_view import WarDashboardFrame
 from modules.utils import extract_character_info
+from modules.security import (
+    AntiTamperGuard,
+    TamperViolation,
+    TamperViolationType,
+    ActionLogRecord,
+    ActionLogParser,
+)
 
 try:
-    myappid = 'neko.family.shop.tracker v6.1.0' 
+    myappid = f'neko.family.shop.tracker v{CLIENT_VERSION}' 
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
 except Exception:
     pass
@@ -69,8 +76,23 @@ class NGSTrackerApp(ctk.CTk):
         self.board_coord = "0, 0, 1"
         self.needs_ui_update = False 
 
-        # Modular Subsystems
+        # Modular Subsystems & Security
         self.event_bus = event_bus
+        self.anti_tamper = AntiTamperGuard(
+            enforce_process_validation=ENFORCE_PROCESS_VALIDATION,
+            enforce_file_handle_validation=ENFORCE_FILE_HANDLE_VALIDATION,
+            enforce_canonical_path=ENFORCE_CANONICAL_PATH_GATING,
+            enforce_cadence_validation=ENFORCE_CADENCE_VALIDATION,
+            min_cadence_sample_size=MIN_CADENCE_SAMPLE_SIZE,
+            min_cadence_stddev=MIN_CADENCE_STDDEV_SEC,
+            max_single_meseta_drop=MAX_SINGLE_MESETA_DROP,
+            max_meseta_per_minute=MAX_MESETA_PER_MINUTE,
+            max_future_timestamp_skew=MAX_FUTURE_TIMESTAMP_SKEW_SEC,
+            max_past_timestamp_skew=MAX_PAST_TIMESTAMP_SKEW_SEC,
+            max_sequence_jump=MAX_SEQUENCE_JUMP_ALERT,
+            active_version=CLIENT_VERSION,
+        )
+        self.anti_tamper.on_violation = self._on_tamper_violation
         self.war_service = WarService()
         self.current_view = "offline"
         self.event_bus.subscribe("character_detected", self._on_character_detected)
@@ -277,10 +299,17 @@ class NGSTrackerApp(ctk.CTk):
         self.event_bus.emit("board_coord_changed", coord=norm, sector_x=gx, sector_y=gy, slot=cslot)
         return norm
 
-    def _on_character_detected(self, character_name="", **kwargs):
+    def _on_tamper_violation(self, violation: TamperViolation) -> None:
+        """Invoked when AntiTamperGuard detects an ActionLog integrity violation."""
+        print(f"[AntiTamper] Violation detected: {violation}")
+        self.event_bus.emit("tamper_violation", violation=violation)
+
+    def _on_character_detected(self, character_name="", player_id="", **kwargs):
         try:
             if character_name:
                 self.character_name = character_name
+                if hasattr(self, "anti_tamper"):
+                    self.anti_tamper.lock_identity(player_id or self.player_id, character_name)
                 if hasattr(self, "btn_enter_war"):
                     self.btn_enter_war.configure(text=f"⚔️ เข้าสู่สงคราม ({character_name})")
                 if hasattr(self, "war_service"):
@@ -399,6 +428,8 @@ class NGSTrackerApp(ctk.CTk):
             self.item_counts = {}
             self.first_drop_time = None
             self.last_income_time = None
+            if hasattr(self, "anti_tamper"):
+                self.anti_tamper.reset()
         
         if self.log_path and os.path.exists(self.log_path):
             try:
@@ -665,6 +696,14 @@ class NGSTrackerApp(ctk.CTk):
             
             if self.log_path and os.path.exists(self.log_path):
                 try:
+                    current_file_size = os.path.getsize(self.log_path)
+                    if hasattr(self, "anti_tamper"):
+                        if not self.anti_tamper.validate_stream(
+                            self.last_file_pos, current_file_size, file_path=self.log_path
+                        ):
+                            time.sleep(1)
+                            continue
+
                     with open(self.log_path, 'r', encoding=self.active_encoding, errors='replace') as f:
                         f.seek(self.last_file_pos)
                         lines = f.readlines()
@@ -683,6 +722,8 @@ class NGSTrackerApp(ctk.CTk):
 
     def process_log_line(self, line):
         try:
+            record = ActionLogParser.parse_line(line)
+
             # Extract in-game character name (not ID) from ActionLog:
             char_info = extract_character_info(line)
             if char_info:
@@ -695,11 +736,11 @@ class NGSTrackerApp(ctk.CTk):
             meseta_match = re.search(r'\t(?:N-)?Meseta\s*\(\s*(\d+)\s*\)', line, re.IGNORECASE)
             wallet_match = re.search(r'\tCurrent(?:N-)?Meseta\s*\(\s*(\d+)\s*\)', line, re.IGNORECASE)
 
-            raw_valid_action = ("[Pickup]" in line or "[AutoSell]" in line or "[Reward]" in line or "[Clear]" in line)
-            
-            if not raw_valid_action and wallet_match:
-                if "[" not in line: 
-                    raw_valid_action = True
+            raw_valid_action = ActionLogParser.is_valid_farming_action(
+                record.action if record else "",
+                has_wallet_update=bool(wallet_match),
+                raw_line=line,
+            )
 
             drop_amount = int(meseta_match.group(1)) if meseta_match else 0
 
@@ -716,12 +757,23 @@ class NGSTrackerApp(ctk.CTk):
                     self.current_wallet = new_wallet
 
                 if income > 0 and raw_valid_action:
+                    # Validate against AntiTamperGuard before crediting
+                    if hasattr(self, "anti_tamper") and record:
+                        record.meseta_drop = max(record.meseta_drop, income)
+                        if not self.anti_tamper.validate_record(record):
+                            # Tamper detected - discard income
+                            return
+
                     if self.first_drop_time is None: self.first_drop_time = time.time()
                     self.session_meseta += income
                     self.last_income_time = time.time()
                     self.event_bus.emit("meseta_earned", amount=income, wallet=self.current_wallet)
 
             if raw_valid_action and not meseta_match and "Num(" in line:
+                if hasattr(self, "anti_tamper") and record:
+                    if not self.anti_tamper.validate_record(record):
+                        return
+
                 item_pattern = r'\t([^\t]+)\tNum\((\d+)\)'
                 match = re.search(item_pattern, line)
                 if match:

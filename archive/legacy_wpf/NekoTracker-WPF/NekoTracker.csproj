@@ -6,11 +6,11 @@
     <Nullable>enable</Nullable>
     <UseWPF>true</UseWPF>
     
-    <!-- Versioning System (v7 alpha) -->
-    <Version>7.0.0-alpha</Version>
-    <AssemblyVersion>7.0.0.0</AssemblyVersion>
-    <FileVersion>7.0.0.0</FileVersion>
-    <InformationalVersion>7.0.0-alpha</InformationalVersion>
+    <!-- Versioning System (v7.1.0) -->
+    <Version>7.1.0</Version>
+    <AssemblyVersion>7.1.0.0</AssemblyVersion>
+    <FileVersion>7.1.0.0</FileVersion>
+    <InformationalVersion>7.1.0</InformationalVersion>
     
     <!-- Metadata -->
     <Product>NEKO Item &amp; Meseta Tracker</Product>

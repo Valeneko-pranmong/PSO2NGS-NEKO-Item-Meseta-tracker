@@ -30,6 +30,9 @@ try:
         SLOT_MAX,
         SLOT_TARGET_MESETA,
         SECTOR_TARGET_MESETA,
+        CLIENT_VERSION,
+        MIN_SECURE_VERSION,
+        REVOKED_VERSIONS,
     )
 except Exception:
     DEFAULT_FIREBASE_RTDB_URL = "https://arks-war-room-default-rtdb.asia-southeast1.firebasedatabase.app"
@@ -41,6 +44,68 @@ except Exception:
     SLOT_MAX = 4
     SLOT_TARGET_MESETA = 25_000_000
     SECTOR_TARGET_MESETA = 100_000_000
+    CLIENT_VERSION = "7.1.0"
+    MIN_SECURE_VERSION = "7.1.0"
+    REVOKED_VERSIONS = ["7.0.0-alpha", "7.0.0"]
+
+
+def parse_semver(v: str) -> Tuple[int, int, int, str]:
+    """Parse semantic version string into (major, minor, patch, pre_release)."""
+    if not v or not isinstance(v, str):
+        return (0, 0, 0, "")
+    clean = v.strip().lstrip("vV").strip()
+    pre = ""
+    if "-" in clean:
+        parts_pre = clean.split("-", 1)
+        clean = parts_pre[0].strip()
+        pre = parts_pre[1].strip()
+    nums = clean.split(".")
+    major = int(nums[0]) if len(nums) > 0 and nums[0].isdigit() else 0
+    minor = int(nums[1]) if len(nums) > 1 and nums[1].isdigit() else 0
+    patch = int(nums[2]) if len(nums) > 2 and nums[2].isdigit() else 0
+    return (major, minor, patch, pre)
+
+
+def compare_semver(v1: str, v2: str) -> int:
+    """
+    Compare two semantic version strings.
+    Returns: -1 if v1 < v2, 0 if equal, 1 if v1 > v2.
+    Pre-release versions (e.g. 7.0.0-alpha) have lower precedence than core release.
+    """
+    p1 = parse_semver(v1)
+    p2 = parse_semver(v2)
+    if p1[:3] > p2[:3]:
+        return 1
+    if p1[:3] < p2[:3]:
+        return -1
+    if p1[3] and not p2[3]:
+        return -1
+    if not p1[3] and p2[3]:
+        return 1
+    if p1[3] and p2[3]:
+        if p1[3] < p2[3]:
+            return -1
+        if p1[3] > p2[3]:
+            return 1
+    return 0
+
+
+def is_version_secure(
+    version: str,
+    min_version: str = MIN_SECURE_VERSION,
+    revoked_versions: Optional[Any] = None,
+) -> bool:
+    """
+    Verify client version against security policy.
+    Rejects revoked versions (e.g. 7.0.0-alpha) and versions below MIN_SECURE_VERSION.
+    """
+    if not version or not isinstance(version, str):
+        return False
+    v_clean = version.strip().lower().lstrip("v").strip()
+    rev_set = {r.lower().lstrip("v").strip() for r in (revoked_versions or REVOKED_VERSIONS)}
+    if v_clean in rev_set:
+        return False
+    return compare_semver(version, min_version) >= 0
 
 # Canonical landmark coordinates for ARKS galaxy presets
 LANDMARK_COORDINATES: Dict[str, Dict[str, Any]] = {
@@ -155,6 +220,7 @@ class WarService:
         self,
         war_room_path: str = "E:/ARKS War Room",
         firebase_url: Optional[str] = DEFAULT_FIREBASE_RTDB_URL,
+        client_version: Optional[str] = None,
         realtime_sync: bool = True,
         sync_debounce: float = 0.35,
         heartbeat_interval: float = 5.0,
@@ -162,6 +228,7 @@ class WarService:
     ) -> None:
         self.war_room_path = war_room_path
         self.firebase_url = firebase_url
+        self.client_version = client_version or CLIENT_VERSION
         self.operative_name = "Operative"
         self.target_coord: TargetCoord = TargetCoord(0, 0, 1)
 
@@ -171,6 +238,17 @@ class WarService:
         self.session_start_time = time.time()
         self.war_logs: List[Dict[str, Any]] = []
         self._logs_lock = threading.Lock()
+
+        # Remote Version Control Policy (Dynamic Firebase RTDB Sync)
+        self.remote_policy: Dict[str, Any] = {}
+        self.latest_version: str = CLIENT_VERSION
+        self.min_secure_version: str = MIN_SECURE_VERSION
+        self.revoked_versions: List[str] = list(REVOKED_VERSIONS)
+        self.remote_policy_fetched: bool = False
+
+        # Security & Anti-Tamper State
+        self.is_tamper_compromised: bool = False
+        self.tamper_violations_count: int = 0
 
         # Realtime Sync Architecture
         self.realtime_sync_enabled: bool = realtime_sync
@@ -202,6 +280,19 @@ class WarService:
         event_bus.subscribe("tracker_reset", self.on_tracker_reset)
         event_bus.subscribe("character_detected", self.on_character_detected)
         event_bus.subscribe("board_coord_changed", self.on_board_coord_changed)
+        event_bus.subscribe("tamper_violation", self.on_tamper_violation)
+
+    def on_tamper_violation(self, violation: Any = None, **kwargs) -> None:
+        """Handles anti-tamper violation events from tracker engine."""
+        if violation:
+            self.tamper_violations_count += 1
+            is_fatal = getattr(violation, "is_fatal", True)
+            if is_fatal:
+                self.is_tamper_compromised = True
+            msg = f"🛡️ [ANTI-TAMPER] {getattr(violation, 'message', str(violation))}"
+            self.add_log(msg, "warning" if not is_fatal else "danger")
+            if is_fatal:
+                self.trigger_realtime_sync()
 
     def on_character_detected(self, character_name: str = "", player_id: str = "", **kwargs) -> None:
         if character_name and character_name != self.operative_name:
@@ -354,6 +445,8 @@ class WarService:
         self.session_contribution = 0
         self.session_start_time = time.time()
         self._last_logged_contribution = 0
+        self.is_tamper_compromised = False
+        self.tamper_violations_count = 0
         self.add_log("รีเซ็ตสถิติรอบการฟาร์มสงคราม", "reset")
         self._save_stats()
         self.trigger_realtime_sync()
@@ -381,11 +474,109 @@ class WarService:
             return (self.session_contribution / duration) * 3600
         return 0.0
 
+    def fetch_remote_version_policy(self, timeout: float = 3.0) -> Dict[str, Any]:
+        """
+        Fetch dynamic version control policy from Firebase RTDB (/arks_war_room/version_control.json).
+        Updates local min_secure_version, latest_version, and revoked_versions if successfully fetched.
+        """
+        if not self.firebase_url:
+            return {}
+        base_url = self.firebase_url.rstrip("/")
+        url = f"{base_url}/arks_war_room/version_control.json"
+        try:
+            req = urllib.request.Request(
+                url, headers={"User-Agent": f"NEKOTracker/{self.client_version}"}
+            )
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                if isinstance(data, dict):
+                    self.remote_policy = data
+                    if "latest_version" in data and isinstance(data["latest_version"], str):
+                        self.latest_version = data["latest_version"]
+                    if "min_secure_version" in data and isinstance(data["min_secure_version"], str):
+                        self.min_secure_version = data["min_secure_version"]
+                    if "revoked_versions" in data:
+                        rev = data["revoked_versions"]
+                        if isinstance(rev, dict):
+                            self.revoked_versions = [k.replace("_", ".") for k, v in rev.items() if v]
+                        elif isinstance(rev, (list, set)):
+                            self.revoked_versions = list(rev)
+                    self.remote_policy_fetched = True
+                    return data
+        except Exception:
+            pass
+        return {}
+
+    def is_version_secure(self, version: Optional[str] = None) -> bool:
+        """Check if current client version meets security verification standards (remote policy or local fallback)."""
+        v = version or self.client_version
+        return is_version_secure(
+            v,
+            min_version=self.min_secure_version,
+            revoked_versions=self.revoked_versions,
+        )
+
+    def check_version_status(self) -> Dict[str, Any]:
+        """
+        Evaluate full status of client against remote version control policy:
+        Returns structured status:
+          - current_version: str
+          - latest_version: str
+          - min_secure_version: str
+          - is_secure: bool
+          - is_latest: bool
+          - status: "SECURE_LATEST" | "UPDATE_AVAILABLE" | "REVOKED_INSECURE" | "OUTDATED_INSECURE"
+          - message: str
+          - download_url: str
+        """
+        if not self.remote_policy_fetched:
+            self.fetch_remote_version_policy()
+
+        is_sec = self.is_version_secure(self.client_version)
+        cmp_latest = compare_semver(self.client_version, self.latest_version)
+        is_latest = cmp_latest >= 0
+        v_clean = self.client_version.strip().lower().lstrip("v").strip()
+        rev_set = {r.lower().lstrip("v").strip() for r in self.revoked_versions}
+
+        download_url = self.remote_policy.get(
+            "download_url", "https://github.com/Vale3neko/PSO2NGS-NEKO-Item-Meseta-tracker/releases"
+        )
+
+        if v_clean in rev_set:
+            status = "REVOKED_INSECURE"
+            msg = f"เวอร์ชัน {self.client_version} ถูกเพิกถอนเนื่องจากมีปัญหาความปลอดภัย ยอดเงินจะไม่ถูกบันทึก กรุณาอัปเดตเป็น {self.latest_version}"
+        elif not is_sec:
+            status = "OUTDATED_INSECURE"
+            msg = f"เวอร์ชัน {self.client_version} ต่ำกว่าเกณฑ์ความปลอดภัยขั้นต่ำ ({self.min_secure_version}) ยอดเงินจะไม่ถูกบันทึก กรุณาอัปเดตเป็น {self.latest_version}"
+        elif not is_latest:
+            status = "UPDATE_AVAILABLE"
+            msg = f"มีเวอร์ชันใหม่ {self.latest_version} (เวอร์ชันปัจจุบัน: {self.client_version}) แนะนำให้อัปเดตเพื่อฟีเจอร์ล่าสุด"
+        else:
+            status = "SECURE_LATEST"
+            msg = f"เวอร์ชันปัจจุบัน {self.client_version} เป็นเวอร์ชันล่าสุดและปลอดภัย"
+
+        return {
+            "current_version": self.client_version,
+            "latest_version": self.latest_version,
+            "min_secure_version": self.min_secure_version,
+            "is_secure": is_sec,
+            "is_latest": is_latest,
+            "status": status,
+            "message": msg,
+            "download_url": download_url,
+            "announcement": self.remote_policy.get("announcement", ""),
+        }
+
     def get_database_payload(self) -> Dict[str, Any]:
         """
         Produce database record storing:
         - character_name: In-game name read from log (Primary Key, NOT ID)
-        - meseta: Farmed meseta
+        - meseta: Farmed meseta (gated by version security: 0 if version is insecure)
+        - raw_meseta: Unfiltered session contribution
+        - client_version: Client application version sent for security verification
+        - version: Semantic version
+        - security_status: SECURE or REVOKED_VERSION_INSECURE
+        - version_security_valid: Boolean security verification flag
         - sector_coord: dict {"x": X, "y": Y, "slot": Slot}
         - target_coord: dict {"x": X, "y": Y, "slot": Slot}
         - coord_key: "X,Y"
@@ -394,15 +585,32 @@ class WarService:
         """
         gx, gy, slot = self.target_coord.x, self.target_coord.y, self.target_coord.slot
         now_ms = int(time.time() * 1000)
+        is_secure = self.is_version_secure() and not self.is_tamper_compromised
+
+        # Security gate: Insecure/revoked versions or compromised tamper do NOT count meseta
+        counted_meseta = self.session_contribution if is_secure else 0
+        if self.is_tamper_compromised:
+            sec_status = "TAMPER_COMPROMISED"
+        elif is_secure:
+            sec_status = "SECURE"
+        else:
+            sec_status = "REVOKED_VERSION_INSECURE"
+
         return {
             "character_name": self.operative_name,
-            "meseta": self.session_contribution,
+            "meseta": counted_meseta,
+            "raw_meseta": self.session_contribution,
+            "client_version": self.client_version,
+            "version": self.client_version,
+            "app_version": self.client_version,
+            "security_status": sec_status,
+            "version_security_valid": is_secure,
             "sector_coord": {"x": gx, "y": gy, "slot": slot},
             "target_coord": {"x": gx, "y": gy, "slot": slot},
             "coord_key": f"{gx},{gy}",
             "slot": slot,
             "lastUpdated": now_ms,
-            "farming_rate_mhr": round(self.get_live_rate()),
+            "farming_rate_mhr": round(self.get_live_rate()) if is_secure else 0,
             "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
             "timestamp": now_ms,
         }
@@ -485,9 +693,20 @@ class WarService:
         if not self.firebase_url:
             return False, "ไม่ได้ระบุ Firebase Database URL"
 
+        if not self.remote_policy_fetched:
+            self.fetch_remote_version_policy(timeout=min(2.0, timeout))
+
         base_url = self.firebase_url.rstrip("/")
         db_payload = self.get_database_payload()
         now_ms = db_payload["lastUpdated"]
+        is_secure = db_payload["version_security_valid"]
+        client_ver = self.client_version
+
+        if self.is_tamper_compromised:
+            return False, "ระบบตรวจพบการแทรกแซงข้อมูล (Anti-Tamper Compromised): ระงับการบันทึกยอดเงินขึ้นฐานข้อมูล"
+
+        if not is_secure:
+            return False, f"เวอร์ชันไคลเอนต์ ({client_ver}) ไม่ผ่านเกณฑ์ความปลอดภัย (Security Revoked): ปฏิเสธการบันทึกยอดเงินขึ้นฐานข้อมูล"
 
         char_name = self.operative_name or "Operative"
         safe_key = "".join(
@@ -502,6 +721,11 @@ class WarService:
         op_payload = {
             "character_name": char_name,
             "meseta": db_payload["meseta"],
+            "raw_meseta": db_payload["raw_meseta"],
+            "client_version": client_ver,
+            "version": client_ver,
+            "security_status": db_payload["security_status"],
+            "version_security_valid": is_secure,
             "sector_coord": db_payload["sector_coord"],
             "coord_key": db_payload["coord_key"],
             "slot": slot,
@@ -516,6 +740,9 @@ class WarService:
         sec_payload = {
             "character_name": char_name,
             "meseta": db_payload["meseta"],
+            "client_version": client_ver,
+            "security_status": db_payload["security_status"],
+            "status": "claimed" if (is_secure and db_payload["meseta"] >= SLOT_TARGET_MESETA) else ("BLOCKED_INSECURE_VERSION" if not is_secure else "contributing"),
             "slot": slot,
             "lastUpdated": now_ms,
         }
@@ -524,6 +751,8 @@ class WarService:
         sub_payload = {
             "character_name": char_name,
             "meseta": db_payload["meseta"],
+            "client_version": client_ver,
+            "security_status": db_payload["security_status"],
             "lastUpdated": now_ms,
         }
 
@@ -581,6 +810,37 @@ class WarService:
             except Exception:
                 pass
 
+            # If client version is insecure, log security warning and reject counting meseta
+            if not is_secure:
+                warn_entry = {
+                    "time": time.strftime("%H:%M:%S"),
+                    "day": 1,
+                    "type": "SECURITY_WARNING",
+                    "character_name": char_name,
+                    "meseta": 0,
+                    "gain": 0,
+                    "client_version": client_ver,
+                    "security_status": "REVOKED_VERSION_INSECURE",
+                    "coord": f"{self.target_coord.x}, {self.target_coord.y}, {slot}",
+                    "slot": slot,
+                    "message": f"[ความปลอดภัย] ตรวจพบไคลเอนต์เวอร์ชัน {client_ver} ซึ่งมีช่องโหว่ความปลอดภัย ยอดเงินจะไม่ถูกนับเข้าสู่ฐานข้อมูล กรุณาอัปเดตเป็น 7.1.0",
+                    "timestamp": now_ms,
+                    "lastUpdated": now_ms,
+                }
+                url_log = f"{base_url}/arks_war_room/war_logs.json"
+                req_log = urllib.request.Request(
+                    url_log,
+                    data=json.dumps(warn_entry).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                try:
+                    with urllib.request.urlopen(req_log, timeout=timeout) as resp:
+                        pass
+                except Exception:
+                    pass
+                return False, f"ไคลเอนต์เวอร์ชัน {client_ver} มีช่องโหว่ความปลอดภัย ยอดเงินจะไม่ถูกนับเข้าสู่ฐานข้อมูล (กรุณาอัปเดตเป็น 7.1.0)"
+
             # 5. Add to live war logs when contribution increases
             if self.session_contribution > self._last_logged_contribution:
                 gain = self.session_contribution - self._last_logged_contribution
@@ -593,9 +853,11 @@ class WarService:
                     "character_name": char_name,
                     "meseta": self.session_contribution,
                     "gain": gain,
+                    "client_version": client_ver,
+                    "security_status": "SECURE",
                     "coord": f"{gx}, {gy}, {cslot}",
                     "slot": cslot,
-                    "message": f"{char_name} เก็บเกี่ยว +{gain:,} ℳ พิกัด [{gx}, {gy}] ช่อง #{cslot} (ยอดสะสม: {self.session_contribution:,} ℳ)",
+                    "message": f"{char_name} เก็บเกี่ยว +{gain:,} ℳ พิกัด [{gx}, {gy}] ช่อง #{cslot} (ยอดสะสม: {self.session_contribution:,} ℳ | v{client_ver})",
                     "timestamp": now_ms,
                     "lastUpdated": now_ms,
                 }
@@ -625,27 +887,34 @@ class WarService:
         db_payload = self.get_database_payload()
 
         payload = {
-            "version": "2.0",
+            "version": self.client_version,
+            "client_version": self.client_version,
+            "security_status": db_payload["security_status"],
+            "version_security_valid": db_payload["version_security_valid"],
             "lastSync": time.strftime("%Y-%m-%d %H:%M:%S"),
             "timestamp": int(now * 1000),
             "lastUpdated": int(now * 1000),
             # Core database fields
             "character_name": db_payload["character_name"],
             "meseta": db_payload["meseta"],
+            "raw_meseta": db_payload["raw_meseta"],
             "sector_coord": db_payload["sector_coord"],
             "target_coord": db_payload["target_coord"],
             "coord_key": db_payload["coord_key"],
             "slot": db_payload["slot"],
-            "farmingRateMhr": round(self.get_live_rate()),
+            "farmingRateMhr": round(self.get_live_rate()) if db_payload["version_security_valid"] else 0,
             "operative": {
                 "name": self.operative_name,
                 "character_name": self.operative_name,
+                "client_version": self.client_version,
+                "security_status": db_payload["security_status"],
                 "targetSector": db_payload["target_coord"],
                 "sectorCoord": db_payload["sector_coord"],
                 "slot": db_payload["slot"],
-                "sessionContribution": self.session_contribution,
+                "sessionContribution": db_payload["meseta"],
+                "rawContribution": self.session_contribution,
                 "totalFarmed": self.total_farmed,
-                "farmingRateMhr": round(self.get_live_rate()),
+                "farmingRateMhr": round(self.get_live_rate()) if db_payload["version_security_valid"] else 0,
             },
             "recentLogs": self.get_recent_logs(10),
         }

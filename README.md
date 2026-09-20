@@ -1,9 +1,8 @@
 # 🌸 NEKO Item & Meseta Tracker (PSO2:NGS)
 
-![Version](https://img.shields.io/badge/Python_Version-6.1.0-FF69B4?style=for-the-badge)
-![WPF Version](https://img.shields.io/badge/.NET_WPF_Version-7.0.0--alpha-8A2BE2?style=for-the-badge)
+![Version](https://img.shields.io/badge/Python_Version-7.1.0-FF69B4?style=for-the-badge)
 ![Platform](https://img.shields.io/badge/Platform-Windows_10%2F11-blue?style=for-the-badge)
-![Tests](https://img.shields.io/badge/Tests-40%20Passed-brightgreen?style=for-the-badge)
+![Tests](https://img.shields.io/badge/Tests-24%20Passed-brightgreen?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-Non--Commercial-red?style=for-the-badge)
 
 โปรแกรมและเครื่องมือติดตามรายได้ N-Meseta และไอเทมดรอปแบบ Real-time สำหรับเกม **Phantasy Star Online 2: New Genesis (PSO2:NGS)** พัฒนาขึ้นโดยทีม **NEKO FAMILY TEAM SHIP 4 JP** ออกแบบมาเป็นพิเศษสำหรับการฟาร์ม PSE Burst, การคำนวณอัตราความเร็ว Meseta ต่อชั่วโมง (M/hr), และการทำสงครามยึดพื้นที่ในโหมด **ARKS War Room**
@@ -42,23 +41,18 @@ E:\PSO2NGS-NEKO-Item-Meseta-tracker\
 │   ├── __init__.py                         # Tools Package
 │   └── firebase_war_sync.py                # ตัวส่งข้อมูลขึ้น Firebase RTDB (Admin SDK + REST)
 ├── 📂 tests/                               # [CURRENT] 🟢 ชุดทดสอบ Unit Tests ของ Python
-│   └── test_tracker_modules.py             # ทดสอบ EventBus, WarService, Zero-Login (13 Tests)
-├── 📂 NekoTracker-WPF/                     # [CURRENT] 🟢 โครงการเนทีฟ C# .NET 6 WPF (V7.0.0-alpha)
-│   ├── App.xaml / App.xaml.cs              # จุดเริ่มต้นโปรแกรม WPF
-│   ├── MainWindow.xaml / cs                # หน้าต่างหลักธีมพาสเทล
-│   ├── OverlayWindow.xaml / cs             # หน้าต่าง Overlay ลอยทับเกม
-│   ├── 📂 Core/                            # ActionLogParser, LogWatcher, TrackerStats
-│   ├── 📂 Security/                        # AntiTamperGuard, IProcessValidator
-│   ├── 📂 Localization/                    # LanguageManager (en, ja, th)
-│   └── 📂 Themes/                          # PastelTheme.xaml
-├── 📂 NekoTracker.Tests/                   # [CURRENT] 🟢 ชุดทดสอบ Unit Tests ของ C# WPF
-│   ├── AntiTamperTests.cs                  # ทดสอบระบบตรวจจับการโกงและการปลอมแปลง
-│   ├── LocalizationTests.cs                # ทดสอบการแปลภาษาแบบ JSON
-│   ├── LogParserTests.cs                   # ทดสอบการ Parse ข้อความ ActionLog
-│   └── VersioningTests.cs                  # ทดสอบการกำหนดเวอร์ชัน V7
+│   └── test_tracker_modules.py             # ทดสอบ EventBus, WarService, Zero-Login, SemVer, Security (24 Tests)
+├── 📂 installer/                           # [CURRENT] 🟢 ไฟล์กำหนดค่าและสคริปต์ไปป์ไลน์ตัวติดตั้ง
+│   ├── NekoTracker.iss                     # สคริปต์ Inno Setup 6 (Per-user, 64-bit, LZMA2 Compression)
+│   ├── build_installer.py                  # สคริปต์อัตโนมัติ (Tests -> Builds -> Package -> Smoke)
+│   ├── LICENSE.txt                         # ข้อกำหนดและสิทธิ์การใช้งาน (Non-Commercial)
+│   └── README.md                           # คู่มือการทำงานของระบบตัวติดตั้ง
+├── 📂 artifacts/                           # [CURRENT] 🟢 คลังอาร์ติแฟกต์ทางการ
+│   └── 📂 release-v6.1.0/                  # [CURRENT] 🟢 โฟลเดอร์ Release หลัก (Python Tracker Setup.exe, SHA256, Docs)
 ├── 📂 archive/                             # [ARCHIVE] 🔴 ซอร์สโค้ดเก่าที่ปลดระวาง (ห้ามใช้งาน)
 │   ├── README.md                           # บันทึกชี้แจงเหตุผลการปลดระวางโค้ด
-│   └── 📂 legacy_auth/                     # โค้ดระบบ Login เก่าที่ยกเลิกไปแล้ว
+│   ├── 📂 legacy_auth/                     # โค้ดระบบ Login เก่าที่ยกเลิกไปแล้ว
+│   └── 📂 legacy_wpf/                      # โครงการ C# WPF Native Tracker ที่ยกเลิกการพัฒนาแล้ว
 ├── 📂 fonts/                               # ฟอนต์ Sarabun และ Kanit สำหรับ Windows GDI
 ├── config.py                               # ค่าคอนฟิกูเรชันหลักของ Python App
 ├── dashboard_ui.py                         # แดชบอร์ดสรุปสถิติหน้าแรก
@@ -66,6 +60,7 @@ E:\PSO2NGS-NEKO-Item-Meseta-tracker\
 ├── meseta_tracker.py                       # จุดเริ่มต้นรันหลักของ Python Application
 ├── run_app.bat                             # สคริปต์เปิดรันแอปพลิเคชันอย่างรวดเร็ว
 ├── run_test.bat                            # สคริปต์รันชุดทดสอบ Python อัตโนมัติ
+├── build_installer.bat                     # สคริปต์สร้างไฟล์ติดตั้ง Windows Setup อัตโนมัติ
 └── README.md                               # เอกสารหลักฉบับนี้
 ```
 
@@ -91,35 +86,52 @@ E:\PSO2NGS-NEKO-Item-Meseta-tracker\
 * **Zero-Login Architecture:** ตรวจจับชื่อตัวละครจริงในเกมจากไฟล์ Log อัตโนมัติและใช้เป็น Primary Key ทันที ไม่ต้องสร้างบัญชี ไม่ต้องจำรหัสผ่าน
 * **Firebase Realtime Sync:** เธรดเบื้องหลังส่ง Telemetry สดขึ้น Google Firebase Realtime Database ด้วย Debounce 0.35 วินาที พร้อม Heartbeat ทุก 5 วินาที
 
-### 3. 🛡️ C# .NET 6 WPF Native Tracker (V7.0.0-alpha)
-* **ประสิทธิภาพระดับ Native:** เรนเดอร์ด้วยฮาร์ดแวร์กราฟิก ประหยัดทรัพยากรเครื่อง
-* **AntiTamperGuard:** ระบบตรวจจับความถูกต้องของ Process ป้องกันการโกงตัวเลขสถิติ
-* **Multi-Language Support:** รองรับภาษาไทย (TH), ภาษาอังกฤษ (EN), และภาษาญี่ปุ่น (JA)
+### 3. 🛡️ Client Version Security & Data Gating
+* **ระบบตรวจสอบความปลอดภัยของเวอร์ชัน:** ส่งเลขเวอร์ชันไคลเอนต์ (`client_version`) ขึ้น Firebase RTDB อัตโนมัติทุกครั้งที่ซิงค์ข้อมูล
+* **Meseta Security Gating:** ไคลเอนต์เวอร์ชันที่มีช่องโหว่ความปลอดภัยหรือถูกเพิกถอน (Revoked) จะถูกปฏิเสธไม่นับยอดเงินเข้าสู่ฐานข้อมูล (`meseta = 0`) และบันทึกคำเตือนความปลอดภัย
+* **Pure Python Architecture:** ออกแบบด้วย Python 3.11 และ CustomTkinter น้ำหนักเบา ปลอดภัย และเสถียร
 
 ---
 
 ## 🚀 วิธีการใช้งาน (Getting Started)
 
-### การใช้งานทั่วไปสำหรับผู้เล่น
-1. ดับเบิลคลิกเปิดโปรแกรมผ่าน `run_app.bat` หรือเปิดไฟล์ `.exe`
-2. คลิกปุ่ม **"📂 จิ้มเลือกโฟลเดอร์ Log"** และเลือกโฟลเดอร์ Log ของเกม PSO2:NGS
+### การติดตั้งและใช้งานสำหรับผู้เล่นทั่วไป
+1. ดาวน์โหลดตัวติดตั้ง **`NekoTracker-Setup-v6.1.0.exe`** จากโฟลเดอร์ [`artifacts/release-v6.1.0/`](artifacts/release-v6.1.0/)
+2. ดับเบิลคลิกติดตั้งตามวิซาร์ด (ระบบจะสร้างไอคอนทางลัดบน Desktop และ Start Menu ให้โดยอัตโนมัติ ติดตั้งในระดับผู้ใช้ ไม่ต้องใช้สิทธิ์ Admin)
+3. เปิดโปรแกรม แล้วคลิกปุ่ม **"📂 จิ้มเลือกโฟลเดอร์ Log"** เลือกโฟลเดอร์ Log ของเกม PSO2:NGS
    * *พาธเริ่มต้น: `Documents\SEGA\PHANTASYSTARONLINE2\log_ngs`*
-3. เริ่มต้นฟาร์มในเกม ตัวเลขเงินและรายการไอเทมจะอัปเดตแบบเรียลไทม์ทันที!
-4. หากต้องการร่วมสงคราม ให้คลิก **"⚔️ เข้าสู่สงคราม (ARKS War)"** ป้อนพิกัด Sector หรือเลือกช่อง Quadrant ที่ต้องการช่วยทีมยึดครอง
+4. เริ่มต้นฟาร์มในเกม ตัวเลขเงินและรายการไอเทมจะอัปเดตแบบเรียลไทม์ทันที!
+5. หากต้องการร่วมสงคราม ให้คลิก **"⚔️ เข้าสู่สงคราม (ARKS War)"** ป้อนพิกัด Sector หรือเลือกช่อง Quadrant ที่ต้องการช่วยทีมยึดครอง
+
+### การรันจาก Source Code
+* ดับเบิลคลิก `run_app.bat` หรือสั่งรัน `python meseta_tracker.py`
+
+---
+
+## 🏗️ การสร้างไฟล์ติดตั้ง (Installer Build Pipeline)
+
+วิศวกรหรือผู้พัฒนาสามารถสั่งบิลด์ตัวติดตั้ง Windows พร้อมขั้นตอนการทดสอบ Process Smoke แบบอัตโนมัติ 100%:
+
+```bash
+# รันผ่าน Batch Script (คลิกเดียว)
+build_installer.bat
+
+# หรือรันผ่านคำสั่ง Python
+python installer/build_installer.py
+```
+> ระบบจะรันการทดสอบ Python (24 รายการ ผ่าน 100%) -> แพ็กเกจ Python Tracker ด้วย PyInstaller -> คอมไพล์ Inno Setup (มาตรฐาน Per-User `%LOCALAPPDATA%\NEKO FAMILY\NekoTracker`) -> สร้างแฮช SHA-256 -> ทำ Lifecycle Smoke Test ใน Sandbox ตามมาตรฐานกลาง [`Doc/reference/INSTALLER_STANDARD.md`](Doc/reference/INSTALLER_STANDARD.md)
 
 ---
 
 ## 🧪 การรันชุดทดสอบ (Automated Testing)
 
-โครงการนี้มีชุดทดสอบครอบคลุมทั้ง 2 แพลตฟอร์ม รวม **40 การทดสอบ** ซึ่งผ่านการรับรอง 100%:
+โครงการนี้มีชุดทดสอบ Python Unit & Integration Tests ครอบคลุม **24 การทดสอบ** ซึ่งผ่านการรับรอง 100%:
 
 ```bash
-# 1. ทดสอบระบบ Python (13 รายการ)
+# ทดสอบระบบ Python (24 รายการ)
 python -m pytest -v
-# หรือดับเบิลคลิก run_test.bat
 
-# 2. ทดสอบระบบ C# .NET 6 WPF (27 รายการ)
-dotnet test NekoTracker.Tests/NekoTracker.Tests.csproj
+# หรือดับเบิลคลิก run_test.bat
 ```
 
 ---
@@ -130,6 +142,7 @@ dotnet test NekoTracker.Tests/NekoTracker.Tests.csproj
 * 🟢 **[สเปคระบบปัจจุบัน (ACTIVE_SPECIFICATION.md)](Doc/current/ACTIVE_SPECIFICATION.md)**
 * 🟢 **[บันทึกประวัติวิศวกรรม (ENGINEERING_LOG.md)](Doc/current/ENGINEERING_LOG.md)**
 * 🟢 **[คู่มือส่งต่องานสำหรับ AI Agents (AI_HANDOFF.md)](Doc/current/AI_HANDOFF.md)**
+* 🔵 **[มาตรฐานกลางระบบติดตั้งซอฟต์แวร์ Windows (INSTALLER_STANDARD.md)](Doc/reference/INSTALLER_STANDARD.md)**
 * 🔵 **[สถาปัตยกรรมระบบและการไหลของข้อมูล (ARCHITECTURE.md)](Doc/reference/ARCHITECTURE.md)**
 * 🔵 **[ข้อกำหนดระบบพิกัด Sector และ 4 Slots (COORDINATE_SYSTEM.md)](Doc/reference/COORDINATE_SYSTEM.md)**
 * 🔵 **[โครงสร้างข้อมูล Firebase RTDB (FIREBASE_WIRE_SCHEMA.md)](Doc/reference/FIREBASE_WIRE_SCHEMA.md)**
