@@ -32,6 +32,7 @@ from config import (
 )
 from PIL import Image
 from dashboard_ui import DashboardFrame
+from modules.i18n import i18n, t, tr
 
 try:
     from .war_service import WarService, TEAMS_DATA
@@ -69,13 +70,14 @@ class WarDashboardFrame(ctk.CTkFrame):
             event_bus.subscribe("realtime_sync_started", self._on_realtime_sync_started)
             event_bus.subscribe("realtime_sync_completed", self._on_realtime_sync_completed)
             event_bus.subscribe("board_coord_changed", self._on_board_coord_changed)
+            event_bus.subscribe("language_changed", self._on_language_changed)
         except Exception:
             pass
 
     def _on_realtime_sync_started(self, **kwargs) -> None:
         try:
             if hasattr(self, "lbl_sync_time") and self.lbl_sync_time.winfo_exists():
-                self.lbl_sync_time.configure(text="⚡ กำลังซิงค์ขึ้น Firebase...", text_color="#0284C7")
+                self.lbl_sync_time.configure(text=t("war_syncing"), text_color="#0284C7")
         except Exception:
             pass
 
@@ -87,12 +89,12 @@ class WarDashboardFrame(ctk.CTkFrame):
                 if success:
                     contrib = contribution if contribution > 0 else getattr(self.war_service, "session_contribution", 0)
                     self.lbl_sync_time.configure(
-                        text=f"⚡ Firebase ซิงค์: ล่าสุด {t_str} (+{contrib:,} ℳ)",
+                        text=t("war_synced", time=t_str, contrib=f"{contrib:,}"),
                         text_color="#10B981",
                     )
                 else:
                     self.lbl_sync_time.configure(
-                        text=f"⚡ รอการเชื่อมต่อ...",
+                        text=t("war_sync_waiting"),
                         text_color="#F59E0B",
                     )
         except Exception:
@@ -119,7 +121,7 @@ class WarDashboardFrame(ctk.CTkFrame):
 
         self.lbl_op_title = ctk.CTkLabel(
             top_left,
-            text="👤 ชื่อในเกม: -",
+            text=t("war_op_title", name="-"),
             font=(FONT_FAMILY, 13, "bold"),
             text_color=COLOR_TEXT_MAIN,
         )
@@ -128,7 +130,7 @@ class WarDashboardFrame(ctk.CTkFrame):
 
         self.lbl_op_sub = ctk.CTkLabel(
             top_left,
-            text="Primary Key จาก Log ไฟล์เกม",
+            text=t("war_op_sub"),
             font=(FONT_FAMILY, 10),
             text_color="#64748B",
         )
@@ -138,12 +140,13 @@ class WarDashboardFrame(ctk.CTkFrame):
         self.coord_frame = ctk.CTkFrame(self.top_banner, fg_color="transparent")
         self.coord_frame.pack(side="left", padx=(15, 0), pady=4)
 
-        ctk.CTkLabel(
+        self.lbl_coord_title = ctk.CTkLabel(
             self.coord_frame,
-            text="🎯 พิกัด [X, Y]:",
+            text=t("war_coord_label"),
             font=(FONT_FAMILY, 11, "bold"),
             text_color=COLOR_TEXT_MAIN,
-        ).pack(side="left", padx=(0, 4))
+        )
+        self.lbl_coord_title.pack(side="left", padx=(0, 4))
 
         init_coord = "0, 0, 1"
         if hasattr(self.war_service, "target_coord"):
@@ -192,18 +195,7 @@ class WarDashboardFrame(ctk.CTkFrame):
             self.slot_buttons[s_idx] = btn_s
 
         # Preset Landmarks Dropdown
-        landmark_options = [
-            "🪐 พิกัดสำคัญ...",
-            "🌌 Core [0, 0]",
-            "🏙️ NGS [3, 3]",
-            "🌍 Earth [9, -3]",
-            "☀️ Sun [8, -3]",
-            "🔴 Mars [9, -4]",
-            "🌲 Naberius [-2, -2]",
-            "🌋 Amduskia [-3, -3]",
-            "🏜️ Lillipa [-1, -3]",
-            "🚀 Hail Mary [20, 7]",
-        ]
+        landmark_options = i18n.get_landmarks()
         self.opt_landmark = ctk.CTkOptionMenu(
             self.coord_frame,
             values=landmark_options,
@@ -222,7 +214,7 @@ class WarDashboardFrame(ctk.CTkFrame):
 
         self.btn_paste_coord = ctk.CTkButton(
             self.coord_frame,
-            text="📋 วาง",
+            text=t("war_paste_btn"),
             width=48,
             height=28,
             font=(FONT_FAMILY, 11, "bold"),
@@ -236,7 +228,7 @@ class WarDashboardFrame(ctk.CTkFrame):
 
         self.btn_save_coord = ctk.CTkButton(
             self.coord_frame,
-            text="💾 บันทึก",
+            text=t("war_save_btn"),
             width=54,
             height=28,
             font=(FONT_FAMILY, 11, "bold"),
@@ -258,7 +250,7 @@ class WarDashboardFrame(ctk.CTkFrame):
 
         self.lbl_sync_time = ctk.CTkLabel(
             top_right,
-            text="⚡ ซิงค์อัตโนมัติพร้อมทำงาน",
+            text=t("war_sync_ready"),
             font=(FONT_FAMILY, 10, "bold"),
             text_color=COLOR_TEXT_SUB,
         )
@@ -296,7 +288,7 @@ class WarDashboardFrame(ctk.CTkFrame):
         # Left Action: Open Web ARKS War Room
         self.btn_open_web = ctk.CTkButton(
             btn_bar,
-            text="🪐 ARKS War Room (Web)",
+            text=t("war_btn_open_web"),
             font=(FONT_FAMILY, 11, "bold"),
             fg_color="#0284C7",
             hover_color="#0369A1",
@@ -310,7 +302,7 @@ class WarDashboardFrame(ctk.CTkFrame):
         # Right Action: Back to Main Offline View (No login / logout needed!)
         self.btn_back_offline = ctk.CTkButton(
             btn_bar,
-            text="🔙 กลับสู่โหมดออฟไลน์",
+            text=t("war_btn_back_offline"),
             font=(FONT_FAMILY, 11, "bold"),
             fg_color=COLOR_PINK_HEADER,
             hover_color=COLOR_PINK_SOFT,
@@ -353,12 +345,19 @@ class WarDashboardFrame(ctk.CTkFrame):
             "Core": (0, 0),
             "NGS": (3, 3),
             "Earth": (9, -3),
+            "地球": (9, -3),
             "Sun": (8, -3),
+            "太陽": (8, -3),
             "Mars": (9, -4),
+            "火星": (9, -4),
             "Naberius": (-2, -2),
+            "ナベリウス": (-2, -2),
             "Amduskia": (-3, -3),
+            "アムドゥスキア": (-3, -3),
             "Lillipa": (-1, -3),
+            "リリーパ": (-1, -3),
             "Hail Mary": (20, 7),
+            "ヘイルメアリー": (20, 7),
         }
         for key, (lx, ly) in landmarks_map.items():
             if key in choice:
@@ -367,7 +366,7 @@ class WarDashboardFrame(ctk.CTkFrame):
                 self._on_coord_submit()
                 break
         if hasattr(self, "opt_landmark"):
-            self.opt_landmark.set("🪐 พิกัดสำคัญ...")
+            self.opt_landmark.set(i18n.get_landmarks()[0])
 
     def _on_coord_submit(self) -> None:
         val = self.coord_var.get().strip()
@@ -397,8 +396,8 @@ class WarDashboardFrame(ctk.CTkFrame):
         self._on_coord_submit()
         try:
             if hasattr(self, "btn_paste_coord"):
-                self.btn_paste_coord.configure(text="✓ วางแล้ว", fg_color="#059669")
-                self.after(1200, lambda: self.btn_paste_coord.configure(text="📋 วาง", fg_color="#2563EB"))
+                self.btn_paste_coord.configure(text=t("war_pasted_btn"), fg_color="#059669")
+                self.after(1200, lambda: self.btn_paste_coord.configure(text=t("war_paste_btn"), fg_color="#2563EB"))
         except Exception:
             pass
 
@@ -427,7 +426,7 @@ class WarDashboardFrame(ctk.CTkFrame):
         return "break"
 
     def _setup_coord_entry_support(self) -> None:
-        """Attach right-click context menu, clipboard paste handler, and Thai keyboard shortcuts."""
+        """Attach right-click context menu, clipboard paste handler, and Thai/EN keyboard shortcuts."""
         inner = getattr(self.entry_coord, "_entry", self.entry_coord)
 
         def _do_paste(event=None):
@@ -436,20 +435,20 @@ class WarDashboardFrame(ctk.CTkFrame):
         def _show_menu(event):
             menu = tk.Menu(self, tearoff=0)
             menu.add_command(
-                label="✂️ ตัด (Cut)",
+                label=t("war_context_cut"),
                 command=lambda: inner.event_generate("<<Cut>>"),
             )
             menu.add_command(
-                label="📄 คัดลอก (Copy)",
+                label=t("war_context_copy"),
                 command=lambda: inner.event_generate("<<Copy>>"),
             )
             menu.add_command(
-                label="📋 วางพิกัด (Paste)",
+                label=t("war_context_paste"),
                 command=_do_paste,
             )
             menu.add_separator()
             menu.add_command(
-                label="🔘 เลือกทั้งหมด (Select All)",
+                label=t("war_context_select_all"),
                 command=lambda: (inner.select_range(0, tk.END), inner.icursor(tk.END)),
             )
             try:
@@ -501,34 +500,38 @@ class WarDashboardFrame(ctk.CTkFrame):
         # 2. Brand text
         brand_frame = ctk.CTkFrame(parent, fg_color="transparent")
         brand_frame.pack(pady=(0, 2))
-        ctk.CTkLabel(
+        self.lbl_brand_sub = ctk.CTkLabel(
             brand_frame,
-            text="ITEM & MESETA",
+            text=t("brand_subtitle"),
             font=(FONT_FAMILY, 13, "bold"),
             text_color="#D81B60",
-        ).pack()
-        ctk.CTkLabel(
+        )
+        self.lbl_brand_sub.pack()
+        self.lbl_brand_trk = ctk.CTkLabel(
             brand_frame,
-            text="TRACKER",
+            text=t("brand_tracker"),
             font=(FONT_FAMILY, 20, "bold"),
             text_color=COLOR_PINK_ACCENT,
-        ).pack(pady=(0, 1))
+        )
+        self.lbl_brand_trk.pack(pady=(0, 1))
 
         sep = ctk.CTkFrame(brand_frame, height=2, fg_color=COLOR_PINK_HEADER)
         sep.pack(fill="x", padx=30, pady=2)
 
-        ctk.CTkLabel(
+        self.lbl_brand_by = ctk.CTkLabel(
             brand_frame,
-            text="CREATED BY",
+            text=t("brand_created_by"),
             font=(FONT_FAMILY, 9, "bold"),
             text_color=COLOR_TEXT_VAL,
-        ).pack(pady=(1, 0))
-        ctk.CTkLabel(
+        )
+        self.lbl_brand_by.pack(pady=(1, 0))
+        self.lbl_brand_team = ctk.CTkLabel(
             brand_frame,
-            text="TEAM NEKO FAMILY SHIP 4 TH",
+            text=t("brand_team_credit"),
             font=(FONT_FAMILY, 10, "bold"),
             text_color=COLOR_TEXT_VAL,
-        ).pack()
+        )
+        self.lbl_brand_team.pack()
 
         # 3. Action Buttons
         BTN_HEIGHT = 30
@@ -539,7 +542,7 @@ class WarDashboardFrame(ctk.CTkFrame):
 
         self.btn_reset = ctk.CTkButton(
             self.btn_frame,
-            text="เริ่มนับใหม่ (Reset)",
+            text=t("btn_reset"),
             font=(FONT_FAMILY, 12),
             fg_color=COLOR_PINK_HEADER,
             text_color=COLOR_TEXT_MAIN,
@@ -552,7 +555,7 @@ class WarDashboardFrame(ctk.CTkFrame):
 
         self.btn_watchlist = ctk.CTkButton(
             self.btn_frame,
-            text="Edit Watch List",
+            text=t("btn_watchlist"),
             font=(FONT_FAMILY, 12, "bold"),
             fg_color=COLOR_WATCHLIST,
             hover_color="#D81B60",
@@ -565,7 +568,7 @@ class WarDashboardFrame(ctk.CTkFrame):
 
         self.switch_filter = ctk.CTkSwitch(
             self.btn_frame,
-            text="เปิดใช้ Watch List Filter",
+            text=t("switch_filter"),
             font=(FONT_FAMILY, 11, "bold"),
             progress_color=COLOR_WATCHLIST,
             command=self._on_toggle_filter,
@@ -580,7 +583,7 @@ class WarDashboardFrame(ctk.CTkFrame):
 
         self.btn_overlay_full = ctk.CTkButton(
             row_overlays,
-            text="Item & Meseta",
+            text=t("btn_overlay_full"),
             font=(FONT_FAMILY, 11, "bold"),
             fg_color=COLOR_PINK_ACCENT,
             hover_color="#FF1493",
@@ -593,7 +596,7 @@ class WarDashboardFrame(ctk.CTkFrame):
 
         self.btn_overlay_mini = ctk.CTkButton(
             row_overlays,
-            text="Meseta",
+            text=t("btn_overlay_mini"),
             font=(FONT_FAMILY, 11, "bold"),
             fg_color="#F06292",
             hover_color="#D81B60",
@@ -606,7 +609,7 @@ class WarDashboardFrame(ctk.CTkFrame):
 
         self.btn_discord = ctk.CTkButton(
             self.btn_frame,
-            text="DISCORD NEKO FAMILY",
+            text=t("btn_discord"),
             font=(FONT_FAMILY, 12, "bold"),
             fg_color=COLOR_DISCORD,
             hover_color="#AB47BC",
@@ -617,11 +620,37 @@ class WarDashboardFrame(ctk.CTkFrame):
         )
         self.btn_discord.pack(fill="x", pady=(0, 4))
 
+        # Language Selector Row in War Menu
+        lang_row = ctk.CTkFrame(self.btn_frame, fg_color="transparent")
+        lang_row.pack(fill="x", pady=(0, 4))
+        self.lbl_sidebar_lang = ctk.CTkLabel(
+            lang_row,
+            text=f"🌐 {t('label_language')}:",
+            font=(FONT_FAMILY, 10, "bold"),
+            text_color=COLOR_TEXT_SUB,
+        )
+        self.lbl_sidebar_lang.pack(side="left", padx=(0, 4))
+        self.seg_lang_sidebar = ctk.CTkSegmentedButton(
+            lang_row,
+            values=["EN", "TH", "JA"],
+            height=26,
+            font=(FONT_FAMILY, 10, "bold"),
+            selected_color=COLOR_PINK_ACCENT,
+            selected_hover_color="#D81B60",
+            unselected_color="#F0F0F0",
+            unselected_hover_color="#E0E0E0",
+            text_color=COLOR_TEXT_MAIN,
+            corner_radius=UI_RADIUS,
+            command=self._on_sidebar_lang_selected,
+        )
+        self.seg_lang_sidebar.set(i18n.get_button_label())
+        self.seg_lang_sidebar.pack(side="right", fill="x", expand=True)
+
         # 4. Status & Folder Selector at bottom
         self.status_frame = ctk.CTkFrame(parent, fg_color="transparent")
         self.status_frame.pack(side="bottom", fill="x", pady=(2, 4), padx=15)
 
-        initial_status = "ยังไม่เลือกโฟลเดอร์ Log"
+        initial_status = t("status_no_folder")
         status_color = COLOR_TEXT_SUB
         if hasattr(self.controller, "lbl_file_status"):
             try:
@@ -641,7 +670,7 @@ class WarDashboardFrame(ctk.CTkFrame):
 
         self.btn_select = ctk.CTkButton(
             self.status_frame,
-            text="📂 จิ้มเลือกโฟลเดอร์ Log",
+            text=t("btn_select_folder"),
             font=(FONT_FAMILY, 11),
             fg_color="#F0F0F0",
             text_color="#333333",
@@ -660,6 +689,73 @@ class WarDashboardFrame(ctk.CTkFrame):
         )
         self.lbl_version.pack(pady=(1, 0))
 
+    def _on_sidebar_lang_selected(self, val: str) -> None:
+        if hasattr(self.controller, "set_app_language"):
+            self.controller.set_app_language(val)
+        else:
+            i18n.set_language(val)
+            self.retranslate_ui()
+
+    def _on_language_changed(self, language: str = "", **kwargs) -> None:
+        try:
+            self.retranslate_ui()
+        except Exception:
+            pass
+
+    def retranslate_ui(self) -> None:
+        """Update all text in War Dashboard according to current language."""
+        try:
+            op_name = self.war_service.operative_name or getattr(self.controller, "character_name", "") or "Operative"
+            if hasattr(self, "lbl_op_title") and self.lbl_op_title.winfo_exists():
+                self.lbl_op_title.configure(text=t("war_op_title", name=op_name))
+            if hasattr(self, "lbl_op_sub") and self.lbl_op_sub.winfo_exists():
+                self.lbl_op_sub.configure(text=t("war_op_sub"))
+            if hasattr(self, "lbl_coord_title") and self.lbl_coord_title.winfo_exists():
+                self.lbl_coord_title.configure(text=t("war_coord_label"))
+            if hasattr(self, "btn_paste_coord") and self.btn_paste_coord.winfo_exists():
+                self.btn_paste_coord.configure(text=t("war_paste_btn"))
+            if hasattr(self, "btn_save_coord") and self.btn_save_coord.winfo_exists():
+                self.btn_save_coord.configure(text=t("war_save_btn"))
+            if hasattr(self, "opt_landmark") and self.opt_landmark.winfo_exists():
+                landmarks = i18n.get_landmarks()
+                self.opt_landmark.configure(values=landmarks)
+                self.opt_landmark.set(landmarks[0])
+            if hasattr(self, "btn_open_web") and self.btn_open_web.winfo_exists():
+                self.btn_open_web.configure(text=t("war_btn_open_web"))
+            if hasattr(self, "btn_back_offline") and self.btn_back_offline.winfo_exists():
+                self.btn_back_offline.configure(text=t("war_btn_back_offline"))
+            if hasattr(self, "lbl_brand_sub") and self.lbl_brand_sub.winfo_exists():
+                self.lbl_brand_sub.configure(text=t("brand_subtitle"))
+            if hasattr(self, "lbl_brand_trk") and self.lbl_brand_trk.winfo_exists():
+                self.lbl_brand_trk.configure(text=t("brand_tracker"))
+            if hasattr(self, "lbl_brand_by") and self.lbl_brand_by.winfo_exists():
+                self.lbl_brand_by.configure(text=t("brand_created_by"))
+            if hasattr(self, "lbl_brand_team") and self.lbl_brand_team.winfo_exists():
+                self.lbl_brand_team.configure(text=t("brand_team_credit"))
+            if hasattr(self, "btn_reset") and self.btn_reset.winfo_exists():
+                self.btn_reset.configure(text=t("btn_reset"))
+            if hasattr(self, "btn_watchlist") and self.btn_watchlist.winfo_exists():
+                self.btn_watchlist.configure(text=t("btn_watchlist"))
+            if hasattr(self, "switch_filter") and self.switch_filter.winfo_exists():
+                self.switch_filter.configure(text=t("switch_filter"))
+            if hasattr(self, "btn_overlay_full") and self.btn_overlay_full.winfo_exists():
+                self.btn_overlay_full.configure(text=t("btn_overlay_full"))
+            if hasattr(self, "btn_overlay_mini") and self.btn_overlay_mini.winfo_exists():
+                self.btn_overlay_mini.configure(text=t("btn_overlay_mini"))
+            if hasattr(self, "btn_discord") and self.btn_discord.winfo_exists():
+                self.btn_discord.configure(text=t("btn_discord"))
+            if hasattr(self, "btn_select") and self.btn_select.winfo_exists():
+                self.btn_select.configure(text=t("btn_select_folder"))
+            if hasattr(self, "lbl_sidebar_lang") and self.lbl_sidebar_lang.winfo_exists():
+                self.lbl_sidebar_lang.configure(text=f"🌐 {t('label_language')}:")
+            if hasattr(self, "seg_lang_sidebar") and self.seg_lang_sidebar.winfo_exists():
+                self.seg_lang_sidebar.set(i18n.get_button_label())
+            if hasattr(self, "dashboard_area") and hasattr(self.dashboard_area, "retranslate_ui"):
+                self.dashboard_area.retranslate_ui()
+            self.update_view()
+        except Exception:
+            pass
+
     def _on_toggle_filter(self) -> None:
         if hasattr(self, "switch_filter") and hasattr(self.controller, "toggle_filter"):
             val = bool(self.switch_filter.get())
@@ -670,9 +766,9 @@ class WarDashboardFrame(ctk.CTkFrame):
         op_name = self.war_service.operative_name or getattr(self.controller, "character_name", "") or "Operative"
 
         if hasattr(self, "lbl_op_title"):
-            self.lbl_op_title.configure(text=f"👤 ชื่อในเกม: {op_name}")
+            self.lbl_op_title.configure(text=t("war_op_title", name=op_name))
         elif hasattr(self, "lbl_op_name"):
-            self.lbl_op_name.configure(text=f"👤 ชื่อในเกม: {op_name}")
+            self.lbl_op_name.configure(text=t("war_op_title", name=op_name))
 
         if hasattr(self, "entry_coord"):
             tc = getattr(self.war_service, "target_coord", (0, 0, 1))
@@ -719,7 +815,7 @@ class WarDashboardFrame(ctk.CTkFrame):
             try:
                 t_str = time.strftime("%H:%M:%S", time.localtime(self.war_service._last_sync_time))
                 self.lbl_sync_time.configure(
-                    text=f"⚡ Firebase ซิงค์: ล่าสุด {t_str} (+{self.war_service.session_contribution:,} ℳ)",
+                    text=t("war_synced", time=t_str, contrib=f"{self.war_service.session_contribution:,}"),
                     text_color="#10B981",
                 )
             except Exception:
@@ -730,21 +826,21 @@ class WarDashboardFrame(ctk.CTkFrame):
         if os.path.exists(index_path):
             webbrowser.open(f"file:///{index_path}")
         else:
-            self.lbl_sync_time.configure(text="ไม่พบไฟล์ E:/ARKS War Room/index.html", text_color="#EF4444")
+            self.lbl_sync_time.configure(text=f"File not found: {index_path}", text_color="#EF4444")
 
     def _do_sync(self) -> None:
-        self.lbl_sync_time.configure(text="⚡ กำลังซิงค์ข้อมูล Realtime...", text_color="#0284C7")
+        self.lbl_sync_time.configure(text=t("war_syncing"), text_color="#0284C7")
         self.update_idletasks()
         success, msg = self.war_service.sync_to_war_room()
         color = "#10B981" if success else "#EF4444"
         now_str = time.strftime("%H:%M:%S")
         if success:
             self.lbl_sync_time.configure(
-                text=f"⚡ Firebase ซิงค์: ล่าสุด {now_str} (+{self.war_service.session_contribution:,} ℳ)",
+                text=t("war_synced", time=now_str, contrib=f"{self.war_service.session_contribution:,}"),
                 text_color=color,
             )
         else:
-            self.lbl_sync_time.configure(text=msg, text_color=color)
+            self.lbl_sync_time.configure(text=msg or t("war_sync_error"), text_color=color)
         self.update_view()
 
 

@@ -3,6 +3,8 @@ import tkinter as tk
 import time
 from config import *
 from modules.utils import format_duration, format_rate, filter_and_sort_items
+from modules.i18n import t
+from modules.event_bus import event_bus
 
 class DashboardFrame(ctk.CTkFrame):
     def __init__(self, parent, controller):
@@ -25,14 +27,16 @@ class DashboardFrame(ctk.CTkFrame):
         session_frame = ctk.CTkFrame(self.money_card, fg_color="transparent")
         session_frame.grid(row=0, column=0, pady=8)
         
-        ctk.CTkLabel(session_frame, text="ยอดเงินรอบนี้ (Session)", font=(FONT_FAMILY, 12), text_color=COLOR_TEXT_SUB).pack()
+        self.lbl_session_title = ctk.CTkLabel(session_frame, text=t("lbl_session"), font=(FONT_FAMILY, 12), text_color=COLOR_TEXT_SUB)
+        self.lbl_session_title.pack()
         self.lbl_session = ctk.CTkLabel(session_frame, text="+0", font=FONT_NUMBER, text_color=COLOR_TEXT_VAL)
         self.lbl_session.pack(pady=(0, 3))
 
         wallet_frame = ctk.CTkFrame(self.money_card, fg_color="transparent")
         wallet_frame.grid(row=0, column=1, pady=8)
 
-        ctk.CTkLabel(wallet_frame, text="เงินที่มีในกระเป๋า", font=(FONT_FAMILY, 12), text_color=COLOR_TEXT_SUB).pack()
+        self.lbl_wallet_title = ctk.CTkLabel(wallet_frame, text=t("lbl_wallet"), font=(FONT_FAMILY, 12), text_color=COLOR_TEXT_SUB)
+        self.lbl_wallet_title.pack()
         self.lbl_wallet = ctk.CTkLabel(wallet_frame, text="---", font=("Impact", 30), text_color=COLOR_TEXT_MAIN)
         self.lbl_wallet.pack(pady=(0, 3))
 
@@ -42,13 +46,15 @@ class DashboardFrame(ctk.CTkFrame):
 
         time_frame = ctk.CTkFrame(self.stats_card, fg_color="transparent")
         time_frame.grid(row=0, column=0, pady=6)
-        ctk.CTkLabel(time_frame, text="เวลาที่ใช้ฟาร์ม", font=(FONT_FAMILY, 12), text_color=COLOR_TEXT_SUB).pack()
+        self.lbl_time_title = ctk.CTkLabel(time_frame, text=t("lbl_farming_time"), font=(FONT_FAMILY, 12), text_color=COLOR_TEXT_SUB)
+        self.lbl_time_title.pack()
         self.lbl_time = ctk.CTkLabel(time_frame, text="00:00:00", font=FONT_STATS, text_color=COLOR_PINK_ACCENT)
         self.lbl_time.pack()
 
         mhr_frame = ctk.CTkFrame(self.stats_card, fg_color="transparent")
         mhr_frame.grid(row=0, column=1, pady=6)
-        ctk.CTkLabel(mhr_frame, text="ความเร็ว (M/hr)", font=(FONT_FAMILY, 12), text_color=COLOR_TEXT_SUB).pack()
+        self.lbl_mhr_title = ctk.CTkLabel(mhr_frame, text=t("lbl_speed"), font=(FONT_FAMILY, 12), text_color=COLOR_TEXT_SUB)
+        self.lbl_mhr_title.pack()
         self.lbl_mhr = ctk.CTkLabel(mhr_frame, text="0 /hr", font=FONT_STATS, text_color=COLOR_TEXT_VAL)
         self.lbl_mhr.pack()
 
@@ -58,20 +64,50 @@ class DashboardFrame(ctk.CTkFrame):
         self.search_var = tk.StringVar(value=getattr(self.controller, "search_keyword", ""))
         self.search_var.trace_add("write", self.on_search_change)
         
-        search_entry = ctk.CTkEntry(header_frame, placeholder_text="🔍 ค้นหาไอเท็ม...", 
-                                   textvariable=self.search_var, width=200, font=(FONT_FAMILY, 12), 
-                                   border_color=COLOR_PINK_ACCENT, height=32, corner_radius=UI_RADIUS,
-                                   fg_color="white", text_color=COLOR_TEXT_MAIN)
-        search_entry.pack(side="right")
+        self.search_entry = ctk.CTkEntry(header_frame, placeholder_text=t("search_placeholder"), 
+                                        textvariable=self.search_var, width=200, font=(FONT_FAMILY, 12), 
+                                        border_color=COLOR_PINK_ACCENT, height=32, corner_radius=UI_RADIUS,
+                                        fg_color="white", text_color=COLOR_TEXT_MAIN)
+        self.search_entry.pack(side="right")
 
-        ctk.CTkLabel(header_frame, text="📦 รายการของที่ดรอป", font=FONT_HEADER, text_color=COLOR_TEXT_MAIN).pack(side="left")
+        self.lbl_drops_title = ctk.CTkLabel(header_frame, text=t("header_drops"), font=FONT_HEADER, text_color=COLOR_TEXT_MAIN)
+        self.lbl_drops_title.pack(side="left")
 
         self.scroll = ctk.CTkScrollableFrame(self.content_container, fg_color="transparent", label_text="", corner_radius=0)
         self.scroll.grid(row=3, column=0, sticky="nsew", padx=10, pady=(0, 10))
 
-        
         self.item_rows = []
         self.empty_msg_lbl = ctk.CTkLabel(self.scroll, text="", font=(FONT_FAMILY, 13), text_color=COLOR_TEXT_SUB)
+
+        try:
+            event_bus.subscribe("language_changed", self._on_language_changed)
+        except Exception:
+            pass
+
+    def _on_language_changed(self, language: str = "", **kwargs) -> None:
+        try:
+            self.retranslate_ui()
+        except Exception:
+            pass
+
+    def retranslate_ui(self) -> None:
+        """Update all displayed text to current active language."""
+        try:
+            if hasattr(self, "lbl_session_title") and self.lbl_session_title.winfo_exists():
+                self.lbl_session_title.configure(text=t("lbl_session"))
+            if hasattr(self, "lbl_wallet_title") and self.lbl_wallet_title.winfo_exists():
+                self.lbl_wallet_title.configure(text=t("lbl_wallet"))
+            if hasattr(self, "lbl_time_title") and self.lbl_time_title.winfo_exists():
+                self.lbl_time_title.configure(text=t("lbl_farming_time"))
+            if hasattr(self, "lbl_mhr_title") and self.lbl_mhr_title.winfo_exists():
+                self.lbl_mhr_title.configure(text=t("lbl_speed"))
+            if hasattr(self, "search_entry") and self.search_entry.winfo_exists():
+                self.search_entry.configure(placeholder_text=t("search_placeholder"))
+            if hasattr(self, "lbl_drops_title") and self.lbl_drops_title.winfo_exists():
+                self.lbl_drops_title.configure(text=t("header_drops"))
+            self.update_display()
+        except Exception:
+            pass
 
     def on_search_change(self, *args):
         self.controller.search_keyword = self.search_var.get().strip().lower()
@@ -119,10 +155,14 @@ class DashboardFrame(ctk.CTkFrame):
             
             if not sorted_items:
                 msg = ""
-                if keyword: msg = f"ไม่พบ: {keyword}"
-                elif filter_enabled and watchlist: msg = "ไม่พบไอเท็มใน Watch List"
-                elif filter_enabled and not watchlist: msg = "Watch List ว่างเปล่า"
-                else: msg = "รอของเข้า..."
+                if keyword:
+                    msg = t("empty_not_found", keyword=keyword)
+                elif filter_enabled and watchlist:
+                    msg = t("empty_watchlist_no_match")
+                elif filter_enabled and not watchlist:
+                    msg = t("empty_watchlist_empty")
+                else:
+                    msg = t("empty_waiting")
                 
                 self.empty_msg_lbl.configure(text=msg)
                 self.empty_msg_lbl.pack(pady=20)

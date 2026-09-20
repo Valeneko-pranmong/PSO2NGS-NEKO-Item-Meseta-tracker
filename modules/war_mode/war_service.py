@@ -17,6 +17,8 @@ except (ImportError, ValueError):
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
     from modules.event_bus import event_bus
 
+from modules.i18n import t
+
 TEAMS_DATA: Dict[str, Dict[str, Any]] = {}
 
 try:
@@ -703,10 +705,10 @@ class WarService:
         client_ver = self.client_version
 
         if self.is_tamper_compromised:
-            return False, "ระบบตรวจพบการแทรกแซงข้อมูล (Anti-Tamper Compromised): ระงับการบันทึกยอดเงินขึ้นฐานข้อมูล"
+            return False, t("msg_anti_tamper_compromised")
 
         if not is_secure:
-            return False, f"เวอร์ชันไคลเอนต์ ({client_ver}) ไม่ผ่านเกณฑ์ความปลอดภัย (Security Revoked): ปฏิเสธการบันทึกยอดเงินขึ้นฐานข้อมูล"
+            return False, t("msg_security_revoked", version=client_ver)
 
         char_name = self.operative_name or "Operative"
         safe_key = "".join(

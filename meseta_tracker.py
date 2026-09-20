@@ -16,6 +16,7 @@ from config import *
 from dashboard_ui import DashboardFrame 
 from overlay_ui import OverlayWindow
 from modules.event_bus import event_bus
+from modules.i18n import i18n, t, tr
 from modules.war_mode.war_service import WarService
 from modules.war_mode.war_view import WarDashboardFrame
 from modules.utils import extract_character_info
@@ -48,12 +49,13 @@ class NGSTrackerApp(ctk.CTk):
 
         self.overrideredirect(True) 
         self.geometry("950x620")
-        self.title("NEKO Item & Meseta Tracker (Offline)") 
+        self.title(t("app_window_title")) 
         self.configure(fg_color=COLOR_BG_MAIN) 
         self.setup_icon()
         
         self.after(200, self.force_taskbar_icon)
 
+        self.current_language = DEFAULT_LANGUAGE
         self.log_folder = ""   
         self.log_path = ""     
         self.active_encoding = 'utf-16' 
@@ -96,6 +98,7 @@ class NGSTrackerApp(ctk.CTk):
         self.war_service = WarService()
         self.current_view = "offline"
         self.event_bus.subscribe("character_detected", self._on_character_detected)
+        self.event_bus.subscribe("language_changed", self._on_language_changed)
 
         self.main_container = ctk.CTkFrame(self, fg_color=COLOR_PINK_HEADER, corner_radius=0)
         self.main_container.pack(fill="both", expand=True)
@@ -125,7 +128,7 @@ class NGSTrackerApp(ctk.CTk):
         # War Mode Entry Button
         self.btn_enter_war = ctk.CTkButton(
             self.btn_frame,
-            text="⚔️ เข้าสู่สงคราม (ARKS War)",
+            text=t("btn_enter_war"),
             font=(FONT_FAMILY, 13, "bold"),
             fg_color="#D81B60",
             hover_color="#AD1457",
@@ -136,17 +139,17 @@ class NGSTrackerApp(ctk.CTk):
         )
         self.btn_enter_war.pack(pady=(0, 8), fill="x")
 
-        self.btn_reset = ctk.CTkButton(self.btn_frame, text="เริ่มนับใหม่ (Reset)", font=(FONT_FAMILY, 13,),
+        self.btn_reset = ctk.CTkButton(self.btn_frame, text=t("btn_reset"), font=(FONT_FAMILY, 13,),
                                        fg_color=COLOR_PINK_HEADER, text_color=COLOR_TEXT_MAIN,
                                        hover_color=COLOR_PINK_SOFT, height=BTN_HEIGHT, corner_radius=BTN_RADIUS, command=self.confirm_reset)
         self.btn_reset.pack(pady=(0, 8), fill="x")
 
-        self.btn_watchlist = ctk.CTkButton(self.btn_frame, text="Edit Watch List", font=(FONT_FAMILY, 13, "bold"), 
+        self.btn_watchlist = ctk.CTkButton(self.btn_frame, text=t("btn_watchlist"), font=(FONT_FAMILY, 13, "bold"), 
                                            fg_color=COLOR_WATCHLIST, hover_color="#D81B60", text_color="white", 
                                            height=BTN_HEIGHT, corner_radius=BTN_RADIUS, command=self.open_watchlist_editor)
         self.btn_watchlist.pack(pady=(0, 5), fill="x")
 
-        self.switch_filter = ctk.CTkSwitch(self.btn_frame, text="เปิดใช้ Watch List Filter", font=(FONT_FAMILY, 11, "bold"),
+        self.switch_filter = ctk.CTkSwitch(self.btn_frame, text=t("switch_filter"), font=(FONT_FAMILY, 11, "bold"),
                                            progress_color=COLOR_WATCHLIST, command=self.toggle_filter)
         self.switch_filter.pack(pady=(5, 10))
 
@@ -154,28 +157,55 @@ class NGSTrackerApp(ctk.CTk):
         row3.pack(fill="x", pady=(0, 8))
         row3.columnconfigure((0, 1), weight=1, uniform="equal")
 
-        self.btn_overlay_full = ctk.CTkButton(row3, text="Item & Meseta", font=(FONT_FAMILY, 12, "bold"), 
+        self.btn_overlay_full = ctk.CTkButton(row3, text=t("btn_overlay_full"), font=(FONT_FAMILY, 12, "bold"), 
                                          fg_color=COLOR_PINK_ACCENT, hover_color="#FF1493", text_color="white", 
                                          height=BTN_HEIGHT, corner_radius=BTN_RADIUS, command=lambda: self.open_overlay("full"))
         self.btn_overlay_full.grid(row=0, column=0, sticky="ew", padx=(0, 3))
 
-        self.btn_overlay_mini = ctk.CTkButton(row3, text="Meseta", font=(FONT_FAMILY, 12, "bold"), 
+        self.btn_overlay_mini = ctk.CTkButton(row3, text=t("btn_overlay_mini"), font=(FONT_FAMILY, 12, "bold"), 
                                          fg_color="#F06292", hover_color="#D81B60", text_color="white", 
                                          height=BTN_HEIGHT, corner_radius=BTN_RADIUS, command=lambda: self.open_overlay("mini"))
         self.btn_overlay_mini.grid(row=0, column=1, sticky="ew", padx=(3, 0))
 
-        self.btn_discord = ctk.CTkButton(self.btn_frame, text="DISCORD NEKO FAMILY", font=(FONT_FAMILY, 13, "bold"), 
+        self.btn_discord = ctk.CTkButton(self.btn_frame, text=t("btn_discord"), font=(FONT_FAMILY, 13, "bold"), 
                                          fg_color=COLOR_DISCORD, hover_color="#AB47BC", text_color="white", 
                                          height=BTN_HEIGHT, corner_radius=BTN_RADIUS, command=self.open_discord)
         self.btn_discord.pack(fill="x", pady=(0, 8))
+
+        # Language Selector Row in Sidebar
+        self.lang_row_sidebar = ctk.CTkFrame(self.btn_frame, fg_color="transparent")
+        self.lang_row_sidebar.pack(fill="x", pady=(0, 8))
+        self.lbl_sidebar_lang = ctk.CTkLabel(
+            self.lang_row_sidebar,
+            text=f"🌐 {t('label_language')}:",
+            font=(FONT_FAMILY, 11, "bold"),
+            text_color=COLOR_TEXT_SUB,
+        )
+        self.lbl_sidebar_lang.pack(side="left", padx=(0, 5))
+
+        self.seg_lang_sidebar = ctk.CTkSegmentedButton(
+            self.lang_row_sidebar,
+            values=["EN", "TH", "JA"],
+            height=28,
+            font=(FONT_FAMILY, 11, "bold"),
+            selected_color=COLOR_PINK_ACCENT,
+            selected_hover_color="#D81B60",
+            unselected_color="#F0F0F0",
+            unselected_hover_color="#E0E0E0",
+            text_color=COLOR_TEXT_MAIN,
+            corner_radius=UI_RADIUS,
+            command=self._on_sidebar_lang_selected,
+        )
+        self.seg_lang_sidebar.set(i18n.get_button_label())
+        self.seg_lang_sidebar.pack(side="right", fill="x", expand=True)
         
         self.status_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         self.status_frame.pack(side="bottom", fill="x", pady=(10, 5), padx=15)
         
-        self.lbl_file_status = ctk.CTkLabel(self.status_frame, text="ยังไม่เลือกโฟลเดอร์ Log", text_color=COLOR_TEXT_SUB, wraplength=220, font=(FONT_FAMILY, 11))
+        self.lbl_file_status = ctk.CTkLabel(self.status_frame, text=t("status_no_folder"), text_color=COLOR_TEXT_SUB, wraplength=220, font=(FONT_FAMILY, 11))
         self.lbl_file_status.pack(anchor="w", pady=(0, 3))
         
-        self.btn_select = ctk.CTkButton(self.status_frame, text="📂 จิ้มเลือกโฟลเดอร์ Log", font=(FONT_FAMILY, 12), 
+        self.btn_select = ctk.CTkButton(self.status_frame, text=t("btn_select_folder"), font=(FONT_FAMILY, 12), 
                                         fg_color="#F0F0F0", text_color="#333333", hover_color="#E0E0E0", 
                                         height=30, corner_radius=UI_RADIUS, command=self.select_log_folder)
         self.btn_select.pack(fill="x")
@@ -259,7 +289,7 @@ class NGSTrackerApp(ctk.CTk):
             except Exception:
                 pass
 
-        title_text = "NEKO FAMILY TEAM SHOP - Item & Meseta tracker"
+        title_text = t("app_title_offline")
         self.title_label = ctk.CTkLabel(
             self.title_bar,
             text=title_text,
@@ -277,6 +307,23 @@ class NGSTrackerApp(ctk.CTk):
                                 fg_color="white", text_color="#D81B60", hover_color="#FFE4E1",
                                 font=("Arial", 14, "bold"), command=self.minimize_window)
         min_btn.pack(side="right", padx=(0, 5), pady=5)
+
+        self.lang_btn_title = ctk.CTkSegmentedButton(
+            self.title_bar,
+            values=["EN", "TH", "JA"],
+            width=110,
+            height=26,
+            font=(FONT_FAMILY, 10, "bold"),
+            selected_color=COLOR_PINK_ACCENT,
+            selected_hover_color="#D81B60",
+            unselected_color="white",
+            unselected_hover_color="#FFE4E1",
+            text_color=COLOR_TEXT_MAIN,
+            corner_radius=6,
+            command=self._on_title_lang_selected,
+        )
+        self.lang_btn_title.set(i18n.get_button_label())
+        self.lang_btn_title.pack(side="right", padx=(0, 10), pady=7)
 
         self.title_bar.bind("<ButtonPress-1>", self.start_move)
         self.title_bar.bind("<B1-Motion>", self.do_move)
@@ -311,7 +358,7 @@ class NGSTrackerApp(ctk.CTk):
                 if hasattr(self, "anti_tamper"):
                     self.anti_tamper.lock_identity(player_id or self.player_id, character_name)
                 if hasattr(self, "btn_enter_war"):
-                    self.btn_enter_war.configure(text=f"⚔️ เข้าสู่สงคราม ({character_name})")
+                    self.btn_enter_war.configure(text=t("btn_enter_war_char", character=character_name))
                 if hasattr(self, "war_service"):
                     self.war_service.set_operative(character_name)
                 if getattr(self, "current_view", "") == "war" and hasattr(self, "war_view") and self.war_view.winfo_ismapped():
@@ -325,7 +372,7 @@ class NGSTrackerApp(ctk.CTk):
     def show_offline_view(self):
         self.current_view = "offline"
         try:
-            self.title_label.configure(text="NEKO FAMILY TEAM SHOP - Item & Meseta tracker")
+            self.title_label.configure(text=t("app_title_offline"))
         except Exception:
             pass
         if hasattr(self, "war_view"):
@@ -336,7 +383,7 @@ class NGSTrackerApp(ctk.CTk):
         self.ensure_character_from_log()
         self.current_view = "war"
         try:
-            self.title_label.configure(text="NEKO FAMILY — ARKS War Room Realtime Meseta Tracker")
+            self.title_label.configure(text=t("app_title_war"))
         except Exception:
             pass
         self.offline_container.grid_remove()
@@ -393,9 +440,9 @@ class NGSTrackerApp(ctk.CTk):
 
         title_bar = ctk.CTkFrame(dlg, height=36, corner_radius=0, fg_color=COLOR_PINK_HEADER)
         title_bar.pack(fill="x", side="top")
-        ctk.CTkLabel(title_bar, text="ยืนยันรีเซ็ต", font=(FONT_FAMILY, 13, "bold"), text_color="#333333").pack(side="left", padx=15, pady=5)
+        ctk.CTkLabel(title_bar, text=t("dialog_reset_title"), font=(FONT_FAMILY, 13, "bold"), text_color="#333333").pack(side="left", padx=15, pady=5)
 
-        ctk.CTkLabel(dlg, text="ต้องการรีเซ็ตข้อมูลรอบนี้?\nยอดเงิน เวลา และไอเทมทั้งหมดจะหายไป",
+        ctk.CTkLabel(dlg, text=t("dialog_reset_msg"),
                      font=(FONT_FAMILY, 12), text_color=COLOR_TEXT_MAIN, justify="center").pack(pady=(20, 15), padx=20)
 
         btn_frame = ctk.CTkFrame(dlg, fg_color="transparent")
@@ -406,12 +453,12 @@ class NGSTrackerApp(ctk.CTk):
             dlg.destroy()
             self.reset_data()
 
-        ctk.CTkButton(btn_frame, text="ยกเลิก", font=(FONT_FAMILY, 12),
+        ctk.CTkButton(btn_frame, text=t("btn_cancel"), font=(FONT_FAMILY, 12),
                       fg_color="#F0F0F0", text_color="#333333", hover_color="#E0E0E0",
                       height=35, corner_radius=UI_RADIUS,
                       command=dlg.destroy).grid(row=0, column=0, sticky="ew", padx=(0, 5))
 
-        ctk.CTkButton(btn_frame, text="ยืนยันรีเซ็ต", font=(FONT_FAMILY, 12, "bold"),
+        ctk.CTkButton(btn_frame, text=t("btn_confirm_reset"), font=(FONT_FAMILY, 12, "bold"),
                       fg_color=COLOR_PINK_ACCENT, hover_color="#D81B60", text_color="white",
                       height=35, corner_radius=UI_RADIUS,
                       command=do_confirm).grid(row=0, column=1, sticky="ew", padx=(5, 0))
@@ -484,7 +531,60 @@ class NGSTrackerApp(ctk.CTk):
 
         self.trigger_update_ui()
 
+    def _on_sidebar_lang_selected(self, val: str) -> None:
+        self.set_app_language(val)
+
+    def _on_title_lang_selected(self, val: str) -> None:
+        self.set_app_language(val)
+
+    def _on_language_changed(self, language: str = "", **kwargs) -> None:
+        try:
+            self.retranslate_ui()
+        except Exception:
+            pass
+
+    def set_app_language(self, lang_code: str, save: bool = True) -> None:
+        code = i18n.set_language(lang_code)
+        self.current_language = code
+        if save:
+            self.save_settings()
+        self.retranslate_ui()
+
+    def retranslate_ui(self) -> None:
+        """Update all labels and buttons to current active language."""
+        try:
+            self.title(t("app_window_title"))
+            if hasattr(self, "btn_enter_war") and self.btn_enter_war.winfo_exists():
+                self.btn_enter_war.configure(text=t("btn_enter_war"))
+            if hasattr(self, "btn_reset") and self.btn_reset.winfo_exists():
+                self.btn_reset.configure(text=t("btn_reset"))
+            if hasattr(self, "btn_watchlist") and self.btn_watchlist.winfo_exists():
+                self.btn_watchlist.configure(text=t("btn_watchlist"))
+            if hasattr(self, "switch_filter") and self.switch_filter.winfo_exists():
+                self.switch_filter.configure(text=t("switch_filter"))
+            if hasattr(self, "btn_overlay_full") and self.btn_overlay_full.winfo_exists():
+                self.btn_overlay_full.configure(text=t("btn_overlay_full"))
+            if hasattr(self, "btn_overlay_mini") and self.btn_overlay_mini.winfo_exists():
+                self.btn_overlay_mini.configure(text=t("btn_overlay_mini"))
+            if hasattr(self, "btn_discord") and self.btn_discord.winfo_exists():
+                self.btn_discord.configure(text=t("btn_discord"))
+            if hasattr(self, "lbl_sidebar_lang") and self.lbl_sidebar_lang.winfo_exists():
+                self.lbl_sidebar_lang.configure(text=f"🌐 {t('label_language')}:")
+            if hasattr(self, "seg_lang_sidebar") and self.seg_lang_sidebar.winfo_exists():
+                self.seg_lang_sidebar.set(i18n.get_button_label())
+            if hasattr(self, "btn_select") and self.btn_select.winfo_exists():
+                self.btn_select.configure(text=t("btn_select_folder"))
+            if hasattr(self, "dashboard") and hasattr(self.dashboard, "retranslate_ui"):
+                self.dashboard.retranslate_ui()
+            if hasattr(self, "war_view") and hasattr(self.war_view, "retranslate_ui"):
+                self.war_view.retranslate_ui()
+            if hasattr(self, "overlay") and self.overlay and hasattr(self.overlay, "retranslate_ui"):
+                self.overlay.retranslate_ui()
+        except Exception:
+            pass
+
     def load_settings(self):
+        saved_lang = DEFAULT_LANGUAGE
         if os.path.exists(CONFIG_FILE):
             try:
                 with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
@@ -492,8 +592,11 @@ class NGSTrackerApp(ctk.CTk):
                     self.watchlist_items = data.get("watchlist", [])
                     self.log_folder = data.get("log_folder", "")
                     self.board_coord = data.get("board_coord", "0, 0, 1")
+                    saved_lang = data.get("language", DEFAULT_LANGUAGE)
             except (OSError, json.JSONDecodeError):
                 pass
+
+        self.set_app_language(saved_lang, save=False)
 
         if hasattr(self, "war_service"):
             self.war_service.set_target_coord(self.board_coord)
@@ -508,15 +611,16 @@ class NGSTrackerApp(ctk.CTk):
         if self.log_folder and os.path.exists(self.log_folder): 
             self.find_latest_log_file()
         else: 
-            self.lbl_file_status.configure(text="ยังไม่ได้ระบุโฟลเดอร์ Log", text_color="red")
+            self.lbl_file_status.configure(text=t("status_folder_unspecified"), text_color="red")
             if hasattr(self, "war_view") and hasattr(self.war_view, "lbl_file_status"):
-                self.war_view.lbl_file_status.configure(text="ยังไม่ได้ระบุโฟลเดอร์ Log", text_color="red")
+                self.war_view.lbl_file_status.configure(text=t("status_folder_unspecified"), text_color="red")
 
     def save_settings(self):
         data = {
             "watchlist": self.watchlist_items,
             "log_folder": self.log_folder,
             "board_coord": self.board_coord,
+            "language": i18n.get_language(),
         }
         try:
             with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
@@ -542,14 +646,14 @@ class NGSTrackerApp(ctk.CTk):
             return
         
         if not target_files:
-            self.pending_status_text = "หาไฟล์ Log ไม่เจออะ"
+            self.pending_status_text = t("status_log_not_found")
             self.pending_status_color = "red"
             return
 
         latest_file = max(target_files, key=os.path.getmtime)
         if latest_file != self.log_path:
             self.log_path = latest_file
-            self.pending_status_text = f"กำลังอ่านไฟล์: {os.path.basename(latest_file)}"
+            self.pending_status_text = t("status_reading_file", file=os.path.basename(latest_file))
             self.pending_status_color = COLOR_TEXT_VAL
             self.detect_encoding(self.log_path)
             self.reset_data() 
@@ -611,7 +715,7 @@ class NGSTrackerApp(ctk.CTk):
                 except Exception:
                     pass
 
-            title_label = ctk.CTkLabel(title_bar, text="Watch List Editor", font=(FONT_FAMILY, 14, "bold"), text_color="#333333")
+            title_label = ctk.CTkLabel(title_bar, text=t("dialog_watchlist_title"), font=(FONT_FAMILY, 14, "bold"), text_color="#333333")
             title_label.pack(side="left", padx=5, pady=5)
 
             close_btn = ctk.CTkButton(title_bar, text="✕", width=30, height=30, corner_radius=0,
@@ -632,13 +736,13 @@ class NGSTrackerApp(ctk.CTk):
             title_label.bind("<ButtonPress-1>", start_move)
             title_label.bind("<B1-Motion>", do_move)
 
-            ctk.CTkLabel(self.watchlist_window, text="ใส่ชื่อไอเท็มที่ต้องการโฟกัส (บรรทัดละ 1 ชื่อ)", font=(FONT_FAMILY, 14, "bold"), text_color=COLOR_TEXT_MAIN).pack(pady=(15, 5))
+            ctk.CTkLabel(self.watchlist_window, text=t("dialog_watchlist_prompt"), font=(FONT_FAMILY, 14, "bold"), text_color=COLOR_TEXT_MAIN).pack(pady=(15, 5))
             
             self.txt_watchlist = ctk.CTkTextbox(self.watchlist_window, font=(FONT_FAMILY, 12), border_color=COLOR_PINK_HEADER, border_width=2, corner_radius=5, fg_color="white", text_color="#333333")
             self.txt_watchlist.pack(fill="both", expand=True, padx=20, pady=10)
             self.txt_watchlist.insert("0.0", "\n".join(self.watchlist_items))
             
-            ctk.CTkButton(self.watchlist_window, text="บันทึก (Save Config)", font=(FONT_FAMILY, 14, "bold"), fg_color=COLOR_PINK_ACCENT, hover_color="#D81B60", text_color="white", corner_radius=5, height=40, command=self.save_watchlist_from_editor).pack(pady=(5, 15), padx=20, fill="x")
+            ctk.CTkButton(self.watchlist_window, text=t("btn_save_watchlist"), font=(FONT_FAMILY, 14, "bold"), fg_color=COLOR_PINK_ACCENT, hover_color="#D81B60", text_color="white", corner_radius=5, height=40, command=self.save_watchlist_from_editor).pack(pady=(5, 15), padx=20, fill="x")
         else: self.watchlist_window.lift()
 
     def save_watchlist_from_editor(self):
@@ -663,14 +767,18 @@ class NGSTrackerApp(ctk.CTk):
     def design_brand_text(self):
         brand_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         brand_frame.pack(pady=(0, 10))
-        ctk.CTkLabel(brand_frame, text="ITEM & MESETA", font=(FONT_FAMILY, 16), text_color=COLOR_PINK_HEADER).pack()
-        ctk.CTkLabel(brand_frame, text="TRACKER", font=(FONT_FAMILY, 26), text_color=COLOR_PINK_ACCENT).pack(pady=(0,2))
+        self.lbl_brand_sub = ctk.CTkLabel(brand_frame, text=t("brand_subtitle"), font=(FONT_FAMILY, 16), text_color=COLOR_PINK_HEADER)
+        self.lbl_brand_sub.pack()
+        self.lbl_brand_trk = ctk.CTkLabel(brand_frame, text=t("brand_tracker"), font=(FONT_FAMILY, 26), text_color=COLOR_PINK_ACCENT)
+        self.lbl_brand_trk.pack(pady=(0,2))
         
         separator = ctk.CTkFrame(brand_frame, height=2, fg_color=COLOR_PINK_HEADER)
         separator.pack(fill="x", padx=40, pady=5)
         
-        ctk.CTkLabel(brand_frame, text="CREATED BY", font=(FONT_FAMILY, 10, "bold"), text_color=COLOR_TEXT_VAL).pack(pady=(2,0))
-        ctk.CTkLabel(brand_frame, text="TEAM NEKO FAMILY SHIP 4 TH", font=(FONT_FAMILY, 12, "bold"), text_color=COLOR_TEXT_VAL).pack()
+        self.lbl_brand_by = ctk.CTkLabel(brand_frame, text=t("brand_created_by"), font=(FONT_FAMILY, 10, "bold"), text_color=COLOR_TEXT_VAL)
+        self.lbl_brand_by.pack(pady=(2,0))
+        self.lbl_brand_team = ctk.CTkLabel(brand_frame, text=t("brand_team_credit"), font=(FONT_FAMILY, 12, "bold"), text_color=COLOR_TEXT_VAL)
+        self.lbl_brand_team.pack()
 
     def detect_encoding(self, filepath):
         try:
@@ -811,6 +919,94 @@ class NGSTrackerApp(ctk.CTk):
         self.attributes("-topmost", False)
         self.lift()
         self.focus_force()
+
+    def _on_title_lang_selected(self, val: str):
+        self.set_app_language(val)
+
+    def _on_sidebar_lang_selected(self, val: str):
+        self.set_app_language(val)
+
+    def _on_language_changed(self, language: str = "", **kwargs):
+        label = i18n.get_button_label(language)
+        if hasattr(self, "lang_btn_title") and self.lang_btn_title.winfo_exists():
+            self.lang_btn_title.set(label)
+        if hasattr(self, "seg_lang_sidebar") and self.seg_lang_sidebar.winfo_exists():
+            self.seg_lang_sidebar.set(label)
+        if hasattr(self, "war_view") and hasattr(self.war_view, "seg_lang_sidebar") and self.war_view.seg_lang_sidebar.winfo_exists():
+            self.war_view.seg_lang_sidebar.set(label)
+        self.retranslate_ui()
+
+    def set_app_language(self, lang_code_or_name: str, save: bool = True):
+        changed = i18n.set_language(lang_code_or_name)
+        self.current_language = i18n.get_language()
+        label = i18n.get_button_label()
+        if hasattr(self, "lang_btn_title") and self.lang_btn_title.winfo_exists():
+            self.lang_btn_title.set(label)
+        if hasattr(self, "seg_lang_sidebar") and self.seg_lang_sidebar.winfo_exists():
+            self.seg_lang_sidebar.set(label)
+        if hasattr(self, "war_view") and hasattr(self.war_view, "seg_lang_sidebar") and self.war_view.seg_lang_sidebar.winfo_exists():
+            self.war_view.seg_lang_sidebar.set(label)
+        self.retranslate_ui()
+        if save:
+            self.save_settings()
+
+    def retranslate_ui(self):
+        """Retranslate all widgets in the main application."""
+        try:
+            self.title(t("app_window_title"))
+            if getattr(self, "current_view", "offline") == "war":
+                self.title_label.configure(text=t("app_title_war"))
+            else:
+                self.title_label.configure(text=t("app_title_offline"))
+
+            if hasattr(self, "lbl_brand_sub") and self.lbl_brand_sub.winfo_exists():
+                self.lbl_brand_sub.configure(text=t("brand_subtitle"))
+            if hasattr(self, "lbl_brand_trk") and self.lbl_brand_trk.winfo_exists():
+                self.lbl_brand_trk.configure(text=t("brand_tracker"))
+            if hasattr(self, "lbl_brand_by") and self.lbl_brand_by.winfo_exists():
+                self.lbl_brand_by.configure(text=t("brand_created_by"))
+            if hasattr(self, "lbl_brand_team") and self.lbl_brand_team.winfo_exists():
+                self.lbl_brand_team.configure(text=t("brand_team_credit"))
+
+            if hasattr(self, "btn_enter_war") and self.btn_enter_war.winfo_exists():
+                if self.character_name:
+                    self.btn_enter_war.configure(text=t("btn_enter_war_char", character=self.character_name))
+                else:
+                    self.btn_enter_war.configure(text=t("btn_enter_war"))
+
+            if hasattr(self, "btn_reset") and self.btn_reset.winfo_exists():
+                self.btn_reset.configure(text=t("btn_reset"))
+            if hasattr(self, "btn_watchlist") and self.btn_watchlist.winfo_exists():
+                self.btn_watchlist.configure(text=t("btn_watchlist"))
+            if hasattr(self, "switch_filter") and self.switch_filter.winfo_exists():
+                self.switch_filter.configure(text=t("switch_filter"))
+            if hasattr(self, "btn_overlay_full") and self.btn_overlay_full.winfo_exists():
+                self.btn_overlay_full.configure(text=t("btn_overlay_full"))
+            if hasattr(self, "btn_overlay_mini") and self.btn_overlay_mini.winfo_exists():
+                self.btn_overlay_mini.configure(text=t("btn_overlay_mini"))
+            if hasattr(self, "btn_discord") and self.btn_discord.winfo_exists():
+                self.btn_discord.configure(text=t("btn_discord"))
+            if hasattr(self, "lbl_sidebar_lang") and self.lbl_sidebar_lang.winfo_exists():
+                self.lbl_sidebar_lang.configure(text=f"🌐 {t('label_language')}:")
+            if hasattr(self, "btn_select") and self.btn_select.winfo_exists():
+                self.btn_select.configure(text=t("btn_select_folder"))
+
+            if hasattr(self, "lbl_file_status") and self.lbl_file_status.winfo_exists():
+                if not self.log_path:
+                    self.lbl_file_status.configure(text=t("status_no_folder"))
+                elif self.log_path:
+                    self.lbl_file_status.configure(text=t("status_reading_file", file=os.path.basename(self.log_path)))
+
+            if hasattr(self, "dashboard_area") and hasattr(self.dashboard_area, "retranslate_ui"):
+                self.dashboard_area.retranslate_ui()
+
+            if hasattr(self, "war_view") and hasattr(self.war_view, "retranslate_ui"):
+                self.war_view.retranslate_ui()
+
+            if getattr(self, 'overlay_window', None) and self.overlay_window.winfo_exists():
+                self.overlay_window.retranslate_ui()
+        except Exception:
+            pass
 
 if __name__ == "__main__":
     app = NGSTrackerApp()

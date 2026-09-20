@@ -69,6 +69,10 @@ CLIENT_VERSION = "7.1.0"
 MIN_SECURE_VERSION = "7.1.0"
 REVOKED_VERSIONS = ["7.0.0-alpha", "7.0.0"]
 
+# Internationalization (i18n) - 3 Languages: English (Primary/Default), Thai, Japanese
+DEFAULT_LANGUAGE = "en"
+SUPPORTED_LANGUAGES = ["en", "th", "ja"]
+
 # Firebase Realtime Database
 DEFAULT_FIREBASE_RTDB_URL = os.getenv(
     "FIREBASE_RTDB_URL",

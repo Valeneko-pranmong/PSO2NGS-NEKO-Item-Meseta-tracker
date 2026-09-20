@@ -9,6 +9,8 @@ from modules.utils import (
     format_duration,
     filter_and_sort_items,
 )
+from modules.i18n import t
+from modules.event_bus import event_bus
 
 # Backward-compatible aliases
 _format_compact = format_compact
@@ -32,7 +34,12 @@ class OverlayWindow(ctk.CTkToplevel):
         self._opacity_high = True
         self.attributes("-alpha", self.OPACITY_HIGH)
         self.configure(fg_color=COLOR_BG_MAIN)
-        self.title("Gadget Mode - NEKO Tracker")
+        self.title(t("overlay_window_title"))
+
+        try:
+            event_bus.subscribe("language_changed", self._on_language_changed)
+        except Exception:
+            pass
 
         if os.path.exists(ICON_FILENAME):
             try:
@@ -52,6 +59,11 @@ class OverlayWindow(ctk.CTkToplevel):
         self._build_stats_section()
         if self.mode == "full":
             self._build_item_list()
+        else:
+            self.update_idletasks()
+            needed_h = max(250, self.inner_frame.winfo_reqheight() + 4)
+            if self.winfo_height() < needed_h:
+                self.geometry(f"{self.winfo_width()}x{needed_h}")
 
         self.update_data()
 
@@ -67,7 +79,7 @@ class OverlayWindow(ctk.CTkToplevel):
             target_height = int(screen_height * 0.78)
             y_pos = int(screen_height * 0.10)
         else:
-            target_height = 200
+            target_height = 250
             y_pos = int(screen_height * 0.15)
 
         self.geometry(f"{window_width}x{target_height}+{x_pos}+{y_pos}")
@@ -92,7 +104,7 @@ class OverlayWindow(ctk.CTkToplevel):
         self.header.pack(fill="x", padx=6, pady=(6, 4))
         self.header.pack_propagate(False)
 
-        title_text = "ITEM • MESETA" if self.mode == "full" else "MESETA"
+        title_text = t("overlay_title_full") if self.mode == "full" else t("overlay_title_mini")
         self.lbl_title = ctk.CTkLabel(
             self.header,
             text=title_text,
@@ -152,7 +164,7 @@ class OverlayWindow(ctk.CTkToplevel):
 
         self.lbl_subtitle = ctk.CTkLabel(
             self.inner_frame,
-            text="เงินรอบนี้ (Session)",
+            text=t("overlay_subtitle"),
             font=(FONT_FAMILY, 11),
             text_color=COLOR_TEXT_SUB,
         )
@@ -160,7 +172,7 @@ class OverlayWindow(ctk.CTkToplevel):
 
         self.lbl_wallet_overlay = ctk.CTkLabel(
             self.inner_frame,
-            text="กระเป๋า: ---",
+            text=t("overlay_wallet", wallet="---"),
             font=(FONT_FAMILY, 12, "bold"),
             text_color=COLOR_TEXT_MAIN,
         )
@@ -177,11 +189,11 @@ class OverlayWindow(ctk.CTkToplevel):
 
         time_col = ctk.CTkFrame(stats_frame, fg_color="transparent")
         time_col.grid(row=0, column=0, sticky="nsew", padx=10, pady=6)
-        lbl_time_cap = ctk.CTkLabel(
-            time_col, text="TIME",
+        self.lbl_time_cap = ctk.CTkLabel(
+            time_col, text=t("overlay_time_cap"),
             font=(FONT_FAMILY, 9, "bold"), text_color=COLOR_TEXT_SUB,
         )
-        lbl_time_cap.pack(anchor="w")
+        self.lbl_time_cap.pack(anchor="w")
         self.lbl_time_overlay = ctk.CTkLabel(
             time_col, text="00:00:00",
             font=("Impact", 17), text_color=COLOR_TEXT_MAIN,
@@ -190,11 +202,11 @@ class OverlayWindow(ctk.CTkToplevel):
 
         rate_col = ctk.CTkFrame(stats_frame, fg_color="transparent")
         rate_col.grid(row=0, column=1, sticky="nsew", padx=10, pady=6)
-        lbl_rate_cap = ctk.CTkLabel(
-            rate_col, text="RATE",
+        self.lbl_rate_cap = ctk.CTkLabel(
+            rate_col, text=t("overlay_rate_cap"),
             font=(FONT_FAMILY, 9, "bold"), text_color=COLOR_TEXT_SUB,
         )
-        lbl_rate_cap.pack(anchor="e")
+        self.lbl_rate_cap.pack(anchor="e")
         self.lbl_mhr_overlay = ctk.CTkLabel(
             rate_col, text="0 /hr",
             font=("Impact", 17), text_color=COLOR_PINK_ACCENT,
@@ -203,18 +215,18 @@ class OverlayWindow(ctk.CTkToplevel):
 
         self._make_draggable(
             stats_frame, time_col, rate_col,
-            lbl_time_cap, lbl_rate_cap,
+            self.lbl_time_cap, self.lbl_rate_cap,
             self.lbl_time_overlay, self.lbl_mhr_overlay,
         )
 
     def _build_item_list(self):
         head = ctk.CTkFrame(self.inner_frame, fg_color="transparent")
         head.pack(fill="x", padx=16, pady=(0, 2))
-        lbl_drops = ctk.CTkLabel(
-            head, text="DROPS",
+        self.lbl_drops = ctk.CTkLabel(
+            head, text=t("overlay_drops_cap"),
             font=(FONT_FAMILY, 10, "bold"), text_color=COLOR_TEXT_SUB,
         )
-        lbl_drops.pack(side="left")
+        self.lbl_drops.pack(side="left")
         self.lbl_filter_badge = ctk.CTkLabel(
             head, text="",
             font=(FONT_FAMILY, 10, "bold"), text_color=COLOR_WATCHLIST,
@@ -227,11 +239,11 @@ class OverlayWindow(ctk.CTkToplevel):
         self.list_frame.pack(fill="both", expand=True, padx=8, pady=(0, 8))
 
         self.empty_label = ctk.CTkLabel(
-            self.list_frame, text="รอของเข้า…",
+            self.list_frame, text=t("overlay_waiting"),
             font=(FONT_FAMILY, 12), text_color=COLOR_TEXT_SUB,
         )
 
-        self._make_draggable(head, lbl_drops, self.lbl_filter_badge)
+        self._make_draggable(head, self.lbl_drops, self.lbl_filter_badge)
 
     # ---------- Behavior ----------
 
@@ -251,9 +263,9 @@ class OverlayWindow(ctk.CTkToplevel):
 
             wallet = self.controller.current_wallet
             if wallet > 0:
-                self.lbl_wallet_overlay.configure(text=f"กระเป๋า: {wallet:,}")
+                self.lbl_wallet_overlay.configure(text=t("overlay_wallet", wallet=f"{wallet:,}"))
             else:
-                self.lbl_wallet_overlay.configure(text="กระเป๋า: ---")
+                self.lbl_wallet_overlay.configure(text=t("overlay_wallet", wallet="---"))
 
             duration = 0
             first = getattr(self.controller, "first_drop_time", None)
@@ -290,7 +302,7 @@ class OverlayWindow(ctk.CTkToplevel):
     def redraw_items(self):
         items, filter_enabled = self._filtered_items()
 
-        self.lbl_filter_badge.configure(text="● FOCUS" if filter_enabled else "")
+        self.lbl_filter_badge.configure(text=t("overlay_focus_badge") if filter_enabled else "")
 
         for row in self.item_rows:
             row["frame"].pack_forget()
@@ -298,7 +310,7 @@ class OverlayWindow(ctk.CTkToplevel):
 
         if not items:
             self.empty_label.configure(
-                text="🔎 Focus Mode" if filter_enabled else "รอของเข้า…"
+                text=t("overlay_focus_empty") if filter_enabled else t("overlay_waiting")
             )
             self.empty_label.pack(pady=24)
             return
@@ -316,6 +328,38 @@ class OverlayWindow(ctk.CTkToplevel):
             row["name"].configure(text=display_name)
             row["count"].configure(text=f"×{count:,}")
             row["frame"].pack(fill="x", pady=1, padx=2)
+
+    def _on_language_changed(self, language: str = "", **kwargs) -> None:
+        try:
+            self.retranslate_ui()
+        except Exception:
+            pass
+
+    def retranslate_ui(self) -> None:
+        """Update all text in Overlay window according to current language."""
+        try:
+            self.title(t("overlay_window_title"))
+            title_text = t("overlay_title_full") if self.mode == "full" else t("overlay_title_mini")
+            if hasattr(self, "lbl_title") and self.lbl_title.winfo_exists():
+                self.lbl_title.configure(text=title_text)
+            if hasattr(self, "lbl_subtitle") and self.lbl_subtitle.winfo_exists():
+                self.lbl_subtitle.configure(text=t("overlay_subtitle"))
+            if hasattr(self, "lbl_time_cap") and self.lbl_time_cap.winfo_exists():
+                self.lbl_time_cap.configure(text=t("overlay_time_cap"))
+            if hasattr(self, "lbl_rate_cap") and self.lbl_rate_cap.winfo_exists():
+                self.lbl_rate_cap.configure(text=t("overlay_rate_cap"))
+            if hasattr(self, "lbl_drops") and self.lbl_drops.winfo_exists():
+                self.lbl_drops.configure(text=t("overlay_drops_cap"))
+            self.update_data()
+        except Exception:
+            pass
+
+    def destroy(self):
+        try:
+            event_bus.unsubscribe("language_changed", self._on_language_changed)
+        except Exception:
+            pass
+        super().destroy()
 
     def _make_row(self):
         frame = ctk.CTkFrame(self.list_frame, fg_color="transparent",

@@ -30,18 +30,6 @@ def isolate_test_environment(tmp_path, monkeypatch):
     yield
 
 
-@pytest.fixture(scope="module")
-def shared_app():
-    """Shared GUI app instance for module to prevent repeated Tk re-initialization crashes."""
-    app = NGSTrackerApp()
-    app.update_idletasks()
-    yield app
-    try:
-        app.destroy()
-    except Exception:
-        pass
-
-
 def test_event_bus_pub_sub():
     bus = EventBus()
     received = []
@@ -363,12 +351,14 @@ def test_war_view_realtime_sync_ui_labels(shared_app):
     # Trigger events to verify dynamic updates
     event_bus.emit("realtime_sync_started")
     app.update_idletasks()
-    assert "กำลังซิงค์" in wv.lbl_sync_time.cget("text")
+    txt_syncing = wv.lbl_sync_time.cget("text")
+    assert ("กำลังซิงค์" in txt_syncing or "Syncing" in txt_syncing)
 
     event_bus.emit("realtime_sync_completed", success=True, timestamp=1789830000, contribution=150000)
     app.update_idletasks()
-    assert "ล่าสุด" in wv.lbl_sync_time.cget("text")
-    assert "150,000" in wv.lbl_sync_time.cget("text")
+    txt_completed = wv.lbl_sync_time.cget("text")
+    assert ("ล่าสุด" in txt_completed or "synced" in txt_completed.lower() or "last" in txt_completed.lower())
+    assert "150,000" in txt_completed
 
     app.show_offline_view()
 
@@ -781,3 +771,42 @@ def test_broadcaster_version_control_policy_methods(monkeypatch):
         announcement="System OK",
     )
     assert ok is True
+
+
+def test_overlay_mini_layout_not_clipped(shared_app):
+    """
+    Verify OverlayWindow in mini mode:
+    - Has sufficient window height so that lbl_time_overlay and lbl_mhr_overlay are not clipped.
+    - Accurately renders TIME and RATE statistics when updated.
+    """
+    from unittest.mock import MagicMock
+    import time
+    from overlay_ui import OverlayWindow
+
+    controller = MagicMock()
+    controller.session_meseta = 117952
+    controller.current_wallet = 169072
+    controller.first_drop_time = time.time() - 473
+    controller.item_counts = {}
+    controller.watchlist_items = set()
+    controller.search_keyword = ""
+    controller.is_filter_active = False
+
+    overlay = OverlayWindow(controller, mode="mini")
+    try:
+        overlay.update()
+        win_h = overlay.winfo_height()
+        assert win_h >= 240
+
+        time_bottom = (overlay.lbl_time_overlay.winfo_rooty() - overlay.winfo_rooty()) + overlay.lbl_time_overlay.winfo_height()
+        rate_bottom = (overlay.lbl_mhr_overlay.winfo_rooty() - overlay.winfo_rooty()) + overlay.lbl_mhr_overlay.winfo_height()
+
+        assert time_bottom <= win_h
+        assert rate_bottom <= win_h
+
+        assert overlay.lbl_time_overlay.cget("text") == "00:07:53"
+        assert "k/hr" in overlay.lbl_mhr_overlay.cget("text")
+        assert overlay.lbl_money.cget("text") == "+118.0k"
+        assert "169,072" in overlay.lbl_wallet_overlay.cget("text")
+    finally:
+        overlay.destroy()

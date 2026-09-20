@@ -12,3 +12,15 @@ def isolate_test_environment(tmp_path_factory):
         os.environ["APPDATA"] = orig_appdata
     elif "APPDATA" in os.environ:
         del os.environ["APPDATA"]
+
+@pytest.fixture(scope="session")
+def shared_app():
+    """Shared GUI app instance for tests to prevent repeated Tk re-initialization crashes."""
+    from meseta_tracker import NGSTrackerApp
+    app = NGSTrackerApp()
+    app.update_idletasks()
+    yield app
+    try:
+        app.destroy()
+    except Exception:
+        pass

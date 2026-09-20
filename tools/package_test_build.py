@@ -48,6 +48,7 @@ def ensure_binaries(force_rebuild: bool = False) -> None:
             "--hidden-import", "PIL",
             "--hidden-import", "PIL.Image",
             "--hidden-import", "modules.event_bus",
+            "--hidden-import", "modules.i18n",
             "--hidden-import", "modules.utils",
             "--hidden-import", "modules.security",
             "--hidden-import", "modules.anti_tamper",
