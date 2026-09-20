@@ -49,6 +49,8 @@ def ensure_binaries(force_rebuild: bool = False) -> None:
             "--hidden-import", "PIL.Image",
             "--hidden-import", "modules.event_bus",
             "--hidden-import", "modules.utils",
+            "--hidden-import", "modules.security",
+            "--hidden-import", "modules.anti_tamper",
             "--hidden-import", "modules.war_mode.war_service",
             "--hidden-import", "modules.war_mode.war_view",
             "--hidden-import", "tools.firebase_war_sync",
@@ -95,7 +97,11 @@ def build_portable_package() -> None:
         f.write("echo ======================================================================\r\n")
         f.write("echo [INFO] Starting Primary Python Tracker (CustomTkinter + War Room)...\r\n")
         f.write("echo [INFO] Zero-Login: Operative identity will be detected from ActionLog.\r\n")
+        f.write("echo [INFO] Standalone Test Mode: Local test environment active.\r\n")
         f.write("echo ======================================================================\r\n")
+        f.write("set NEKO_PROCESS_VALIDATION=0\r\n")
+        f.write("set NEKO_FILE_HANDLE_VALIDATION=0\r\n")
+        f.write("set NEKO_CADENCE_VALIDATION=0\r\n")
         f.write("start \"\" \"%~dp0NekoTracker\\NekoTracker.exe\"\r\n")
 
     # 2_Start_Mock_Log_Feed.bat
@@ -136,6 +142,9 @@ def build_portable_package() -> None:
         f.write("echo    แล้วเลือกโฟลเดอร์: %~dp0sample_logs\r\n")
         f.write("echo    เพื่อดูตัวเลขเงินและไอเทมอัปเดตสดแบบ Real-time ทันที!\r\n")
         f.write("echo ======================================================================\r\n")
+        f.write("set NEKO_PROCESS_VALIDATION=0\r\n")
+        f.write("set NEKO_FILE_HANDLE_VALIDATION=0\r\n")
+        f.write("set NEKO_CADENCE_VALIDATION=0\r\n")
         f.write("start \"\" \"%~dp0NekoTracker\\NekoTracker.exe\"\r\n")
 
     # 5. Documentation

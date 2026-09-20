@@ -15,4 +15,7 @@ echo >> คำแนะนำ: ในหน้าต่าง NEKO Tracker ใ�
 echo    แล้วเลือกโฟลเดอร์: %~dp0sample_logs
 echo    เพื่อดูตัวเลขเงินและไอเทมอัปเดตสดแบบ Real-time ทันที!
 echo ======================================================================
+set NEKO_PROCESS_VALIDATION=0
+set NEKO_FILE_HANDLE_VALIDATION=0
+set NEKO_CADENCE_VALIDATION=0
 start "" "%~dp0NekoTracker\NekoTracker.exe"
