@@ -4,11 +4,11 @@
       ".read": true,
       "version_control": {
         ".read": true,
-        ".write": "auth != null"
+        ".write": "!data.exists() || auth != null"
       },
       "operatives": {
         "$character_name": {
-          ".write": "newData.hasChildren(['client_version']) && newData.child('client_version').val() != '7.0.0-alpha' && (!newData.hasChildren(['meseta']) || newData.child('meseta').val() == 0 || newData.child('client_version').val() >= root.child('arks_war_room/version_control/min_secure_version').val())"
+          ".write": "newData.hasChildren(['client_version']) && newData.child('client_version').val() != '7.0.0-alpha' && (!newData.hasChildren(['meseta']) || newData.child('meseta').val() == 0 || !root.child('arks_war_room/version_control/min_secure_version').exists() || newData.child('client_version').val() >= root.child('arks_war_room/version_control/min_secure_version').val())"
         }
       },
       "sectors": {
@@ -16,14 +16,14 @@
           ".write": "newData.hasChildren(['client_version']) && newData.child('client_version').val() != '7.0.0-alpha'",
           "challengers": {
             "$character_name": {
-              ".write": "newData.hasChildren(['client_version']) && newData.child('client_version').val() != '7.0.0-alpha' && (!newData.hasChildren(['meseta']) || newData.child('meseta').val() == 0 || newData.child('client_version').val() >= root.child('arks_war_room/version_control/min_secure_version').val())"
+              ".write": "newData.hasChildren(['client_version']) && newData.child('client_version').val() != '7.0.0-alpha' && (!newData.hasChildren(['meseta']) || newData.child('meseta').val() == 0 || !root.child('arks_war_room/version_control/min_secure_version').exists() || newData.child('client_version').val() >= root.child('arks_war_room/version_control/min_secure_version').val())"
             }
           },
           "sub_cells": {
             "$slot": {
               "challengers": {
                 "$character_name": {
-                  ".write": "newData.hasChildren(['client_version']) && newData.child('client_version').val() != '7.0.0-alpha' && (!newData.hasChildren(['meseta']) || newData.child('meseta').val() == 0 || newData.child('client_version').val() >= root.child('arks_war_room/version_control/min_secure_version').val())"
+                  ".write": "newData.hasChildren(['client_version']) && newData.child('client_version').val() != '7.0.0-alpha' && (!newData.hasChildren(['meseta']) || newData.child('meseta').val() == 0 || !root.child('arks_war_room/version_control/min_secure_version').exists() || newData.child('client_version').val() >= root.child('arks_war_room/version_control/min_secure_version').val())"
                 }
               }
             }
