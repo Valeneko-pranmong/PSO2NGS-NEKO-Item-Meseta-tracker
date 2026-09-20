@@ -83,6 +83,9 @@ def build_portable_package() -> None:
         "--events", "20"
     ], check=True)
     
+    if os.path.exists(os.path.join(ROOT_DIR, "database.rules.json")):
+        shutil.copy2(os.path.join(ROOT_DIR, "database.rules.json"), os.path.join(PORTABLE_DIR, "database.rules.json"))
+
     # 4. Create Batch Launchers
     log("Creating Windows test launcher scripts...")
     
