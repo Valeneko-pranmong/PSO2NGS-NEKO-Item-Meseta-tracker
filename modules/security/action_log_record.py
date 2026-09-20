@@ -95,14 +95,16 @@ class ActionLogParser:
             if cname and not cname.startswith("[") and "Num(" not in cname:
                 character_name = cname
 
-        # 5. Meseta Drop
+        # 5. Meseta Drop (Only parse for legitimate in-game farming actions, ignoring warehouse/storage/shops)
         meseta_drop = 0
-        m_match = MESETA_REGEX.search(line)
-        if m_match:
-            try:
-                meseta_drop = int(m_match.group(1))
-            except ValueError:
-                pass
+        m_match = None
+        if ActionLogParser.is_valid_farming_action(action, raw_line=line):
+            m_match = MESETA_REGEX.search(line)
+            if m_match:
+                try:
+                    meseta_drop = int(m_match.group(1))
+                except ValueError:
+                    pass
 
         # 6. Current Wallet
         current_wallet = 0

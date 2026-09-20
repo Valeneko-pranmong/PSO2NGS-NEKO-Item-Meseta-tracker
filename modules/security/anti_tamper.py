@@ -242,6 +242,7 @@ class AntiTamperGuard:
                         TamperViolationType.TIMESTAMP_REPLAY_OLD,
                         f"Record timestamp is too old (> {self.max_past_timestamp_skew / 60:.1f} mins): {record.timestamp.isoformat()}.",
                         log_line=record.raw_line,
+                        is_fatal=False,
                     )
                 )
                 return False
