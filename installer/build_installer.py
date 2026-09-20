@@ -74,6 +74,8 @@ def build_python_tracker() -> None:
         "--hidden-import", "PIL",
         "--hidden-import", "PIL.Image",
         "--hidden-import", "modules.event_bus",
+        "--hidden-import", "modules.i18n",
+        "--hidden-import", "modules.guide_dialog",
         "--hidden-import", "modules.utils",
         "--hidden-import", "modules.security",
         "--hidden-import", "modules.war_mode.war_service",

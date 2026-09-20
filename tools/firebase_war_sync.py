@@ -13,10 +13,10 @@ ARKS War Room — Google Firebase Synchronization Tool (Python)
         database_url="https://your-project-default-rtdb.firebaseio.com"
     )
 
-    # ส่งตัวละคร Vale3neko ไปยึด Sector [0, 0] ที่ช่อง #1 ด้วยเงิน 25M
+    # ส่งตัวละคร Vale3neko ไปยึด Sector [0, 0] ที่ช่อง #1 ด้วยเงิน 15M (ผ่านเกณฑ์ยึด 10M)
     broadcaster.sync_operative_sector(
         character_name="Vale3neko",
-        meseta=25000000,
+        meseta=15000000,
         sector_x=0,
         sector_y=0,
         slot=1
@@ -249,7 +249,7 @@ class ARKSFirebaseBroadcaster:
             "meseta": counted_meseta,
             "client_version": client_version,
             "security_status": sec_status,
-            "status": "claimed" if (is_secure and counted_meseta >= 25_000_000) else ("BLOCKED_INSECURE_VERSION" if not is_secure else "contributing"),
+            "status": "claimed" if (is_secure and counted_meseta >= 10_000_000) else ("BLOCKED_INSECURE_VERSION" if not is_secure else "contributing"),
             "slot": slot,
             "lastUpdated": now_ms,
         }
@@ -435,10 +435,10 @@ if __name__ == "__main__":
         database_url="https://your-project-default-rtdb.firebaseio.com"
     )
 
-    # ส่งตัวละคร Vale3neko ไปยึด Sector [0, 0] ที่ช่อง #1 ด้วยเงิน 25M
+    # ส่งตัวละคร Vale3neko ไปยึด Sector [0, 0] ที่ช่อง #1 ด้วยเงิน 15M (ผ่านเกณฑ์ยึด 10M)
     broadcaster.sync_operative_sector(
         character_name="Vale3neko",
-        meseta=25000000,
+        meseta=15000000,
         sector_x=0,
         sector_y=0,
         slot=1

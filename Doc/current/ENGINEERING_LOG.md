@@ -138,3 +138,47 @@
     - หากเกิดการละเมิดร้ายแรง ปรับ `is_tamper_compromised = True`, ปรับ `meseta = 0`, สแตมป์สถานะ `"TAMPER_COMPROMISED"`, และตัดสิทธิ์การซิงค์ขึ้น Firebase RTDB
   - เพิ่มชุดทดสอบเฉพาะทาง `tests/test_anti_tamper.py` (16 รายการทดสอบ)
   - รันการทดสอบ Unit Tests ทั้งหมดในคลังโค้ดผ่านสมบูรณ์ 100% (40 / 40 รายการทดสอบ)
+
+### Milestone 12: ระบบวิธีใช้งานแบบ 3 ภาษา (TH/EN/JA) พร้อมลิงก์ Discord และเครดิตชุมชนทางการ
+* **ขอบเขต:** พัฒนาระบบคู่มือแนะนำการใช้งาน (How-To-Use Guide) แบบอินเทอร์แอคทีฟ รองรับ 3 ภาษา (ไทย, English, 日本語) ภายในแอปพลิเคชัน พร้อมจัดทำเอกสารคู่มือฉบับสมบูรณ์ และระบุเครดิตชุมชนทางการ `NEKO★FAMILY PSO2:NGS Community discord.gg/fkjXW9AJ6a`
+* **การดำเนินการ:**
+  - สร้างโมดูล `modules/guide_dialog.py`:
+    - หน้าต่าง Dialog แบบโมเดิร์น สไตล์คลีน พร้อม Pink Header Bar และ Close Button
+    - รองรับการสลับภาษาแบบสด (In-flight Language Switcher: `[EN | TH | JA]`) ซิงค์กับระบบหลักของแอป
+    - ระบบแท็บ 5 หมวดหมู่หลัก:
+      1. `🚀 Setup & Logs`: ขั้นตอนการเลือกโฟลเดอร์ Log, Zero-Login, 100% TOS Safe
+      2. `💰 Meseta & Items`: การคำนวณเงิน, อัตรา M/hr, First-drop Timer, Item Watchlist Filter, Reset
+      3. `🪟 Gadget Overlay`: การใช้งาน Full Overlay และ Mini Overlay, Drag & Move
+      4. `⚔️ ARKS War`: การเข้าร่วมสงคราม, พิกัด Sector & 4 Slots (10M/40M V9), Smart Paste, Cloud Sync, Web Map
+      5. `🌸 Community & Credit`: กล่อง Discord คอมมูนิตี้, ปุ่ม Join Discord, ปุ่ม Copy Link (พร้อม Toast แจ้งเตือน), และเครดิตทางการ
+  - ผสานรวมเข้ากับ UI ของระบบ:
+    - เพิ่มปุ่ม `📖 วิธีใช้งาน` (`btn_how_to_use`) ใน Sidebar ของ Main Dashboard (`meseta_tracker.py`)
+    - เพิ่มปุ่ม `📖 วิธีใช้งาน` (`btn_how_to_use`) ใน Sidebar ของ ARKS War View (`modules/war_mode/war_view.py`)
+    - รองรับการ Retranslate แบบไดนามิกทันทีเมื่อผู้ใช้เปลี่ยนภาษาในจุดใดก็ตาม
+  - ขยายระบบคำศัพท์ `modules/i18n.py`:
+    - เพิ่มคีย์แปลภาษาสำหรับ Guide Window และปุ่มทั้งหมดครบถ้วนทั้ง 3 ภาษา (EN, TH, JA)
+  - จัดทำเอกสารคู่มือทางการ:
+    - สร้าง `Doc/current/HOW_TO_USE.md` บรรจุเนื้อหาคู่มือละเอียดครบ 3 ภาษา
+    - อัปเดต `Doc/current/ACTIVE_SPECIFICATION.md` และ `README.md`
+  - เพิ่มชุดทดสอบเฉพาะทาง `tests/test_guide_system.py` (7 รายการทดสอบ):
+    - ตรวจสอบความครบถ้วนของข้อมูล 3 ภาษา, การสลับภาษาแบบสด, Single-instance Lifecycle, การคัดลอกลิงก์, การเปิด Discord, และการปฏิบัติตามข้อกำหนด Coordinate War Engine V9
+  - รันการทดสอบทั้งหมดผ่านครบถ้วน 57 / 57 รายการ (100% Passed)
+
+### Milestone 13: การปกป้องข้อมูลความลับและสถาปัตยกรรมหลังบ้านบนส่วนผลิตภัณฑ์ (Product Data & Backend Sanitization)
+* **ขอบเขต:** ตรวจสอบและกำจัดข้อมูลความลับ, รายละเอียดเทคโนโลยีหลังบ้าน (Backend Infrastructure), กฎฐานข้อมูล, และพาธภายในเครื่องพัฒนา ออกจากหน้าจอผู้ใช้และอาร์ติแฟกต์สำหรับแจกจ่ายผู้ใช้ (Sanitization & Defense-in-Depth)
+* **การดำเนินการ:**
+  - **กำจัดกฎฐานข้อมูลจากชุดทดสอบสำหรับผู้ใช้:**
+    - ลบไฟล์ `database.rules.json` ออกจาก `artifacts/portable-test-v7.1.0/`
+    - ปรับปรุง `tools/package_test_build.py` ไม่ให้คัดลอก `database.rules.json` เข้าสู่ชุดแจกจ่าย และตัด `--collect-all tools` เพื่อไม่ให้แพ็กเกจสคริปต์การบิลด์และบรอดคาสเตอร์ภายในลงในไดเรกทอรีแอปพลิเคชัน
+  - **ซ่อนชื่อผู้ให้บริการและเทคโนโลยีหลังบ้านบนหน้าจอผู้ใช้ (UI & Dialogs):**
+    - ปรับปรุง `modules/i18n.py`: ปรับข้อความสถานะ `war_syncing`, `war_synced`, `msg_anti_tamper_compromised`, `msg_security_revoked` ในทั้ง 3 ภาษา (EN, TH, JA) ให้ใช้คำว่า `Cloud Sync` / `ระบบซิงค์ออนไลน์` / `クラウド同期` แทนการระบุชื่อเทคโนโลยีหลังบ้าน
+    - ปรับปรุง `modules/guide_dialog.py`: แก้ไขการ์ดที่ 3 ของแท็บ ARKS War ทั้ง 3 ภาษา ไม่เปิดเผยชื่อผู้ให้บริการคลาวด์และโครงสร้างหลังบ้าน
+    - ปรับปรุง `modules/war_mode/war_service.py`: ปรับข้อความตอบกลับสถานะการซิงค์ให้เป็นข้อความกลาง ป้องกันการหลุดของ Exception URL และชื่อระบบฐานข้อมูล
+  - **ลบพาธดิสก์และข้อความสถาปัตยกรรมภายในออกจากเอกสาร:**
+    - ลบพาธไดรฟ์พัฒนาภายใน (`E:\...`) ออกจาก `README.md`, `config.py`, `Doc/current/ACTIVE_SPECIFICATION.md`, `Doc/current/AI_HANDOFF.md`, `Doc/reference/COORDINATE_SYSTEM.md`, และ `tests/test_guide_system.py`
+    - ปรับปรุง `Doc/reference/FIREBASE_WIRE_SCHEMA.md` กำหนด URL ผ่าน Environment Variable (Private Endpoint)
+    - ปรับปรุง `Doc/current/HOW_TO_USE.md`, `artifacts/portable-test-v7.1.0/HOW_TO_USE.md`, `คู่มือการทดสอบ_README.txt`, และ `README_TEST_GUIDE.md` ให้เป็นคำอธิบายกลาง (Cloud Realtime Sync)
+  - **คอมไพล์และประกอบชุด Portable Test Package ใหม่:**
+    - รัน `tools/package_test_build.py --rebuild` ประกอบไบนารีและสร้างแพ็กเกจ `portable-test-v7.1.0` และ `NekoTracker-v7.1.0-Portable-Test.zip` พร้อมคำนวณ `SHA256SUMS.txt` ใหม่
+  - **การทดสอบความถูกต้อง:**
+    - รันชุดทดสอบทั้งหมด 57 / 57 ผ่าน 100% (Green)

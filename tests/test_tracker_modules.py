@@ -242,6 +242,7 @@ def test_war_view_menu_replaces_chronicle(shared_app):
     assert hasattr(wv, "switch_filter")
     assert hasattr(wv, "btn_overlay_full")
     assert hasattr(wv, "btn_overlay_mini")
+    assert hasattr(wv, "btn_how_to_use")
     assert hasattr(wv, "btn_discord")
     assert hasattr(wv, "lbl_file_status")
     assert hasattr(wv, "btn_select")
@@ -416,6 +417,27 @@ def test_coordinate_paste_support_and_focus(shared_app, monkeypatch):
     wv.update_view()
     tc = app.war_service.target_coord
     assert wv.coord_var.get() == f"{tc.x}, {tc.y}, {tc.slot}"
+
+    app.show_offline_view()
+
+
+def test_open_web_war_room_opens_configured_url(shared_app, monkeypatch):
+    """Verify that ARKS War Room (Web) action opens the configured URL."""
+    import webbrowser
+    from config import DEFAULT_WAR_ROOM_URL
+
+    app = shared_app
+    app.show_war_view()
+    app.update_idletasks()
+    wv = app.war_view
+
+    opened_urls = []
+    monkeypatch.setattr(webbrowser, "open", lambda url: opened_urls.append(url))
+
+    wv._open_web_war_room()
+    assert len(opened_urls) == 1
+    assert opened_urls[0] == "https://arks-war-room.vercel.app/"
+    assert opened_urls[0] == DEFAULT_WAR_ROOM_URL
 
     app.show_offline_view()
 

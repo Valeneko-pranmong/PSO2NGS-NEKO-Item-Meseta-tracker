@@ -2,7 +2,7 @@
 
 > **สถานะ:** `[REFERENCE]` 🔵 — สเปคข้อตกลงการแลกเปลี่ยนข้อมูลผ่านเครือข่าย (Network Wire Contract)  
 > **ฐานข้อมูล:** Google Firebase Realtime Database (RTDB)  
-> **URL เริ่มต้น:** `https://arks-war-room-default-rtdb.asia-southeast1.firebasedatabase.app`  
+> **URL เริ่มต้น:** กำหนดผ่านตัวแปรสภาพแวดล้อม (Private Endpoint)  
 > **Root Namespace:** `arks_war_room`  
 
 ---

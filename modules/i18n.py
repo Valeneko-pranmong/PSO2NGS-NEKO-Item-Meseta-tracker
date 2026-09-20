@@ -113,8 +113,8 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "war_save_btn": "💾 Save",
         "war_landmark_default": "🪐 Landmark...",
         "war_sync_ready": "⚡ Auto-sync ready",
-        "war_syncing": "⚡ Syncing to Firebase...",
-        "war_synced": "⚡ Firebase Synced: {time} (+{contrib} ℳ)",
+        "war_syncing": "⚡ Syncing live data...",
+        "war_synced": "⚡ Cloud Synced: {time} (+{contrib} ℳ)",
         "war_sync_waiting": "⚡ Waiting for connection...",
         "war_sync_error": "⚡ Failed to sync telemetry",
         "war_btn_open_web": "🪐 ARKS War Room (Web)",
@@ -127,8 +127,23 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "menu_select_all": "🔘 Select All",
 
         # Security & Service Messages
-        "msg_anti_tamper_compromised": "Data tampering detected (Anti-Tamper Compromised): Database write suspended",
-        "msg_security_revoked": "Client version ({version}) revoked for security: Database write rejected",
+        "msg_anti_tamper_compromised": "Data tampering detected (Anti-Tamper Compromised): Cloud sync suspended",
+        "msg_security_revoked": "Client version ({version}) revoked for security: Cloud sync rejected",
+
+        # Guide / How-To-Use & Community
+        "btn_how_to_use": "📖 How to Use",
+        "dialog_guide_title": "How to Use — NEKO Item & Meseta Tracker",
+        "guide_tab_setup": "🚀 Setup & Logs",
+        "guide_tab_tracking": "💰 Meseta & Items",
+        "guide_tab_overlay": "🪟 Gadget Overlay",
+        "guide_tab_war": "⚔️ ARKS War",
+        "guide_tab_community": "🌸 Community & Credit",
+        "guide_btn_join_discord": "💬 Join Discord Community",
+        "guide_btn_copy_link": "📋 Copy Discord Link",
+        "guide_link_copied": "✓ Copied to Clipboard!",
+        "guide_credit_label": "NEKO★FAMILY PSO2:NGS Community discord.gg/fkjXW9AJ6a",
+        "guide_community_desc": "Official PSO2:NGS gaming community for team members and players. Join us for farming runs, strategies, tracker updates, and ARKS War Room campaigns!",
+        "guide_close_btn": "✕ Close Guide",
     },
     "th": {
         # App & Window Titles
@@ -205,8 +220,8 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "war_save_btn": "💾 บันทึก",
         "war_landmark_default": "🪐 พิกัดสำคัญ...",
         "war_sync_ready": "⚡ ซิงค์อัตโนมัติพร้อมทำงาน",
-        "war_syncing": "⚡ กำลังซิงค์ขึ้น Firebase...",
-        "war_synced": "⚡ Firebase ซิงค์: ล่าสุด {time} (+{contrib} ℳ)",
+        "war_syncing": "⚡ กำลังซิงค์ข้อมูลออนไลน์...",
+        "war_synced": "⚡ ซิงค์ออนไลน์สำเร็จ: ล่าสุด {time} (+{contrib} ℳ)",
         "war_sync_waiting": "⚡ รอการเชื่อมต่อ...",
         "war_sync_error": "⚡ ไม่สามารถบันทึกข้อมูล Telemetry ได้",
         "war_btn_open_web": "🪐 ARKS War Room (Web)",
@@ -219,8 +234,23 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "menu_select_all": "🔘 เลือกทั้งหมด (Select All)",
 
         # Security & Service Messages
-        "msg_anti_tamper_compromised": "ระบบตรวจพบการแทรกแซงข้อมูล (Anti-Tamper Compromised): ระงับการบันทึกยอดเงินขึ้นฐานข้อมูล",
-        "msg_security_revoked": "เวอร์ชันไคลเอนต์ ({version}) ไม่ผ่านเกณฑ์ความปลอดภัย (Security Revoked): ปฏิเสธการบันทึกยอดเงินขึ้นฐานข้อมูล",
+        "msg_anti_tamper_compromised": "ระบบตรวจพบการแทรกแซงข้อมูล (Anti-Tamper Compromised): ระงับการส่งข้อมูลสถิติขึ้นระบบ",
+        "msg_security_revoked": "เวอร์ชันไคลเอนต์ ({version}) ไม่ผ่านเกณฑ์ความปลอดภัย (Security Revoked): ปฏิเสธการส่งข้อมูลสถิติขึ้นระบบ",
+
+        # Guide / How-To-Use & Community
+        "btn_how_to_use": "📖 วิธีใช้งาน",
+        "dialog_guide_title": "วิธีใช้งาน — NEKO Item & Meseta Tracker",
+        "guide_tab_setup": "🚀 เริ่มต้น & Log",
+        "guide_tab_tracking": "💰 เมเซต้า & ไอเท็ม",
+        "guide_tab_overlay": "🪟 โหมด Overlay",
+        "guide_tab_war": "⚔️ ARKS War",
+        "guide_tab_community": "🌸 ชุมชน & เครดิต",
+        "guide_btn_join_discord": "💬 เข้าสู่ Discord คอมมูนิตี้",
+        "guide_btn_copy_link": "📋 คัดลอกลิงก์ Discord",
+        "guide_link_copied": "✓ คัดลอกลิงก์เรียบร้อยแล้ว!",
+        "guide_credit_label": "NEKO★FAMILY PSO2:NGS Community discord.gg/fkjXW9AJ6a",
+        "guide_community_desc": "คอมมูนิตี้สำหรับคนเล่น PSO2:NGS มาร่วมพูดคุย แลกเปลี่ยนเทคนิคการฟาร์ม แจ้งปัญหา อัปเดตแพตช์ และร่วมกิจกรรมสงคราม ARKS War Room กับพวกเรา!",
+        "guide_close_btn": "✕ ปิดหน้าต่างคู่มือ",
     },
     "ja": {
         # App & Window Titles
@@ -297,8 +327,8 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "war_save_btn": "💾 保存",
         "war_landmark_default": "🪐 主要拠点...",
         "war_sync_ready": "⚡ 自動同期待機中",
-        "war_syncing": "⚡ Firebaseへ同期中...",
-        "war_synced": "⚡ Firebase同期完了: {time} (+{contrib} ℳ)",
+        "war_syncing": "⚡ クラウド同期中...",
+        "war_synced": "⚡ クラウド同期完了: {time} (+{contrib} ℳ)",
         "war_sync_waiting": "⚡ 接続待機中...",
         "war_sync_error": "⚡ テレメトリ同期に失敗しました",
         "war_btn_open_web": "🪐 ARKS War Room (Web)",
@@ -311,8 +341,23 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "menu_select_all": "🔘 すべて選択 (Select All)",
 
         # Security & Service Messages
-        "msg_anti_tamper_compromised": "不正改ざん検知 (Anti-Tamper): データベースへの送信を停止しました",
-        "msg_security_revoked": "クライアントバージョン ({version}) はセキュリティ失効対象です: 送信を拒否しました",
+        "msg_anti_tamper_compromised": "不正改ざん検知 (Anti-Tamper): クラウド同期を停止しました",
+        "msg_security_revoked": "クライアントバージョン ({version}) はセキュリティ失効対象です: 同期を拒否しました",
+
+        # Guide / How-To-Use & Community
+        "btn_how_to_use": "📖 使い方ガイド",
+        "dialog_guide_title": "使い方ガイド — NEKO アイテム＆メセタトラッカー",
+        "guide_tab_setup": "🚀 初期設定＆ログ",
+        "guide_tab_tracking": "💰 メセタ＆アイテム",
+        "guide_tab_overlay": "🪟 ガジェットオーバーレイ",
+        "guide_tab_war": "⚔️ ARKS War 作戦",
+        "guide_tab_community": "🌸 コミュニティ＆謝辞",
+        "guide_btn_join_discord": "💬 Discordコミュニティに参加",
+        "guide_btn_copy_link": "📋 Discordリンクをコピー",
+        "guide_link_copied": "✓ クリップボードにコピーしました！",
+        "guide_credit_label": "NEKO★FAMILY PSO2:NGS Community discord.gg/fkjXW9AJ6a",
+        "guide_community_desc": "PSO2:NGS公式プレイヤーコミュニティ。周回攻略、アイテムドロップ情報、トラッカーの更新情報、ARKS War作戦への参加はこちら！",
+        "guide_close_btn": "✕ ガイドを閉じる",
     },
 }
 

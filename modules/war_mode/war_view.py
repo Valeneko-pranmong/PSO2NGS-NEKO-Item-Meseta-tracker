@@ -28,6 +28,7 @@ from config import (
     FONT_NUMBER,
     FONT_STATS,
     APP_VERSION,
+    DEFAULT_WAR_ROOM_URL,
     resource_path,
 )
 from PIL import Image
@@ -607,6 +608,19 @@ class WarDashboardFrame(ctk.CTkFrame):
         )
         self.btn_overlay_mini.grid(row=0, column=1, sticky="ew", padx=(3, 0))
 
+        self.btn_how_to_use = ctk.CTkButton(
+            self.btn_frame,
+            text=t("btn_how_to_use"),
+            font=(FONT_FAMILY, 12, "bold"),
+            fg_color="#0284C7",
+            hover_color="#0369A1",
+            text_color="white",
+            height=BTN_HEIGHT,
+            corner_radius=BTN_RADIUS,
+            command=self.controller.open_how_to_use,
+        )
+        self.btn_how_to_use.pack(fill="x", pady=(0, 4))
+
         self.btn_discord = ctk.CTkButton(
             self.btn_frame,
             text=t("btn_discord"),
@@ -742,6 +756,8 @@ class WarDashboardFrame(ctk.CTkFrame):
                 self.btn_overlay_full.configure(text=t("btn_overlay_full"))
             if hasattr(self, "btn_overlay_mini") and self.btn_overlay_mini.winfo_exists():
                 self.btn_overlay_mini.configure(text=t("btn_overlay_mini"))
+            if hasattr(self, "btn_how_to_use") and self.btn_how_to_use.winfo_exists():
+                self.btn_how_to_use.configure(text=t("btn_how_to_use"))
             if hasattr(self, "btn_discord") and self.btn_discord.winfo_exists():
                 self.btn_discord.configure(text=t("btn_discord"))
             if hasattr(self, "btn_select") and self.btn_select.winfo_exists():
@@ -822,11 +838,10 @@ class WarDashboardFrame(ctk.CTkFrame):
                 pass
 
     def _open_web_war_room(self) -> None:
-        index_path = os.path.abspath("E:/ARKS War Room/index.html")
-        if os.path.exists(index_path):
-            webbrowser.open(f"file:///{index_path}")
-        else:
-            self.lbl_sync_time.configure(text=f"File not found: {index_path}", text_color="#EF4444")
+        try:
+            webbrowser.open(DEFAULT_WAR_ROOM_URL)
+        except Exception as e:
+            self.lbl_sync_time.configure(text=f"Failed to open URL: {e}", text_color="#EF4444")
 
     def _do_sync(self) -> None:
         self.lbl_sync_time.configure(text=t("war_syncing"), text_color="#0284C7")

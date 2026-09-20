@@ -44,8 +44,8 @@ except Exception:
     SECTOR_Y_MAX = 9
     SLOT_MIN = 1
     SLOT_MAX = 4
-    SLOT_TARGET_MESETA = 25_000_000
-    SECTOR_TARGET_MESETA = 100_000_000
+    SLOT_TARGET_MESETA = 10_000_000
+    SECTOR_TARGET_MESETA = 40_000_000
     CLIENT_VERSION = "7.1.0"
     MIN_SECURE_VERSION = "7.1.0"
     REVOKED_VERSIONS = ["7.0.0-alpha", "7.0.0"]
@@ -693,7 +693,7 @@ class WarService:
         Uses pure Python standard library (urllib.request) for zero dependencies & offline resilience.
         """
         if not self.firebase_url:
-            return False, "ไม่ได้ระบุ Firebase Database URL"
+            return False, "ไม่ได้ระบุ URL สำหรับซิงค์ข้อมูล"
 
         if not self.remote_policy_fetched:
             self.fetch_remote_version_policy(timeout=min(2.0, timeout))
@@ -876,9 +876,9 @@ class WarService:
                 except Exception:
                     pass
 
-            return True, "ส่งข้อมูลขึ้น Firebase สำเร็จ"
+            return True, "ส่งข้อมูลขึ้นระบบคลาวด์สำเร็จ"
         except Exception as exc:
-            return False, f"Firebase Sync Error: {exc}"
+            return False, f"Cloud Sync Error: {exc}"
 
     def sync_to_war_room(self) -> Tuple[bool, str]:
         """

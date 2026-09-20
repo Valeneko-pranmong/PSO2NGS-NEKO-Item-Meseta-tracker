@@ -73,6 +73,21 @@ REVOKED_VERSIONS = ["7.0.0-alpha", "7.0.0"]
 DEFAULT_LANGUAGE = "en"
 SUPPORTED_LANGUAGES = ["en", "th", "ja"]
 
+# ARKS War Room Web URL
+DEFAULT_WAR_ROOM_URL = os.getenv(
+    "WAR_ROOM_URL",
+    os.getenv(
+        "ARKS_WAR_ROOM_URL",
+        "https://arks-war-room.vercel.app/",
+    ),
+)
+
+# Discord Community & Credit
+DEFAULT_DISCORD_URL = os.getenv("DISCORD_URL", "https://discord.gg/fkjXW9AJ6a")
+DISCORD_INVITE_SHORT = "discord.gg/fkjXW9AJ6a"
+DISCORD_COMMUNITY_NAME = "NEKO★FAMILY PSO2:NGS Community"
+DISCORD_CREDIT_FULL = "NEKO★FAMILY PSO2:NGS Community discord.gg/fkjXW9AJ6a"
+
 # Firebase Realtime Database
 DEFAULT_FIREBASE_RTDB_URL = os.getenv(
     "FIREBASE_RTDB_URL",
@@ -82,15 +97,17 @@ DEFAULT_FIREBASE_RTDB_URL = os.getenv(
     ),
 )
 
-# Coordinate Grid & Sub-Cell Defaults (Sector + 4 Slots)
+# Coordinate Grid & Sub-Cell Defaults (Coordinate War Engine V9 Release)
+# Authoritative Reference: Coordinate War Specification V9
+# Core Rule: "เกมแค่เติมเงินเข้าไปในช่อง ใครใส่เยอะคนนั้นเป็นเจ้าของ"
 SECTOR_X_MIN = -12
 SECTOR_X_MAX = 25
 SECTOR_Y_MIN = -11
 SECTOR_Y_MAX = 9
 SLOT_MIN = 1
 SLOT_MAX = 4
-SLOT_TARGET_MESETA = 25_000_000    # 25M per sub-cell
-SECTOR_TARGET_MESETA = 100_000_000 # 100M total per sector (4 slots)
+SLOT_TARGET_MESETA = 10_000_000       # 10M per sub-cell capture threshold (V9 Release)
+SECTOR_TARGET_MESETA = 40_000_000     # 40M total per macro sector (4 slots x 10M to fully liberate)
 
 # Anti-Tamper & Security Heuristic Thresholds
 MAX_SINGLE_MESETA_DROP = 300_000          # Maximum realistic single drop

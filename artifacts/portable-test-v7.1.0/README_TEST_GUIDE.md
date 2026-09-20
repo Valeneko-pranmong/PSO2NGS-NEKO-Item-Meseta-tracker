@@ -10,7 +10,7 @@
 
 | ไฟล์ Script | หน้าที่ |
 | :--- | :--- |
-| **`1_Run_NekoTracker_Test.bat`** | เปิดตัวโปรแกรมหลัก Python Tracker V7.1.0 (พร้อม War Room & Firebase Sync) |
+| **`1_Run_NekoTracker_Test.bat`** | เปิดตัวโปรแกรมหลัก Python Tracker V7.1.0 (พร้อมโหมด ARKS War Room & Cloud Sync) |
 | **`2_Start_Mock_Log_Feed.bat`** | เริ่มสตรีม ActionLog จำลองสด (Drop เงิน, ไอเทม, PSE Burst) ลงโฟลเดอร์ `sample_logs/` |
 | **`3_Quick_Test_All_In_One.bat`** | รันตัวจำลอง Log พร้อมเปิด NekoTracker ให้อัตโนมัติในคลิกเดียว |
 

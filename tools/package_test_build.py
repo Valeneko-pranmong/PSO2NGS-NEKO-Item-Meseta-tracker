@@ -44,11 +44,11 @@ def ensure_binaries(force_rebuild: bool = False) -> None:
             "--add-data", "fonts;fonts",
             "--collect-all", "customtkinter",
             "--collect-all", "modules",
-            "--collect-all", "tools",
             "--hidden-import", "PIL",
             "--hidden-import", "PIL.Image",
             "--hidden-import", "modules.event_bus",
             "--hidden-import", "modules.i18n",
+            "--hidden-import", "modules.guide_dialog",
             "--hidden-import", "modules.utils",
             "--hidden-import", "modules.security",
             "--hidden-import", "modules.anti_tamper",
@@ -84,8 +84,9 @@ def build_portable_package() -> None:
         "--events", "20"
     ], check=True)
     
-    if os.path.exists(os.path.join(ROOT_DIR, "database.rules.json")):
-        shutil.copy2(os.path.join(ROOT_DIR, "database.rules.json"), os.path.join(PORTABLE_DIR, "database.rules.json"))
+    how_to_use_src = os.path.join(ROOT_DIR, "Doc", "current", "HOW_TO_USE.md")
+    if os.path.exists(how_to_use_src):
+        shutil.copy2(how_to_use_src, os.path.join(PORTABLE_DIR, "HOW_TO_USE.md"))
 
     # 4. Create Batch Launchers
     log("Creating Windows test launcher scripts...")
@@ -163,7 +164,7 @@ def build_portable_package() -> None:
 ------------------------------------------------------------------------------
 📂 โครงสร้างไฟล์ในชุดทดสอบ:
 ------------------------------------------------------------------------------
-1_Run_NekoTracker_Test.bat     -> รันตัวโปรแกรมหลัก Python Tracker V7.1.0 (พร้อม War Room & Firebase)
+1_Run_NekoTracker_Test.bat     -> รันตัวโปรแกรมหลัก Python Tracker V7.1.0 (พร้อมโหมด ARKS War Room & Cloud Sync)
 2_Start_Mock_Log_Feed.bat     -> รันโปรแกรมจำลองเหตุการณ์ Log สด (Streaming PSE Burst & Drops)
 3_Quick_Test_All_In_One.bat   -> รันทั้งตัวจำลอง Log และโปรแกรม Tracker พร้อมกันทันที
 NekoTracker/                  -> โฟลเดอร์ไบนารีหลักแบบไม่ต้องติดตั้ง (PyInstaller Onedir)
@@ -192,6 +193,12 @@ tools/mock_log_simulator.py   -> สคริปต์จำลอง ActionLog 
 - 100% TOS Safe: อ่านเฉพาะไฟล์ข้อความ ActionLog เท่านั้น ไม่แตะต้อง Process หรือ RAM ของเกม
 - Zero-Login: ไม่มีการขอหรือจัดเก็บ Username / Password ใดๆ ทั้งสิ้น
 - Client Version Security: บังคับใช้ Version 7.1.0 (บล็อกเวอร์ชันไม่ปลอดภัย 7.0.0-alpha)
+
+------------------------------------------------------------------------------
+🌸 ชุมชน Discord & เครดิตทางการ:
+------------------------------------------------------------------------------
+NEKO★FAMILY PSO2:NGS Community discord.gg/fkjXW9AJ6a
+Discord: https://discord.gg/fkjXW9AJ6a
 """
     with open(os.path.join(PORTABLE_DIR, "คู่มือการทดสอบ_README.txt"), "w", encoding="utf-8") as f:
         f.write(guide_th)
@@ -208,7 +215,7 @@ tools/mock_log_simulator.py   -> สคริปต์จำลอง ActionLog 
 
 | ไฟล์ Script | หน้าที่ |
 | :--- | :--- |
-| **`1_Run_NekoTracker_Test.bat`** | เปิดตัวโปรแกรมหลัก Python Tracker V7.1.0 (พร้อม War Room & Firebase Sync) |
+| **`1_Run_NekoTracker_Test.bat`** | เปิดตัวโปรแกรมหลัก Python Tracker V7.1.0 (พร้อมโหมด ARKS War Room & Cloud Sync) |
 | **`2_Start_Mock_Log_Feed.bat`** | เริ่มสตรีม ActionLog จำลองสด (Drop เงิน, ไอเทม, PSE Burst) ลงโฟลเดอร์ `sample_logs/` |
 | **`3_Quick_Test_All_In_One.bat`** | รันตัวจำลอง Log พร้อมเปิด NekoTracker ให้อัตโนมัติในคลิกเดียว |
 

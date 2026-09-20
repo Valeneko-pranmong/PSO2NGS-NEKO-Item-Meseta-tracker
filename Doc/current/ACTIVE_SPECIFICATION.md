@@ -48,17 +48,21 @@ NEKO Item & Meseta Tracker เป็นเครื่องมือติด�
 * `board_coord_changed(coord, sector_x, sector_y, slot)`: แจ้งเตือนเมื่อมีการเปลี่ยนพิกัดเป้าหมาย
 * `war_telemetry_synced(character_name, meseta, sector_coord)`: แจ้งเตือนเมื่อข้อมูลถูกซิงค์
 
-### 2.4 โหมด ARKS War Room & ระบบพิกัด Sector + 4 Slots
+### 2.4 โหมด ARKS War Room & ระบบพิกัด Sector + 4 Slots (Coordinate War Engine V9)
+* **ปรัชญาและกฎกติกาหลัก:**
+  **"เกมแค่เติมเงินเข้าไปในช่อง ใครใส่เยอะคนนั้นเป็นเจ้าของ"** (อ้างอิงเอกสารหลัก Coordinate War Specification V9 และ `AI_HANDOFF.md`)
 * **พิกัดอวกาศแบบ Sector และ Quadrant Sub-cells:**
   - แกน X (Sector X): ช่วงค่าระหว่าง `-12` ถึง `+25` (รวม 38 ช่องในแนวนอน)
   - แกน Y (Sector Y): ช่วงค่าระหว่าง `-11` ถึง `+9` (รวม 21 ช่องในแนวตั้ง)
   - รวมทั้งหมด: 798 Sectors ทั่วกาแล็กซี ARKS
-  - **4 Sub-cell Slots ต่อ Sector:**
-    - ช่อง `#1` (NW - บนซ้าย): เป้าหมาย 25,000,000 N-Meseta
-    - ช่อง `#2` (NE - บนขวา): เป้าหมาย 25,000,000 N-Meseta
-    - ช่อง `#3` (SW - ล่างซ้าย): เป้าหมาย 25,000,000 N-Meseta
-    - ช่อง `#4` (SE - ล่างขวา): เป้าหมาย 25,000,000 N-Meseta
-    - รวมเป้าหมายทั้ง Sector: 100,000,000 N-Meseta
+  - **4 Sub-cell Slots ต่อ Sector (ขนาดช่องละ 300px x 300px):**
+    - ช่อง `#1` (NW - บนซ้าย): เกณฑ์ปลดล็อกยึดครอง 10,000,000 N-Meseta (10M ℳ)
+    - ช่อง `#2` (NE - บนขวา): เกณฑ์ปลดล็อกยึดครอง 10,000,000 N-Meseta (10M ℳ)
+    - ช่อง `#3` (SW - ล่างซ้าย): เกณฑ์ปลดล็อกยึดครอง 10,000,000 N-Meseta (10M ℳ)
+    - ช่อง `#4` (SE - ล่างขวา): เกณฑ์ปลดล็อกยึดครอง 10,000,000 N-Meseta (10M ℳ)
+    - **เกณฑ์ปลดแอกสมบูรณ์ (100% Liberated):** ยึดครองครบทั้ง 4 ช่องย่อย (ยอดรวม $\ge 40,000,000\text{ N-Meseta}$)
+    - **การชิงพื้นที่ (Clash):** หากผู้เล่นคนอื่นมาเติมเงินในช่องเดียวกันมากกว่าผู้นำปัจจุบัน สิทธิ์ความเป็นเจ้าของจะถูกแย่งทันที
+    - **การหลอมรวมผืนแผ่นดิน (Seamless Continent):** หากทั้ง 4 ช่องย่อยถูกยึดครองโดยผู้เล่นคนเดียวกัน ระบบจะหลอมรวมเป็นผืนดินเรืองแสงผืนเดียวโดยซ่อนเส้นแบ่งภายใน
 * **ระบบแปลพิกัดอัจฉริยะ (Coordinate Parser):**
   รองรับการป้อนพิกัด 7 รูปแบบที่พบได้จากการคัดลอกบนหน้าเว็บและอินพุตของผู้ใช้:
   1. ตัวเลข 3 จำนวน: `"0, 0, 1"`, `"3, 3, 4"`
@@ -70,15 +74,18 @@ NEKO Item & Meseta Tracker เป็นเครื่องมือติด�
   7. Fallback 2 จำนวน: `"0, 0"`, `"[15, -8]"` (จะกำหนดช่องเริ่มต้นเป็น Slot 1)
 * **Realtime Sync Worker:**
   - Background Thread ทำงานอัตโนมัติ มี Debounce 0.35 วินาที เพื่อรวบยอดคำขอซิงค์ และส่ง Heartbeat ทุก 5.0 วินาที
-  - ส่งข้อมูลไปยัง Google Firebase Realtime Database ตาม Wire Contract
-  - สำรองข้อมูลสถานะออฟไลน์ลงไฟล์ `%APPDATA%\NekoTrackerOffline\war_stats.json` และไดเรกทอรีโลคอล `E:\ARKS War Room`
+  - ส่งข้อมูลไปยัง Google Firebase Realtime Database ตาม Wire Contract (`arks_war_room/operatives/{character_name}`)
+  - **Standby Presence Visibility:** ตรวจจับสถานะออนไลน์พร้อมรบ แม้มียอดเงิน $0\text{ ℳ}$ จะปรากฏตัวในทำเนียบนักรบพร้อมสัญลักษณ์ `📍 [+X, -Y] #Slot`
+  - สำรองข้อมูลสถานะออฟไลน์ลงไฟล์ `%APPDATA%\NekoTrackerOffline\war_stats.json`
 
 ### 2.5 โหมดการแสดงผล (User Interfaces)
-* **Main Dashboard:** แสดงยอดเงิน, อัตรา M/hr, เวลาที่ฟาร์ม, รายการไอเทม, และปุ่มลัดสลับโหมด
-* **ARKS War View:** แสดงพิกัด Sector ปัจจุบัน, ช่อง Quadrant ที่กำลังยึด, เปอร์เซ็นต์ความคืบหน้า, ชื่อ Operative, และสถานะการซิงค์สด
+* **Main Dashboard:** แสดงยอดเงิน, อัตรา M/hr, เวลาที่ฟาร์ม, รายการไอเทม, ปุ่มคู่มือวิธีใช้งาน 3 ภาษา (How-To-Use Guide), และปุ่มลัดสลับโหมด
+* **ARKS War View:** แสดงพิกัด Sector ปัจจุบัน, ช่อง Quadrant ที่กำลังยึด, เปอร์เซ็นต์ความคืบหน้า, ชื่อ Operative, สถานะการซิงค์สด และปุ่มเปิดหน้าเว็บ ARKS War Room (`https://arks-war-room.vercel.app/`)
 * **Gadget Mode (Overlay):**
   - **Full Overlay:** แสดงทั้งรายได้ N-Meseta และรายการไอเทมดรอปล่าสุด
   - **Mini Overlay:** แสดงเฉพาะตัวเลขเงิน Meseta ในขนาดกะทัดรัด โปร่งใส ลอยอยู่เหนือหน้าจอเกม
+* **Interactive 3-Language Guide Dialog:** หน้าต่างคู่มือวิธีใช้งานแบบไดนามิกรองรับ 3 ภาษา (ไทย, English, 日本語) แบ่งเป็น 5 หมวดหมู่หลัก (🚀 เริ่มต้นใช้งาน, 💰 เมเซต้า & ไอเท็ม, 🪟 โหมด Overlay, ⚔️ ARKS War, 🌸 ชุมชน & เครดิต) พร้อมแนบลิงก์ Discord และเครดิตชุมชนทางการ `NEKO★FAMILY PSO2:NGS Community discord.gg/fkjXW9AJ6a` (`https://discord.gg/fkjXW9AJ6a`)
+
 
 ---
 

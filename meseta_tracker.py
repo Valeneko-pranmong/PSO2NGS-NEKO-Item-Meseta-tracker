@@ -167,6 +167,11 @@ class NGSTrackerApp(ctk.CTk):
                                          height=BTN_HEIGHT, corner_radius=BTN_RADIUS, command=lambda: self.open_overlay("mini"))
         self.btn_overlay_mini.grid(row=0, column=1, sticky="ew", padx=(3, 0))
 
+        self.btn_how_to_use = ctk.CTkButton(self.btn_frame, text=t("btn_how_to_use"), font=(FONT_FAMILY, 12, "bold"),
+                                            fg_color="#0284C7", hover_color="#0369A1", text_color="white",
+                                            height=BTN_HEIGHT, corner_radius=BTN_RADIUS, command=self.open_how_to_use)
+        self.btn_how_to_use.pack(fill="x", pady=(0, 8))
+
         self.btn_discord = ctk.CTkButton(self.btn_frame, text=t("btn_discord"), font=(FONT_FAMILY, 13, "bold"), 
                                          fg_color=COLOR_DISCORD, hover_color="#AB47BC", text_color="white", 
                                          height=BTN_HEIGHT, corner_radius=BTN_RADIUS, command=self.open_discord)
@@ -502,8 +507,13 @@ class NGSTrackerApp(ctk.CTk):
             pass
         sys.exit(0)
 
+    def open_how_to_use(self, tab: str = "setup"):
+        from modules.guide_dialog import open_guide_dialog
+        self.guide_window = open_guide_dialog(self, initial_tab=tab)
+        return self.guide_window
+
     def open_discord(self):
-        webbrowser.open("https://discord.gg/fkjXW9AJ6a")
+        webbrowser.open(DEFAULT_DISCORD_URL)
 
     def toggle_filter(self, val=None):
         if val is not None:
@@ -566,6 +576,8 @@ class NGSTrackerApp(ctk.CTk):
                 self.btn_overlay_full.configure(text=t("btn_overlay_full"))
             if hasattr(self, "btn_overlay_mini") and self.btn_overlay_mini.winfo_exists():
                 self.btn_overlay_mini.configure(text=t("btn_overlay_mini"))
+            if hasattr(self, "btn_how_to_use") and self.btn_how_to_use.winfo_exists():
+                self.btn_how_to_use.configure(text=t("btn_how_to_use"))
             if hasattr(self, "btn_discord") and self.btn_discord.winfo_exists():
                 self.btn_discord.configure(text=t("btn_discord"))
             if hasattr(self, "lbl_sidebar_lang") and self.lbl_sidebar_lang.winfo_exists():
@@ -984,6 +996,8 @@ class NGSTrackerApp(ctk.CTk):
                 self.btn_overlay_full.configure(text=t("btn_overlay_full"))
             if hasattr(self, "btn_overlay_mini") and self.btn_overlay_mini.winfo_exists():
                 self.btn_overlay_mini.configure(text=t("btn_overlay_mini"))
+            if hasattr(self, "btn_how_to_use") and self.btn_how_to_use.winfo_exists():
+                self.btn_how_to_use.configure(text=t("btn_how_to_use"))
             if hasattr(self, "btn_discord") and self.btn_discord.winfo_exists():
                 self.btn_discord.configure(text=t("btn_discord"))
             if hasattr(self, "lbl_sidebar_lang") and self.lbl_sidebar_lang.winfo_exists():
@@ -1005,6 +1019,9 @@ class NGSTrackerApp(ctk.CTk):
 
             if getattr(self, 'overlay_window', None) and self.overlay_window.winfo_exists():
                 self.overlay_window.retranslate_ui()
+
+            if getattr(self, 'guide_window', None) and self.guide_window.winfo_exists():
+                self.guide_window.retranslate_ui()
         except Exception:
             pass
 

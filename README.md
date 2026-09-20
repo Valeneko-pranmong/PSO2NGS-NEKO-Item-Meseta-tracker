@@ -2,10 +2,16 @@
 
 ![Version](https://img.shields.io/badge/Python_Version-7.1.0-FF69B4?style=for-the-badge)
 ![Platform](https://img.shields.io/badge/Platform-Windows_10%2F11-blue?style=for-the-badge)
-![Tests](https://img.shields.io/badge/Tests-24%20Passed-brightgreen?style=for-the-badge)
+![Tests](https://img.shields.io/badge/Tests-56%20Passed-brightgreen?style=for-the-badge)
+![Languages](https://img.shields.io/badge/i18n-EN%20%7C%20TH%20%7C%20JA-purple?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-Non--Commercial-red?style=for-the-badge)
 
-โปรแกรมและเครื่องมือติดตามรายได้ N-Meseta และไอเทมดรอปแบบ Real-time สำหรับเกม **Phantasy Star Online 2: New Genesis (PSO2:NGS)** พัฒนาขึ้นโดยทีม **NEKO FAMILY TEAM SHIP 4 JP** ออกแบบมาเป็นพิเศษสำหรับการฟาร์ม PSE Burst, การคำนวณอัตราความเร็ว Meseta ต่อชั่วโมง (M/hr), และการทำสงครามยึดพื้นที่ในโหมด **ARKS War Room**
+โปรแกรมและเครื่องมือติดตามรายได้ N-Meseta และไอเทมดรอปแบบ Real-time สำหรับเกม **Phantasy Star Online 2: New Genesis (PSO2:NGS)** พัฒนาขึ้นโดยทีม **NEKO FAMILY TEAM SHIP 4 JP** ออกแบบมาเป็นพิเศษสำหรับการฟาร์ม PSE Burst, การคำนวณอัตราความเร็ว Meseta ต่อชั่วโมง (M/hr), การทำสงครามยึดพื้นที่ในโหมด **ARKS War Room**, พร้อมระบบคู่มือวิธีใช้งานแบบไดนามิก 3 ภาษา (ไทย, English, 日本語) และการเชื่อมต่อคอมมูนิตี้ Discord ทางการ
+
+> 🌸 **Official Community Discord & Credit:**  
+> **NEKO★FAMILY PSO2:NGS Community discord.gg/fkjXW9AJ6a**  
+> 🔗 Discord: [https://discord.gg/fkjXW9AJ6a](https://discord.gg/fkjXW9AJ6a)  
+> 📖 คู่มือการใช้งาน 3 ภาษา: [`Doc/current/HOW_TO_USE.md`](Doc/current/HOW_TO_USE.md)
 
 ---
 
@@ -24,7 +30,7 @@ E:\PSO2NGS-NEKO-Item-Meseta-tracker\
 │   ├── 📂 reference/                       # [REFERENCE] 🔵 เอกสารอ้างอิงเชิงลึก
 │   │   ├── ARCHITECTURE.md                 # ผังสถาปัตยกรรมระบบและท่อส่งข้อมูล (Data Pipelines)
 │   │   ├── COORDINATE_SYSTEM.md            # ข้อกำหนดระบบพิกัด Sector + 4 Sub-cell Slots
-│   │   ├── FIREBASE_WIRE_SCHEMA.md         # Wire Contract ของ Google Firebase RTDB
+│   │   ├── FIREBASE_WIRE_SCHEMA.md         # เอกสารข้อกำหนดสถาปัตยกรรมและการเชื่อมต่อข้อมูล
 │   │   └── SECURITY_ANTITAMPER.md          # มาตรฐาน 100% TOS Safe และ AntiTamperGuard
 │   └── 📂 archive/                         # [ARCHIVE] 🔴 ข้อกำหนดที่ปลดระวางแล้ว
 │       ├── README.md                       # สารบัญเอกสารเก่าที่ปลดระวาง
@@ -39,7 +45,7 @@ E:\PSO2NGS-NEKO-Item-Meseta-tracker\
 │       └── war_view.py                     # แดชบอร์ดสงคราม ARKS WarDashboardFrame
 ├── 📂 tools/                               # [CURRENT] 🟢 สคริปต์และเครื่องมือเสริม
 │   ├── __init__.py                         # Tools Package
-│   └── firebase_war_sync.py                # ตัวส่งข้อมูลขึ้น Firebase RTDB (Admin SDK + REST)
+│   └── firebase_war_sync.py                # เครื่องมือส่งข้อมูล Telemetry สด (Admin SDK + REST)
 ├── 📂 tests/                               # [CURRENT] 🟢 ชุดทดสอบ Unit Tests ของ Python
 │   └── test_tracker_modules.py             # ทดสอบ EventBus, WarService, Zero-Login, SemVer, Security (24 Tests)
 ├── 📂 installer/                           # [CURRENT] 🟢 ไฟล์กำหนดค่าและสคริปต์ไปป์ไลน์ตัวติดตั้ง
@@ -74,20 +80,22 @@ E:\PSO2NGS-NEKO-Item-Meseta-tracker\
 * **Item Watchlist Filter:** กรองติดตามเฉพาะไอเทมหายาก แคปซูลพิเศษ หรืออาวุธที่ต้องการได้ตามใจชอบ
 * **Gadget Mode (Overlay):** หน้าต่างมินิมอลโปร่งใส เปิดลอยทับหน้าจอเกมโดยไม่เกะกะ มีทั้งโหมด Full และ Mini Meseta
 
-### 2. ⚔️ ARKS War Room & ระบบพิกัด Sector + 4 Slots
+### 2. ⚔️ ARKS War Room & ระบบพิกัด Sector + 4 Slots (Coordinate War V9)
+* **ปรัชญาหลัก:** **"เกมแค่เติมเงินเข้าไปในช่อง ใครใส่เยอะคนนั้นเป็นเจ้าของ"** (อ้างอิง Coordinate War Specification V9)
 * **ตารางพิกัดระดับกาแล็กซี:** ครอบคลุม Sector X: `[-12 .. +25]` และ Sector Y: `[-11 .. +9]` รวมทั้งสิ้น 798 Sectors
-* **4 Quadrant Sub-cell Slots:** แบ่งแต่ละ Sector ออกเป็น 4 ช่องย่อย:
-  - ช่อง `#1` (NW บนซ้าย) — เป้าหมาย 25,000,000 N-Meseta
-  - ช่อง `#2` (NE บนขวา) — เป้าหมาย 25,000,000 N-Meseta
-  - ช่อง `#3` (SW ล่างซ้าย) — เป้าหมาย 25,000,000 N-Meseta
-  - ช่อง `#4` (SE ล่างขวา) — เป้าหมาย 25,000,000 N-Meseta
-  - รวมเป้าหมายทั้ง Sector เท่ากับ **100,000,000 N-Meseta**
+* **4 Quadrant Sub-cell Slots:** แบ่งแต่ละ Sector ออกเป็น 4 ช่องย่อย (ขนาดช่องละ 300px x 300px):
+  - ช่อง `#1` (NW บนซ้าย) — เกณฑ์ปลดล็อกยึดครอง 10,000,000 N-Meseta (10M ℳ)
+  - ช่อง `#2` (NE บนขวา) — เกณฑ์ปลดล็อกยึดครอง 10,000,000 N-Meseta (10M ℳ)
+  - ช่อง `#3` (SW ล่างซ้าย) — เกณฑ์ปลดล็อกยึดครอง 10,000,000 N-Meseta (10M ℳ)
+  - ช่อง `#4` (SE ล่างขวา) — เกณฑ์ปลดล็อกยึดครอง 10,000,000 N-Meseta (10M ℳ)
+  - ปลดแอกสมบูรณ์ทั้ง Sector เท่ากับ **40,000,000 N-Meseta** (หากยึดครบคนเดียวจะหลอมรวมเป็น Seamless Continent)
+* **การชิงพื้นที่ (Clash):** ใครเติมเงินเกิน 10M และมากกว่าผู้นำเดิม แย่งเป็นเจ้าของทันที!
 * **Smart Coordinate Parser:** วางพิกัดได้ทันที รองรับ 7 รูปแบบอินพุต (ทั้งแบบ 3 จำนวน, วงเล็บ, JSON, และข้อความคัดลอกจากเว็บ)
-* **Zero-Login Architecture:** ตรวจจับชื่อตัวละครจริงในเกมจากไฟล์ Log อัตโนมัติและใช้เป็น Primary Key ทันที ไม่ต้องสร้างบัญชี ไม่ต้องจำรหัสผ่าน
-* **Firebase Realtime Sync:** เธรดเบื้องหลังส่ง Telemetry สดขึ้น Google Firebase Realtime Database ด้วย Debounce 0.35 วินาที พร้อม Heartbeat ทุก 5 วินาที
+* **Zero-Login Architecture & Standby Presence:** ตรวจจับชื่อตัวละครจริงในเกมจากไฟล์ Log อัตโนมัติและปรากฏในทำเนียบนักรบพร้อมรบทันที
+* **Cloud Realtime Sync:** เธรดเบื้องหลังส่ง Telemetry สดขึ้นระบบคลาวด์ War Room อัตโนมัติด้วย Debounce 0.35 วินาที พร้อม Heartbeat ทุก 5 วินาที
 
 ### 3. 🛡️ Client Version Security & Data Gating
-* **ระบบตรวจสอบความปลอดภัยของเวอร์ชัน:** ส่งเลขเวอร์ชันไคลเอนต์ (`client_version`) ขึ้น Firebase RTDB อัตโนมัติทุกครั้งที่ซิงค์ข้อมูล
+* **ระบบตรวจสอบความปลอดภัยของเวอร์ชัน:** ส่งเลขเวอร์ชันไคลเอนต์ (`client_version`) ขึ้นตรวจสอบกับระบบคลาวด์อัตโนมัติทุกครั้งที่ซิงค์ข้อมูล
 * **Meseta Security Gating:** ไคลเอนต์เวอร์ชันที่มีช่องโหว่ความปลอดภัยหรือถูกเพิกถอน (Revoked) จะถูกปฏิเสธไม่นับยอดเงินเข้าสู่ฐานข้อมูล (`meseta = 0`) และบันทึกคำเตือนความปลอดภัย
 * **Pure Python Architecture:** ออกแบบด้วย Python 3.11 และ CustomTkinter น้ำหนักเบา ปลอดภัย และเสถียร
 
@@ -138,6 +146,7 @@ python -m pytest -v
 
 ## 📚 เอกสารประกอบโครงการ (Project Documentation)
 
+* 📖 **[คู่มือการใช้งาน 3 ภาษา (HOW_TO_USE.md)](Doc/current/HOW_TO_USE.md)**
 * 📖 **[สารบัญและหลักธรรมาภิบาลเอกสาร (Doc/README.md)](Doc/README.md)**
 * 🟢 **[สเปคระบบปัจจุบัน (ACTIVE_SPECIFICATION.md)](Doc/current/ACTIVE_SPECIFICATION.md)**
 * 🟢 **[บันทึกประวัติวิศวกรรม (ENGINEERING_LOG.md)](Doc/current/ENGINEERING_LOG.md)**
@@ -145,7 +154,7 @@ python -m pytest -v
 * 🔵 **[มาตรฐานกลางระบบติดตั้งซอฟต์แวร์ Windows (INSTALLER_STANDARD.md)](Doc/reference/INSTALLER_STANDARD.md)**
 * 🔵 **[สถาปัตยกรรมระบบและการไหลของข้อมูล (ARCHITECTURE.md)](Doc/reference/ARCHITECTURE.md)**
 * 🔵 **[ข้อกำหนดระบบพิกัด Sector และ 4 Slots (COORDINATE_SYSTEM.md)](Doc/reference/COORDINATE_SYSTEM.md)**
-* 🔵 **[โครงสร้างข้อมูล Firebase RTDB (FIREBASE_WIRE_SCHEMA.md)](Doc/reference/FIREBASE_WIRE_SCHEMA.md)**
+* 🔵 **[ข้อกำหนดสถาปัตยกรรมและการเชื่อมต่อ (FIREBASE_WIRE_SCHEMA.md)](Doc/reference/FIREBASE_WIRE_SCHEMA.md)**
 * 🔵 **[มาตรฐานความปลอดภัยและ AntiTamperGuard (SECURITY_ANTITAMPER.md)](Doc/reference/SECURITY_ANTITAMPER.md)**
 * 🔴 **[คลังเอกสารและซอร์สโค้ดที่ปลดระวาง (Doc/archive/README.md)](Doc/archive/README.md)**
 

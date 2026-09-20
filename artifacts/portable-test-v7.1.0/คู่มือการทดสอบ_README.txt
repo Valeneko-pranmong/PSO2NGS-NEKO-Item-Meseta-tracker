@@ -9,7 +9,7 @@
 ------------------------------------------------------------------------------
 📂 โครงสร้างไฟล์ในชุดทดสอบ:
 ------------------------------------------------------------------------------
-1_Run_NekoTracker_Test.bat     -> รันตัวโปรแกรมหลัก Python Tracker V7.1.0 (พร้อม War Room & Firebase)
+1_Run_NekoTracker_Test.bat     -> รันตัวโปรแกรมหลัก Python Tracker V7.1.0 (พร้อมโหมด ARKS War Room & Cloud Sync)
 2_Start_Mock_Log_Feed.bat     -> รันโปรแกรมจำลองเหตุการณ์ Log สด (Streaming PSE Burst & Drops)
 3_Quick_Test_All_In_One.bat   -> รันทั้งตัวจำลอง Log และโปรแกรม Tracker พร้อมกันทันที
 NekoTracker/                  -> โฟลเดอร์ไบนารีหลักแบบไม่ต้องติดตั้ง (PyInstaller Onedir)
@@ -38,3 +38,9 @@ tools/mock_log_simulator.py   -> สคริปต์จำลอง ActionLog 
 - 100% TOS Safe: อ่านเฉพาะไฟล์ข้อความ ActionLog เท่านั้น ไม่แตะต้อง Process หรือ RAM ของเกม
 - Zero-Login: ไม่มีการขอหรือจัดเก็บ Username / Password ใดๆ ทั้งสิ้น
 - Client Version Security: บังคับใช้ Version 7.1.0 (บล็อกเวอร์ชันไม่ปลอดภัย 7.0.0-alpha)
+
+------------------------------------------------------------------------------
+🌸 ชุมชน Discord & เครดิตทางการ:
+------------------------------------------------------------------------------
+NEKO★FAMILY PSO2:NGS Community discord.gg/fkjXW9AJ6a
+Discord: https://discord.gg/fkjXW9AJ6a

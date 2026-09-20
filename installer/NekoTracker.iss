@@ -3,7 +3,7 @@
 ; Author: NEKO FAMILY TEAM SHIP 4 JP / Vale3neko
 ; Target Platform: Windows 10 / Windows 11 (64-bit)
 ; Architecture: Per-User Local AppData (NEKO FAMILY Standard)
-; Version: 6.1.0 (Python Modular Engine with ARKS War Room & Firebase Sync)
+; Version: 7.1.0 (Python Modular Engine with ARKS War Room & Cloud Sync)
 ; ==============================================================================
 
 #define MyAppName "NEKO Item & Meseta Tracker"
