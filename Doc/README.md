@@ -19,6 +19,8 @@
 
 ### 1. 🟢 ระดับงานปัจจุบัน (Current — ใช้งานจริง)
 * [`Doc/current/ACTIVE_SPECIFICATION.md`](current/ACTIVE_SPECIFICATION.md) — ข้อกำหนดทางเทคนิคฉบับสมบูรณ์ของระบบ Python Tracker (Modular Engine, CustomTkinter, ARKS War Room & Firebase Realtime Telemetry)
+* [`Doc/current/HOW_TO_USE.md`](current/HOW_TO_USE.md) — คู่มือการใช้งานโปรแกรมสำหรับผู้เล่นทั่วไป 3 ภาษา (ไทย, English, 日本語)
+* [`Doc/current/E2E_TEST_GUIDE.md`](current/E2E_TEST_GUIDE.md) — คู่มือและแบบฟอร์มการทดสอบระบบแบบครบวงจร (E2E Manual Testing Guide for Human Testers) ตั้งแต่ตัวติดตั้งจนถึงถอนการติดตั้ง
 * [`Doc/current/ENGINEERING_LOG.md`](current/ENGINEERING_LOG.md) — บันทึกประวัติวิศวกรรมและวิวัฒนาการสถาปัตยกรรมระบบ ตั้งแต่ V1 จนถึงรุ่นล่าสุด
 * [`Doc/current/AI_HANDOFF.md`](current/AI_HANDOFF.md) — คู่มือการส่งต่องานสำหรับ AI Agents และวิศวกรซอฟต์แวร์ (สภาพแวดล้อม, คำสั่งรัน, การทดสอบ, จุดเชื่อมต่อโค้ด)
 

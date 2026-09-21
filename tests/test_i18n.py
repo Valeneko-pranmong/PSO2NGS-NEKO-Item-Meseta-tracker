@@ -120,12 +120,12 @@ def test_offline_app_language_switching(shared_app):
     assert i18n.current_language == "th"
     assert app.lang_btn_title.get() == "TH"
     assert app.seg_lang_sidebar.get() == "TH"
-    assert app.btn_reset.cget("text") == "เริ่มนับใหม่ (Reset)"
+    assert app.btn_reset.cget("text") == "รีเซ็ตข้อมูล (Reset)"
     assert app.dashboard_area.lbl_session_title.cget("text") == "ยอดเงินรอบนี้ (Session)"
-    assert app.dashboard_area.lbl_wallet_title.cget("text") == "เงินที่มีในกระเป๋า"
-    assert app.dashboard_area.lbl_time_title.cget("text") == "เวลาที่ใช้ฟาร์ม"
+    assert app.dashboard_area.lbl_wallet_title.cget("text") == "เงินในกระเป๋า"
+    assert app.dashboard_area.lbl_time_title.cget("text") == "ระยะเวลาฟาร์ม"
     assert app.dashboard_area.lbl_mhr_title.cget("text") == "ความเร็ว (M/hr)"
-    assert "รายการของที่ดรอป" in app.dashboard_area.lbl_drops_title.cget("text")
+    assert "รายการไอเท็มที่ดรอป" in app.dashboard_area.lbl_drops_title.cget("text")
 
     # 3. Switch to Japanese
     app.set_app_language("ja")
@@ -210,7 +210,7 @@ def test_overlay_language_dynamic_update(shared_app):
         # Switch to Thai
         app.set_app_language("th")
         overlay.update()
-        assert overlay.lbl_subtitle.cget("text") == "เงินรอบนี้ (Session)"
+        assert overlay.lbl_subtitle.cget("text") == "ยอดเงินรอบนี้ (Session)"
         assert "กระเป๋า:" in overlay.lbl_wallet_overlay.cget("text")
         assert overlay.lbl_time_cap.cget("text") == "เวลา"
         assert overlay.lbl_rate_cap.cget("text") == "ความเร็ว"

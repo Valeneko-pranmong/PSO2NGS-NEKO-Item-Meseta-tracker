@@ -34,7 +34,7 @@ python -m pytest -v
 # หรือรันผ่าน Batch Script
 run_test.bat
 ```
-> **เกณฑ์การยอมรับ:** ผลการทดสอบต้องผ่านทั้งหมด **24 / 24 รายการ (100% Passed)**
+> **เกณฑ์การยอมรับ:** ผลการทดสอบต้องผ่านทั้งหมด **65 / 65 รายการ (100% Passed)**
 
 ### 3. การคอมไพล์และสร้างชุดติดตั้ง Windows (Installer Build Pipeline)
 ```bash
@@ -46,6 +46,10 @@ build_installer.bat
 ```
 > **ผลลัพธ์:** ไฟล์ติดตั้ง `artifacts/release-v7.1.0/NekoTracker-Setup-v7.1.0.exe` พร้อมค่าแฮช `SHA256SUMS.txt`  
 > **มาตรฐาน:** ถอดแบบตามมาตรฐานกลาง [`Doc/reference/INSTALLER_STANDARD.md`](../reference/INSTALLER_STANDARD.md) (Per-User `%LOCALAPPDATA%\NEKO FAMILY\NekoTracker`, Non-elevated `PrivilegesRequired=lowest`, บล็อก non-x64, และตัวโปรแกรมหลักคือ Python Tracker)
+
+### 4. คู่มือการทดสอบ End-to-End สำหรับผู้ทดสอบระบบ (Human QA E2E Guide)
+* [`Doc/current/E2E_TEST_GUIDE.md`](E2E_TEST_GUIDE.md) — คู่มือและเกณฑ์การทดสอบ E2E ฉบับสมบูรณ์สำหรับคนเทส ครอบคลุม 12 ระยะตั้งแต่ไฟล์ติดตั้ง `NekoTracker-Setup-v7.1.0.exe` จนถึงการถอนการติดตั้ง
+* [`artifacts/release-v7.1.0/E2E_TEST_CHECKLIST.md`](../../artifacts/release-v7.1.0/E2E_TEST_CHECKLIST.md) — แบบฟอร์มเช็กลิสต์รวดเร็ว (Quick QA Checklist) แนบไปพร้อมกับชุด Release Artifacts
 
 ---
 

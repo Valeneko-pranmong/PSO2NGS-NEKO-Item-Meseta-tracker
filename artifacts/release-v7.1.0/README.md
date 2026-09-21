@@ -11,8 +11,9 @@
 
 | ไฟล์อาร์ติแฟกต์ (Artifact Name) | สถานะ (Tier) | บทบาทและรายละเอียด |
 | :--- | :--- | :--- |
-| **`NekoTracker-Setup-v7.1.0.exe`** | `[CURRENT]` 🟢 | **ใช้งานจริงและทดสอบ (Active):** ตัวติดตั้งแบบ Single-EXE Installer สำหรับผู้ใช้งานทั่วไปและเครื่องทดสอบ (ครอบคลุมทั้งตัวแอปหลัก Python V7.1.0, เครื่องมือจำลอง Mock Log แบบไม่ต้องมี Python, สคริปต์ทดสอบด่วน All-in-One, และคู่มือ 3 ภาษา) |
+| **`NekoTracker-Setup-v7.1.0.exe`** | `[CURRENT]` 🟢 | **ใช้งานจริงและทดสอบ (Active):** ตัวติดตั้งแบบ Single-EXE Installer สำหรับผู้ใช้งานทั่วไปและเครื่องทดสอบ (ครอบคลุมตัวแอปหลัก Python V7.1.0, คู่มือ 3 ภาษา, ระบบ Uninstaller 4 ช่องทาง) |
 | **`SHA256SUMS.txt`** | `[CURRENT]` 🟢 | **ตรวจสอบความถูกต้อง (Verification):** ค่าแฮชทางคณิตศาสตร์ SHA-256 เพื่อความโปร่งใสและตรวจสอบความสมบูรณ์ของไฟล์ |
+| **`E2E_TEST_CHECKLIST.md`** | `[CURRENT]` 🟢 | **คู่มือเช็กลิสต์ QA (Testing):** แบบฟอร์มเช็กลิสต์การทดสอบ E2E สำหรับมนุษย์/คนเทส เริ่มตั้งแต่ตัวติดตั้งจนถึงถอนการติดตั้ง |
 | **`../portable-test-v7.1.0/`** | `[REFERENCE]` 🔵 | **เก็บอ้างอิง (Reference):** โครงสร้างแพ็กเกจแบบ Portable สำหรับทดสอบก่อนคอมไพล์ตัวติดตั้ง |
 | **`../release-v6.1.0/`** | `[ARCHIVE]` 🔴 | **เวอร์ชันเก่า (Archived Release):** ชุดติดตั้งรุ่นก่อนหน้าที่ปลดระวางแล้ว |
 | **`../release-v7.0.0-alpha/`** | `[ARCHIVE]` 🔴 | **เวอร์ชันเก่า (Archived Release):** ชุดติดตั้งรุ่นทดลองเดิมที่ถูกระงับ (Revoked) |
@@ -24,10 +25,10 @@
 ตรวจสอบความถูกต้องของไฟล์ก่อนการใช้งานด้วยค่า SHA-256:
 
 ```text
-a6edd8efbc7a8077e615a09f1b0678e425b17f4df68d18cb107a0c5d35cc0a0c  NekoTracker-Setup-v7.1.0.exe
+567c32d661e5a19396a67dbd7f992a1e3bce6cbf1a2c83c35aa16a3f4402ca4a  NekoTracker-Setup-v7.1.0.exe
 ```
 
-* **ขนาดไฟล์:** ~28.67 MB
+* **ขนาดไฟล์:** ~22.18 MB
 * **กลไกการบีบอัด:** LZMA2/Ultra64 Solid Compression (Inno Setup 6)
 * **สถาปัตยกรรม:** 64-bit Windows (`ArchitecturesAllowed=x64compatible`)
 * **การติดตั้ง:** Per-User Local AppData (`%LOCALAPPDATA%\NEKO FAMILY\NekoTracker`, `PrivilegesRequired=lowest`) ไม่ต้องใช้สิทธิ์ Administrator ไม่เด้งเตือน UAC

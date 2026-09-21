@@ -484,14 +484,14 @@ class WarDashboardFrame(ctk.CTkFrame):
             try:
                 img = Image.open(logo_path)
                 aspect_ratio = img.height / img.width
-                logo_w = 140
+                logo_w = 110
                 self.logo_image = ctk.CTkImage(
                     light_image=img,
                     dark_image=img,
                     size=(logo_w, int(logo_w * aspect_ratio)),
                 )
                 lbl_logo = ctk.CTkLabel(parent, image=self.logo_image, text="")
-                lbl_logo.pack(pady=(6, 0))
+                lbl_logo.pack(pady=(4, 0))
             except Exception:
                 pass
 
@@ -501,42 +501,88 @@ class WarDashboardFrame(ctk.CTkFrame):
         self.lbl_brand_sub = ctk.CTkLabel(
             brand_frame,
             text=t("brand_subtitle"),
-            font=(FONT_FAMILY, 13, "bold"),
+            font=(FONT_FAMILY, 11, "bold"),
             text_color="#D81B60",
         )
         self.lbl_brand_sub.pack()
         self.lbl_brand_trk = ctk.CTkLabel(
             brand_frame,
             text=t("brand_tracker"),
-            font=(FONT_FAMILY, 20, "bold"),
+            font=(FONT_FAMILY, 16, "bold"),
             text_color=COLOR_PINK_ACCENT,
         )
         self.lbl_brand_trk.pack(pady=(0, 1))
 
         sep = ctk.CTkFrame(brand_frame, height=2, fg_color=COLOR_PINK_HEADER)
-        sep.pack(fill="x", padx=30, pady=2)
+        sep.pack(fill="x", padx=30, pady=1)
 
         self.lbl_brand_by = ctk.CTkLabel(
             brand_frame,
             text=t("brand_created_by"),
-            font=(FONT_FAMILY, 9, "bold"),
+            font=(FONT_FAMILY, 8, "bold"),
             text_color=COLOR_TEXT_VAL,
         )
         self.lbl_brand_by.pack(pady=(1, 0))
         self.lbl_brand_team = ctk.CTkLabel(
             brand_frame,
             text=t("brand_team_credit"),
-            font=(FONT_FAMILY, 10, "bold"),
+            font=(FONT_FAMILY, 9, "bold"),
             text_color=COLOR_TEXT_VAL,
         )
         self.lbl_brand_team.pack()
 
-        # 3. Action Buttons
-        BTN_HEIGHT = 30
+        # 3. Status & Folder Selector at bottom - PACK FIRST to guarantee visibility
+        self.status_frame = ctk.CTkFrame(parent, fg_color="transparent")
+        self.status_frame.pack(side="bottom", fill="x", pady=(4, 6), padx=14)
+
+        initial_status = t("status_no_folder")
+        status_color = COLOR_TEXT_SUB
+        if hasattr(self.controller, "log_path") and self.controller.log_path:
+            initial_status = t("status_reading_file", file=os.path.basename(self.controller.log_path))
+            status_color = COLOR_TEXT_VAL
+        elif hasattr(self.controller, "lbl_file_status"):
+            try:
+                initial_status = self.controller.lbl_file_status.cget("text")
+                status_color = self.controller.lbl_file_status.cget("text_color")
+            except Exception:
+                pass
+
+        self.lbl_file_status = ctk.CTkLabel(
+            self.status_frame,
+            text=initial_status,
+            text_color=status_color,
+            wraplength=240,
+            font=(FONT_FAMILY, 10),
+        )
+        self.lbl_file_status.pack(anchor="w", pady=(0, 2))
+
+        self.btn_select = ctk.CTkButton(
+            self.status_frame,
+            text=t("btn_select_folder"),
+            font=(FONT_FAMILY, 11),
+            fg_color="#F0F0F0",
+            text_color="#333333",
+            hover_color="#E0E0E0",
+            height=28,
+            corner_radius=UI_RADIUS,
+            command=self.controller.select_log_folder,
+        )
+        self.btn_select.pack(fill="x")
+
+        self.lbl_version = ctk.CTkLabel(
+            self.status_frame,
+            text=APP_VERSION,
+            font=("Arial", 8),
+            text_color="gray",
+        )
+        self.lbl_version.pack(pady=(1, 0))
+
+        # 4. Action Buttons
+        BTN_HEIGHT = 28
         BTN_RADIUS = UI_RADIUS
 
         self.btn_frame = ctk.CTkFrame(parent, fg_color="transparent")
-        self.btn_frame.pack(fill="x", padx=20, pady=(2, 0))
+        self.btn_frame.pack(fill="both", expand=True, padx=16, pady=(2, 0))
 
         self.btn_reset = ctk.CTkButton(
             self.btn_frame,
@@ -549,7 +595,7 @@ class WarDashboardFrame(ctk.CTkFrame):
             corner_radius=BTN_RADIUS,
             command=self.controller.confirm_reset,
         )
-        self.btn_reset.pack(pady=(0, 4), fill="x")
+        self.btn_reset.pack(pady=(0, 3), fill="x")
 
         self.btn_watchlist = ctk.CTkButton(
             self.btn_frame,
@@ -562,7 +608,7 @@ class WarDashboardFrame(ctk.CTkFrame):
             corner_radius=BTN_RADIUS,
             command=self.controller.open_watchlist_editor,
         )
-        self.btn_watchlist.pack(pady=(0, 4), fill="x")
+        self.btn_watchlist.pack(pady=(0, 3), fill="x")
 
         self.switch_filter = ctk.CTkSwitch(
             self.btn_frame,
@@ -571,12 +617,12 @@ class WarDashboardFrame(ctk.CTkFrame):
             progress_color=COLOR_WATCHLIST,
             command=self._on_toggle_filter,
         )
-        self.switch_filter.pack(pady=(2, 4))
+        self.switch_filter.pack(pady=(1, 3))
         if getattr(self.controller, "is_filter_active", False):
             self.switch_filter.select()
 
         row_overlays = ctk.CTkFrame(self.btn_frame, fg_color="transparent")
-        row_overlays.pack(fill="x", pady=(0, 4))
+        row_overlays.pack(fill="x", pady=(0, 3))
         row_overlays.columnconfigure((0, 1), weight=1, uniform="equal")
 
         self.btn_overlay_full = ctk.CTkButton(
@@ -590,7 +636,7 @@ class WarDashboardFrame(ctk.CTkFrame):
             corner_radius=BTN_RADIUS,
             command=lambda: self.controller.open_overlay("full"),
         )
-        self.btn_overlay_full.grid(row=0, column=0, sticky="ew", padx=(0, 3))
+        self.btn_overlay_full.grid(row=0, column=0, sticky="ew", padx=(0, 2))
 
         self.btn_overlay_mini = ctk.CTkButton(
             row_overlays,
@@ -603,12 +649,16 @@ class WarDashboardFrame(ctk.CTkFrame):
             corner_radius=BTN_RADIUS,
             command=lambda: self.controller.open_overlay("mini"),
         )
-        self.btn_overlay_mini.grid(row=0, column=1, sticky="ew", padx=(3, 0))
+        self.btn_overlay_mini.grid(row=0, column=1, sticky="ew", padx=(2, 0))
+
+        row_help = ctk.CTkFrame(self.btn_frame, fg_color="transparent")
+        row_help.pack(fill="x", pady=(0, 3))
+        row_help.columnconfigure((0, 1), weight=1, uniform="equal")
 
         self.btn_how_to_use = ctk.CTkButton(
-            self.btn_frame,
+            row_help,
             text=t("btn_how_to_use"),
-            font=(FONT_FAMILY, 12, "bold"),
+            font=(FONT_FAMILY, 11, "bold"),
             fg_color="#0284C7",
             hover_color="#0369A1",
             text_color="white",
@@ -616,12 +666,12 @@ class WarDashboardFrame(ctk.CTkFrame):
             corner_radius=BTN_RADIUS,
             command=self.controller.open_how_to_use,
         )
-        self.btn_how_to_use.pack(fill="x", pady=(0, 4))
+        self.btn_how_to_use.grid(row=0, column=0, sticky="ew", padx=(0, 2))
 
         self.btn_discord = ctk.CTkButton(
-            self.btn_frame,
+            row_help,
             text=t("btn_discord"),
-            font=(FONT_FAMILY, 12, "bold"),
+            font=(FONT_FAMILY, 11, "bold"),
             fg_color=COLOR_DISCORD,
             hover_color="#AB47BC",
             text_color="white",
@@ -629,11 +679,11 @@ class WarDashboardFrame(ctk.CTkFrame):
             corner_radius=BTN_RADIUS,
             command=self.controller.open_discord,
         )
-        self.btn_discord.pack(fill="x", pady=(0, 4))
+        self.btn_discord.grid(row=0, column=1, sticky="ew", padx=(2, 0))
 
         # Language Selector Row in War Menu
         lang_row = ctk.CTkFrame(self.btn_frame, fg_color="transparent")
-        lang_row.pack(fill="x", pady=(0, 4))
+        lang_row.pack(fill="x", pady=(0, 2))
         self.lbl_sidebar_lang = ctk.CTkLabel(
             lang_row,
             text=f"🌐 {t('label_language')}:",
@@ -644,7 +694,7 @@ class WarDashboardFrame(ctk.CTkFrame):
         self.seg_lang_sidebar = ctk.CTkSegmentedButton(
             lang_row,
             values=["EN", "TH", "JA"],
-            height=26,
+            height=24,
             font=(FONT_FAMILY, 10, "bold"),
             selected_color=COLOR_PINK_ACCENT,
             selected_hover_color="#D81B60",
@@ -656,49 +706,6 @@ class WarDashboardFrame(ctk.CTkFrame):
         )
         self.seg_lang_sidebar.set(i18n.get_button_label())
         self.seg_lang_sidebar.pack(side="right", fill="x", expand=True)
-
-        # 4. Status & Folder Selector at bottom
-        self.status_frame = ctk.CTkFrame(parent, fg_color="transparent")
-        self.status_frame.pack(side="bottom", fill="x", pady=(2, 4), padx=15)
-
-        initial_status = t("status_no_folder")
-        status_color = COLOR_TEXT_SUB
-        if hasattr(self.controller, "lbl_file_status"):
-            try:
-                initial_status = self.controller.lbl_file_status.cget("text")
-                status_color = self.controller.lbl_file_status.cget("text_color")
-            except Exception:
-                pass
-
-        self.lbl_file_status = ctk.CTkLabel(
-            self.status_frame,
-            text=initial_status,
-            text_color=status_color,
-            wraplength=260,
-            font=(FONT_FAMILY, 10),
-        )
-        self.lbl_file_status.pack(anchor="w", pady=(0, 2))
-
-        self.btn_select = ctk.CTkButton(
-            self.status_frame,
-            text=t("btn_select_folder"),
-            font=(FONT_FAMILY, 11),
-            fg_color="#F0F0F0",
-            text_color="#333333",
-            hover_color="#E0E0E0",
-            height=26,
-            corner_radius=UI_RADIUS,
-            command=self.controller.select_log_folder,
-        )
-        self.btn_select.pack(fill="x")
-
-        self.lbl_version = ctk.CTkLabel(
-            self.status_frame,
-            text=APP_VERSION,
-            font=("Arial", 8),
-            text_color="gray",
-        )
-        self.lbl_version.pack(pady=(1, 0))
 
     def _on_sidebar_lang_selected(self, val: str) -> None:
         if hasattr(self.controller, "set_app_language"):

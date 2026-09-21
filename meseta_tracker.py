@@ -48,8 +48,8 @@ class NGSTrackerApp(ctk.CTk):
         super().__init__()
 
         self.overrideredirect(True) 
-        self.geometry("950x620")
-        self.title(t("app_window_title")) 
+        self.geometry("950x640")
+        self.title(t("app_window_title"))
         self.configure(fg_color=COLOR_BG_MAIN) 
         self.setup_icon()
         self._window_mover = WindowMover(self)
@@ -122,6 +122,21 @@ class NGSTrackerApp(ctk.CTk):
         
         self.load_logo()
         self.design_brand_text()
+
+        # Status Frame and Version at bottom - PACK FIRST to guarantee visibility
+        self.lbl_version = ctk.CTkLabel(self.sidebar, text=APP_VERSION, font=("Arial", 9), text_color="gray")
+        self.lbl_version.pack(side="bottom", pady=(0, 5))
+
+        self.status_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        self.status_frame.pack(side="bottom", fill="x", pady=(6, 5), padx=15)
+        
+        self.lbl_file_status = ctk.CTkLabel(self.status_frame, text=t("status_no_folder"), text_color=COLOR_TEXT_SUB, wraplength=220, font=(FONT_FAMILY, 11))
+        self.lbl_file_status.pack(anchor="w", pady=(0, 3))
+        
+        self.btn_select = ctk.CTkButton(self.status_frame, text=t("btn_select_folder"), font=(FONT_FAMILY, 12), 
+                                        fg_color="#F0F0F0", text_color="#333333", hover_color="#E0E0E0", 
+                                        height=30, corner_radius=UI_RADIUS, command=self.select_log_folder)
+        self.btn_select.pack(fill="x")
 
         self.btn_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         self.btn_frame.pack(fill="both", expand=True, padx=20)
@@ -207,20 +222,6 @@ class NGSTrackerApp(ctk.CTk):
         )
         self.seg_lang_sidebar.set(i18n.get_button_label())
         self.seg_lang_sidebar.pack(side="right", fill="x", expand=True)
-        
-        self.status_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
-        self.status_frame.pack(side="bottom", fill="x", pady=(10, 5), padx=15)
-        
-        self.lbl_file_status = ctk.CTkLabel(self.status_frame, text=t("status_no_folder"), text_color=COLOR_TEXT_SUB, wraplength=220, font=(FONT_FAMILY, 11))
-        self.lbl_file_status.pack(anchor="w", pady=(0, 3))
-        
-        self.btn_select = ctk.CTkButton(self.status_frame, text=t("btn_select_folder"), font=(FONT_FAMILY, 12), 
-                                        fg_color="#F0F0F0", text_color="#333333", hover_color="#E0E0E0", 
-                                        height=30, corner_radius=UI_RADIUS, command=self.select_log_folder)
-        self.btn_select.pack(fill="x")
-
-        self.lbl_version = ctk.CTkLabel(self.sidebar, text=APP_VERSION, font=("Arial", 9), text_color="gray")
-        self.lbl_version.pack(side="bottom", pady=(0, 5))
 
         self.dashboard_area = DashboardFrame(self.offline_container, self)
         self.dashboard_area.grid(row=0, column=1, sticky="nsew", padx=(5, 10), pady=(0, 10))
@@ -676,6 +677,27 @@ class NGSTrackerApp(ctk.CTk):
         except Exception:
             pass
 
+    def _find_default_pso2_log_folder(self) -> str:
+        user_home = os.path.expanduser("~")
+        candidates = [
+            os.path.join(user_home, "Documents", "SEGA", "PHANTASYSTARONLINE2", "log_ngs"),
+            os.path.join(user_home, "Documents", "SEGA", "PHANTASYSTARONLINE2_NA", "log_ngs"),
+            os.path.join(user_home, "Documents", "SEGA", "PHANTASYSTARONLINE2", "log"),
+            os.path.join(user_home, "Documents", "SEGA", "PHANTASYSTARONLINE2_NA", "log"),
+        ]
+        # Prefer folder that already contains ActionLog files
+        for c in candidates:
+            if os.path.exists(c):
+                try:
+                    if any(f.startswith("ActionLog") and f.endswith(".txt") for f in os.listdir(c)):
+                        return c
+                except OSError:
+                    pass
+        for c in candidates:
+            if os.path.exists(c):
+                return c
+        return ""
+
     def load_settings(self):
         saved_lang = DEFAULT_LANGUAGE
         if os.path.exists(CONFIG_FILE):
@@ -697,9 +719,10 @@ class NGSTrackerApp(ctk.CTk):
             self.coord_var.set(self.board_coord)
 
         if not self.log_folder or not os.path.exists(self.log_folder):
-            default_ngs_path = os.path.join(os.path.expanduser("~"), "Documents", "SEGA", "PHANTASYSTARONLINE2", "log_ngs")
-            if os.path.exists(default_ngs_path):
+            default_ngs_path = self._find_default_pso2_log_folder()
+            if default_ngs_path:
                 self.log_folder = default_ngs_path
+                self.save_settings()
             
         if self.log_folder and os.path.exists(self.log_folder): 
             self.find_latest_log_file()
@@ -757,6 +780,10 @@ class NGSTrackerApp(ctk.CTk):
             self.detect_encoding(self.log_path)
             self.reset_data() 
             self.detect_character_from_file(self.log_path)
+        else:
+            if not getattr(self, "pending_status_text", None):
+                self.pending_status_text = t("status_reading_file", file=os.path.basename(latest_file))
+                self.pending_status_color = COLOR_TEXT_VAL
 
     def detect_character_from_file(self, filepath):
         """Read initial lines to extract in-game character name (not ID)."""
@@ -783,9 +810,10 @@ class NGSTrackerApp(ctk.CTk):
             return self.character_name
 
         if not self.log_folder or not os.path.exists(self.log_folder):
-            default_ngs_path = os.path.join(os.path.expanduser("~"), "Documents", "SEGA", "PHANTASYSTARONLINE2", "log_ngs")
-            if os.path.exists(default_ngs_path):
+            default_ngs_path = self._find_default_pso2_log_folder()
+            if default_ngs_path:
                 self.log_folder = default_ngs_path
+                self.save_settings()
 
         if self.log_folder and os.path.exists(self.log_folder):
             self.find_latest_log_file()

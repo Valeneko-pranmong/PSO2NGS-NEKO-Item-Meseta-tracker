@@ -182,3 +182,44 @@
     - รัน `tools/package_test_build.py --rebuild` ประกอบไบนารีและสร้างแพ็กเกจ `portable-test-v7.1.0` และ `NekoTracker-v7.1.0-Portable-Test.zip` พร้อมคำนวณ `SHA256SUMS.txt` ใหม่
   - **การทดสอบความถูกต้อง:**
     - รันชุดทดสอบทั้งหมด 57 / 57 ผ่าน 100% (Green)
+
+### Milestone 14: การทดสอบ End-to-End (E2E) ครบวงจรและการตรวจสอบความพร้อมรอบสุดท้ายก่อน Release (Final Pre-Release E2E Verification & Pipeline Gate)
+* **ขอบเขต:** ดำเนินการทดสอบ End-to-End (E2E) เต็มรูปแบบตลอดวงจรการทำงานของผู้ใช้, ปิดช่องว่างการทดสอบของระบบแปลภาษา, ประกอบและทดสอบกระบวนการบิลด์ตัวติดตั้ง (Installer Pipeline) และชุดทดสอบพกพา (Portable Test Package) พร้อมตรวจสอบ Process Smoke ก่อนการ Release อย่างเป็นทางการ
+* **การดำเนินการ:**
+  - **สร้างชุดทดสอบ End-to-End Lifecycle (`tests/test_e2e_lifecycle.py`):**
+    - ทดสอบการอ่านและประมวลผลไฟล์สตรีมมิ่งสดผ่าน `MockLogSimulator`
+    - ตรวจสอบความถูกต้องของการคำนวณ N-Meseta, กระเป๋าเงิน, อัตราความเร็ว M/hr, และการสะสมรายการไอเท็มดรอป
+    - ทดสอบระบบกรองไอเท็มเฉพาะ Watch List (เปิด/ปิด Filter)
+    - ทดสอบวงจรชีวิตของหน้าต่าง Overlay ทั้งโหมด Mini และ Full
+    - ทดสอบ ARKS War Room: เลือกพิกัดจาก Landmark Preset ("Core" [0, 0]), บันทึกพิกัดด้วยตนเอง, และยิง Cloud Telemetry ซิงค์ออนไลน์
+    - ทดสอบการสลับภาษาแบบสดระหว่างใช้งาน (In-flight Language Switching: EN ↔ TH ↔ JA)
+    - ทดสอบหน้าต่างคู่มือ (GuideWindow): การเปิดหน้าต่าง, การเปลี่ยนแท็บครบทั้ง 5 แท็บ, ลิงก์ Discord ชุมชน และการปิดหน้าต่างอย่างสมบูรณ์
+    - ทดสอบการล้างค่าข้อมูลรอบการเล่น (Session Reset) และการป้องกันการปลอมแปลงข้อมูล (Anti-Tamper Rejection)
+  - **ปรับแต่งชุดทดสอบ i18n (`tests/test_i18n.py`):**
+    - ปรับปรุงข้อความทดสอบภาษาไทยให้ตรงกับศัพท์ทางการชุดใหม่ (Professional Tone) จากคอมมิตล่าสุด
+  - **ปรับปรุงสคริปต์ตัวสร้างแพ็กเกจพกพา (`tools/package_test_build.py`):**
+    - เพิ่มค่าตัวแปรสิ่งแวดล้อมและพารามิเตอร์ `--test` ในสคริปต์ Batch เพื่อให้รันในโหมดทดสอบได้อย่างราบรื่น
+  - **การรันชุดทดสอบระบบ:**
+    - รันการทดสอบ Unit, Integration และ E2E ผ่านทั้งหมด **64 / 64 รายการ (100% Passed)**
+  - **การบิลด์และทดสอบตัวติดตั้งทางการ (Installer & Smoke Gate):**
+    - คอมไพล์ไบนารี PyInstaller และ Inno Setup 6 ได้ไฟล์ `artifacts/release-v7.1.0/NekoTracker-Setup-v7.1.0.exe` (ขนาด 22.18 MB)
+    - คำนวณ SHA-256: `f11264c7ff9d51b0541ba28ad78e25fb317a54e2adef0c5067a9ebe916d6c5e5`
+    - ผ่านการทดสอบ Installer Lifecycle & Process Smoke Test ในสภาพแวดล้อม Sandbox
+  - **การประกอบชุดทดสอบพกพา (Portable Test Package):**
+    - บิลด์แพ็กเกจ `artifacts/portable-test-v7.1.0/` และ `artifacts/NekoTracker-v7.1.0-Portable-Test.zip` (ขนาด 30.28 MB)
+    - คำนวณ SHA-256: `5c29efe57efca3b0b229e2475450fbac5ffe3bc6c7d59a8ec92578587eaa1c97`
+    - ทดสอบ Process Smoke ของไฟล์ไบนารีพกพาผ่านสมบูรณ์
+
+### Milestone 15: แก้ไขบัคแถบสถานะและปุ่มเลือกไฟล์ Log ตกขอบ/หายไปในโหมด ARKS War Room & Offline (Log File Status & Folder Selector Layout Fix)
+* **ปัญหาที่พบ:**
+  - ผู้ใช้รายงานว่า "บัคไฟล์ log หาย" โดยในหน้าจอ ARKS War Room (และโหมด Offline) แถบแสดงสถานะไฟล์ Log (`lbl_file_status`) และปุ่มเลือกโฟลเดอร์ Log (`btn_select`) ถูกดันจนตกขอบล่างของกล่องเมนู เหลือเพียงเส้นสีแดงขอบบน 2 พิกเซล และปุ่ม "เลือกโฟลเดอร์ Log" หลุดหายไปจากหน้าจอทั้งหมด ทำให้ผู้ใช้ไม่ทราบว่าโปรแกรมอ่านไฟล์ใดอยู่ และไม่สามารถกดเลือกโฟลเดอร์ Log ได้
+* **สาเหตุรากเหง้า (Root Cause):**
+  - ใน `modules/war_mode/war_view.py` (`_build_menu_panel`) และ `meseta_tracker.py` มีการแพ็กวิดเจ็ตส่วนหัว (`brand_frame`) และปุ่มต่างๆ (`btn_frame`) ด้วย `side="top"` และ `expand=True` ก่อน แล้วจึงแพ็ก `status_frame` ด้วย `side="bottom"` ในลำดับหลังสุด ทำให้ Tkinter จัดสรรพื้นที่ความสูงให้ส่วนบนจนหมด เหลือพื้นที่ส่วนล่างให้ `status_frame` เพียง 0-3 พิกเซล วิดเจ็ตจึงไม่ถูก map แสดงผล
+  - ฟังก์ชันตรวจหาตำแหน่งโฟลเดอร์ Log อัตโนมัติ (`Documents\SEGA\PHANTASYSTARONLINE2\log_ngs`) ค้นหาเพียงพาธเดียว ไม่ครอบคลุมกรณีติดตั้งเกมเซิร์ฟเวอร์ Global (NA) หรือโฟลเดอร์ `log` มาตรฐาน และไม่ได้บันทึกลงไฟล์คอนฟิกเมื่อตรวจพบอัตโนมัติ
+* **การแก้ไข:**
+  - สลับลำดับการแพ็กให้ `status_frame` และปุ่ม `btn_select` ถูกแพ็กด้วย `side="bottom"` เป็นลำดับแรก เพื่อการันตีพื้นที่แสดงผล 100% ไม่ถูกดันตกขอบ
+  - ปรับขนาดและสัดส่วนกราฟิกใน `card_menu` ให้กระชับขึ้น: ปรับขนาดโลโก้เป็น 110px, รวมปุ่ม `btn_how_to_use` และ `btn_discord` เป็นแถวคู่ 2 คอลัมน์ (`row_help`), ปรับความสูงหน้าต่างหลักเป็น `950x640` เพื่อให้มีระยะปลอดภัย (Safety Margin) รองรับ Display Scaling บน Windows ทุกระดับ
+  - ปรับปรุง `_find_default_pso2_log_folder()` ให้สแกนหาโฟลเดอร์ Log ของเกม PSO2:NGS ครอบคลุมทั้ง JP และ NA/Global พร้อมบันทึกลงคอนฟิกอัตโนมัติ
+  - เพิ่มชุดทดสอบถดถอย `test_sidebar_and_war_view_status_frame_not_clipped` ใน `tests/test_tracker_modules.py` ครอบคลุมทั้งสองโหมด
+  - รันการทดสอบ Unit Tests ทั้งหมดผ่านครบถ้วน **65 / 65 รายการ (100% Passed)**
+

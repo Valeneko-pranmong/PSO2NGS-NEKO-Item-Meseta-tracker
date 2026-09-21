@@ -2,7 +2,7 @@
 
 ![Version](https://img.shields.io/badge/Python_Version-7.1.0-FF69B4?style=for-the-badge)
 ![Platform](https://img.shields.io/badge/Platform-Windows_10%2F11-blue?style=for-the-badge)
-![Tests](https://img.shields.io/badge/Tests-56%20Passed-brightgreen?style=for-the-badge)
+![Tests](https://img.shields.io/badge/Tests-65%20Passed-brightgreen?style=for-the-badge)
 ![Languages](https://img.shields.io/badge/i18n-EN%20%7C%20TH%20%7C%20JA-purple?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-Non--Commercial-red?style=for-the-badge)
 

@@ -53,6 +53,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
+Name: "uninstallicon"; Description: "Create Desktop shortcut for Uninstaller (ถอนการติดตั้ง)"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
 ; Primary Application: Python Tracker (PyInstaller Onedir Distribution)
@@ -74,8 +75,9 @@ Name: "{autoprograms}\{#MyAppName}\User Guide (HOW TO USE)"; Filename: "{app}\HO
 Name: "{autoprograms}\{#MyAppName}\Uninstall (ถอนการติดตั้ง) {#MyAppName}"; Filename: "{uninstallexe}"; IconFilename: "{app}\icon.ico"
 Name: "{autoprograms}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"; IconFilename: "{app}\icon.ico"
 
-; Desktop Shortcuts (Strict single-app icon on desktop)
+; Desktop Shortcuts
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\icon.ico"; WorkingDir: "{app}"; Tasks: desktopicon
+Name: "{autodesktop}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"; IconFilename: "{app}\icon.ico"; Tasks: uninstallicon
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent

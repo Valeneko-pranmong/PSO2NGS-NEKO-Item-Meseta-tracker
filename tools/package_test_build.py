@@ -104,10 +104,14 @@ def build_portable_package() -> None:
         f.write("echo [INFO] Zero-Login: Operative identity will be detected from ActionLog.\r\n")
         f.write("echo [INFO] Standalone Test Mode: Local test environment active.\r\n")
         f.write("echo ======================================================================\r\n")
+        f.write("set NEKO_TEST_MODE=1\r\n")
         f.write("set NEKO_PROCESS_VALIDATION=0\r\n")
         f.write("set NEKO_FILE_HANDLE_VALIDATION=0\r\n")
+        f.write("set NEKO_CANONICAL_PATH_GATING=0\r\n")
         f.write("set NEKO_CADENCE_VALIDATION=0\r\n")
-        f.write("start \"\" \"%~dp0NekoTracker\\NekoTracker.exe\"\r\n")
+        f.write("set NEKO_TIMESTAMP_VALIDATION=0\r\n")
+        f.write("set NEKO_VELOCITY_VALIDATION=0\r\n")
+        f.write("start \"\" \"%~dp0NekoTracker\\NekoTracker.exe\" --test\r\n")
 
     # 2_Start_Mock_Log_Feed.bat
     with open(os.path.join(PORTABLE_DIR, "2_Start_Mock_Log_Feed.bat"), "w", encoding="utf-8") as f:
@@ -147,10 +151,14 @@ def build_portable_package() -> None:
         f.write("echo    แล้วเลือกโฟลเดอร์: %~dp0sample_logs\r\n")
         f.write("echo    เพื่อดูตัวเลขเงินและไอเทมอัปเดตสดแบบ Real-time ทันที!\r\n")
         f.write("echo ======================================================================\r\n")
+        f.write("set NEKO_TEST_MODE=1\r\n")
         f.write("set NEKO_PROCESS_VALIDATION=0\r\n")
         f.write("set NEKO_FILE_HANDLE_VALIDATION=0\r\n")
+        f.write("set NEKO_CANONICAL_PATH_GATING=0\r\n")
         f.write("set NEKO_CADENCE_VALIDATION=0\r\n")
-        f.write("start \"\" \"%~dp0NekoTracker\\NekoTracker.exe\"\r\n")
+        f.write("set NEKO_TIMESTAMP_VALIDATION=0\r\n")
+        f.write("set NEKO_VELOCITY_VALIDATION=0\r\n")
+        f.write("start \"\" \"%~dp0NekoTracker\\NekoTracker.exe\" --test\r\n")
 
     # 5. Documentation
     guide_th = """==============================================================================

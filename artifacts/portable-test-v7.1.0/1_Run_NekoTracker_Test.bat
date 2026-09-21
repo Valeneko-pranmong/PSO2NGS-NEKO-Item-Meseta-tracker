@@ -9,7 +9,11 @@ echo [INFO] Starting Primary Python Tracker (CustomTkinter + War Room)...
 echo [INFO] Zero-Login: Operative identity will be detected from ActionLog.
 echo [INFO] Standalone Test Mode: Local test environment active.
 echo ======================================================================
+set NEKO_TEST_MODE=1
 set NEKO_PROCESS_VALIDATION=0
 set NEKO_FILE_HANDLE_VALIDATION=0
+set NEKO_CANONICAL_PATH_GATING=0
 set NEKO_CADENCE_VALIDATION=0
-start "" "%~dp0NekoTracker\NekoTracker.exe"
+set NEKO_TIMESTAMP_VALIDATION=0
+set NEKO_VELOCITY_VALIDATION=0
+start "" "%~dp0NekoTracker\NekoTracker.exe" --test

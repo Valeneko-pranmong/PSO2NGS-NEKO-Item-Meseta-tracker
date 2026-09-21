@@ -839,3 +839,44 @@ def test_overlay_mini_layout_not_clipped(shared_app):
         assert "169,072" in overlay.lbl_wallet_overlay.cget("text")
     finally:
         overlay.destroy()
+
+
+def test_sidebar_and_war_view_status_frame_not_clipped(shared_app):
+    """
+    Verify both Offline View sidebar and War View card_menu:
+    - Status frame is mapped and has height >= 40px.
+    - btn_select ("Select Log Folder") is mapped, visible, and has height >= 24px.
+    - lbl_file_status is mapped and visible.
+    - btn_how_to_use and btn_discord are both mapped and visible.
+    """
+    app = shared_app
+    app.update()
+
+    # 1. Offline View Sidebar Checks
+    assert hasattr(app, "status_frame")
+    assert app.status_frame.winfo_ismapped()
+    assert app.status_frame.winfo_height() >= 40
+    assert hasattr(app, "btn_select")
+    assert app.btn_select.winfo_ismapped()
+    assert app.btn_select.winfo_height() >= 24
+    assert hasattr(app, "lbl_file_status")
+    assert app.lbl_file_status.winfo_ismapped()
+
+    # 2. War View Menu Checks
+    app.show_war_view()
+    app.update()
+    wv = app.war_view
+
+    assert hasattr(wv, "status_frame")
+    assert wv.status_frame.winfo_ismapped()
+    assert wv.status_frame.winfo_height() >= 40
+    assert hasattr(wv, "btn_select")
+    assert wv.btn_select.winfo_ismapped()
+    assert wv.btn_select.winfo_height() >= 24
+    assert hasattr(wv, "lbl_file_status")
+    assert wv.lbl_file_status.winfo_ismapped()
+    assert hasattr(wv, "btn_how_to_use")
+    assert wv.btn_how_to_use.winfo_ismapped()
+    assert hasattr(wv, "btn_discord")
+    assert wv.btn_discord.winfo_ismapped()
+
