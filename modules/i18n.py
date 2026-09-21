@@ -148,7 +148,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
     },
     "th": {
         # App & Window Titles
-        "app_window_title": "NEKO เครื่องมือติดตามไอเท็ม & เมเซต้า",
+        "app_window_title": "NEKO ติดตามไอเท็ม & เมเซต้า",
         "app_title_offline": "NEKO FAMILY TEAM SHOP - Item & Meseta tracker",
         "app_title_war": "NEKO FAMILY — ARKS War Room Realtime Meseta Tracker",
         "brand_subtitle": "ITEM & MESETA",
@@ -157,11 +157,11 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "brand_team_credit": "TEAM NEKO FAMILY SHIP 4 TH",
 
         # Sidebar Buttons & Toggles
-        "btn_enter_war": "⚔️ เข้าสู่สงคราม (ARKS War)",
-        "btn_enter_war_char": "⚔️ เข้าสู่สงคราม ({character})",
-        "btn_reset": "เริ่มนับใหม่ (Reset)",
-        "btn_watchlist": "Edit Watch List",
-        "switch_filter": "เปิดใช้ Watch List Filter",
+        "btn_enter_war": "⚔️ เข้าร่วมสงคราม (ARKS War)",
+        "btn_enter_war_char": "⚔️ เข้าร่วมสงคราม ({character})",
+        "btn_reset": "รีเซ็ตข้อมูล (Reset)",
+        "btn_watchlist": "แก้ไข Watch List",
+        "switch_filter": "กรองเฉพาะ Watch List",
         "btn_overlay_full": "Item & Meseta",
         "btn_overlay_mini": "Meseta",
         "btn_discord": "DISCORD NEKO FAMILY",
@@ -169,49 +169,49 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "label_language": "ภาษา",
 
         # Log Status & Folder Picker
-        "status_no_folder": "ยังไม่เลือกโฟลเดอร์ Log",
+        "status_no_folder": "ยังไม่ได้เลือกโฟลเดอร์ Log",
         "status_folder_unspecified": "ยังไม่ได้ระบุโฟลเดอร์ Log",
-        "status_log_not_found": "หาไฟล์ Log ไม่เจออะ",
+        "status_log_not_found": "ไม่พบไฟล์ Log",
         "status_reading_file": "กำลังอ่านไฟล์: {file}",
-        "btn_select_folder": "📂 จิ้มเลือกโฟลเดอร์ Log",
+        "btn_select_folder": "📂 เลือกโฟลเดอร์ Log",
 
         # Dashboard Metric Cards
         "lbl_session": "ยอดเงินรอบนี้ (Session)",
-        "lbl_wallet": "เงินที่มีในกระเป๋า",
-        "lbl_farming_time": "เวลาที่ใช้ฟาร์ม",
+        "lbl_wallet": "เงินในกระเป๋า",
+        "lbl_farming_time": "ระยะเวลาฟาร์ม",
         "lbl_speed": "ความเร็ว (M/hr)",
-        "header_drops": "📦 รายการของที่ดรอป",
+        "header_drops": "📦 รายการไอเท็มที่ดรอป",
         "search_placeholder": "🔍 ค้นหาไอเท็ม...",
 
         # Drop List Empty States
-        "empty_waiting": "รอของเข้า...",
-        "empty_not_found": "ไม่พบ: {keyword}",
+        "empty_waiting": "รอไอเท็มดรอป...",
+        "empty_not_found": "ไม่พบ: '{keyword}'",
         "empty_watchlist_no_match": "ไม่พบไอเท็มใน Watch List",
-        "empty_watchlist_empty": "Watch List ว่างเปล่า",
+        "empty_watchlist_empty": "ไม่มีรายการใน Watch List",
 
         # Reset Confirmation Dialog
-        "dialog_reset_title": "ยืนยันรีเซ็ต",
-        "dialog_reset_msg": "ต้องการรีเซ็ตข้อมูลรอบนี้?\nยอดเงิน เวลา และไอเทมทั้งหมดจะหายไป",
+        "dialog_reset_title": "ยืนยันการรีเซ็ต",
+        "dialog_reset_msg": "ต้องการรีเซ็ตข้อมูลรอบนี้หรือไม่?\n(ยอดเงิน เวลา และไอเท็มทั้งหมดจะถูกล้างค่า)",
         "btn_cancel": "ยกเลิก",
         "btn_confirm_reset": "ยืนยันรีเซ็ต",
 
         # Watch List Editor Dialog
         "dialog_watchlist_title": "แก้ไข Watch List",
-        "dialog_watchlist_prompt": "ใส่ชื่อไอเท็มที่ต้องการโฟกัส (บรรทัดละ 1 ชื่อ)",
-        "btn_save_watchlist": "บันทึก (Save Config)",
+        "dialog_watchlist_prompt": "ระบุชื่อไอเท็มที่ต้องการเฝ้าระวัง (บรรทัดละ 1 ชื่อ)",
+        "btn_save_watchlist": "บันทึกข้อมูล",
 
         # Overlay Window
-        "overlay_window_title": "โหมด Gadget - NEKO Tracker",
+        "overlay_window_title": "โหมดหน้าต่างย่อ (Overlay) - NEKO Tracker",
         "overlay_title_full": "ITEM • MESETA",
         "overlay_title_mini": "MESETA",
-        "overlay_subtitle": "เงินรอบนี้ (Session)",
+        "overlay_subtitle": "ยอดเงินรอบนี้ (Session)",
         "overlay_wallet": "กระเป๋า: {wallet}",
         "overlay_time_cap": "เวลา",
         "overlay_rate_cap": "ความเร็ว",
         "overlay_drops_cap": "ดรอป",
         "overlay_focus_badge": "● โฟกัส",
-        "overlay_waiting": "รอของเข้า…",
-        "overlay_focus_empty": "🔎 Focus Mode",
+        "overlay_waiting": "รอไอเท็มดรอป…",
+        "overlay_focus_empty": "🔎 โหมดโฟกัส",
 
         # War Mode (Online)
         "war_op_title": "👤 ชื่อในเกม: {name}",
@@ -220,12 +220,12 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "war_paste_btn": "📋 วาง",
         "war_pasted_btn": "✓ วางแล้ว",
         "war_save_btn": "💾 บันทึก",
-        "war_landmark_default": "🪐 พิกัดสำคัญ...",
-        "war_sync_ready": "⚡ ซิงค์อัตโนมัติพร้อมทำงาน",
+        "war_landmark_default": "🪐 พิกัดเป้าหมาย...",
+        "war_sync_ready": "⚡ ระบบซิงค์อัตโนมัติพร้อมทำงาน",
         "war_syncing": "⚡ กำลังซิงค์ข้อมูลออนไลน์...",
-        "war_synced": "⚡ ซิงค์ออนไลน์สำเร็จ: ล่าสุด {time} (+{contrib} ℳ)",
-        "war_sync_waiting": "⚡ รอการเชื่อมต่อ...",
-        "war_sync_error": "⚡ ไม่สามารถบันทึกข้อมูล Telemetry ได้",
+        "war_synced": "⚡ ซิงค์ข้อมูลล่าสุด: {time} (+{contrib} ℳ)",
+        "war_sync_waiting": "⚡ กำลังรอการเชื่อมต่อ...",
+        "war_sync_error": "⚡ ส่งข้อมูลไม่สำเร็จ (เชื่อมต่อล้มเหลว)",
         "war_btn_open_web": "🪐 ARKS War Room (Web)",
         "war_btn_back_offline": "🔙 กลับสู่โหมดออฟไลน์",
 
@@ -233,25 +233,25 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "menu_cut": "✂️ ตัด (Cut)",
         "menu_copy": "📄 คัดลอก (Copy)",
         "menu_paste_coord": "📋 วางพิกัด (Paste)",
-        "menu_select_all": "🔘 เลือกทั้งหมด (Select All)",
+        "menu_select_all": "🔘 เลือกทั้งหมด",
 
         # Security & Service Messages
-        "msg_anti_tamper_compromised": "ระบบตรวจพบการแทรกแซงข้อมูล (Anti-Tamper Compromised): ระงับการส่งข้อมูลสถิติขึ้นระบบ",
-        "msg_security_revoked": "เวอร์ชันไคลเอนต์ ({version}) ไม่ผ่านเกณฑ์ความปลอดภัย (Security Revoked): ปฏิเสธการส่งข้อมูลสถิติขึ้นระบบ",
+        "msg_anti_tamper_compromised": "⚠️ ตรวจพบการดัดแปลงข้อมูล (Anti-Tamper Compromised): ระงับการส่งข้อมูลสถิติ",
+        "msg_security_revoked": "⚠️ เวอร์ชันไคลเอนต์ ({version}) ไม่ผ่านเกณฑ์ความปลอดภัย: ระงับการส่งข้อมูล",
 
         # Guide / How-To-Use & Community
         "btn_how_to_use": "📖 วิธีใช้งาน",
         "dialog_guide_title": "วิธีใช้งาน — NEKO Item & Meseta Tracker",
         "guide_tab_setup": "🚀 เริ่มต้น & Log",
         "guide_tab_tracking": "💰 เมเซต้า & ไอเท็ม",
-        "guide_tab_overlay": "🪟 โหมด Overlay",
+        "guide_tab_overlay": "🪟 โหมดหน้าต่างย่อ (Overlay)",
         "guide_tab_war": "⚔️ ARKS War",
-        "guide_tab_community": "🌸 ชุมชน & เครดิต",
-        "guide_btn_join_discord": "💬 เข้าสู่ Discord คอมมูนิตี้",
+        "guide_tab_community": "🌸 คอมมูนิตี้",
+        "guide_btn_join_discord": "💬 เข้าร่วม Discord คอมมูนิตี้",
         "guide_btn_copy_link": "📋 คัดลอกลิงก์ Discord",
         "guide_link_copied": "✓ คัดลอกลิงก์เรียบร้อยแล้ว!",
         "guide_credit_label": "NEKO★FAMILY PSO2:NGS Community discord.gg/fkjXW9AJ6a",
-        "guide_community_desc": "คอมมูนิตี้สำหรับคนเล่น PSO2:NGS มาร่วมพูดคุย แลกเปลี่ยนเทคนิคการฟาร์ม แจ้งปัญหา อัปเดตแพตช์ และร่วมกิจกรรมสงคราม ARKS War Room กับพวกเรา!",
+        "guide_community_desc": "คอมมูนิตี้สำหรับผู้เล่น PSO2:NGS ร่วมพูดคุย แลกเปลี่ยนเทคนิคฟาร์ม แจ้งปัญหา และลุยกิจกรรม ARKS War Room ไปด้วยกัน!",
         "guide_close_btn": "✕ ปิดหน้าต่างคู่มือ",
     },
     "ja": {
