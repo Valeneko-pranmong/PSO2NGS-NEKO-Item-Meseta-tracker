@@ -3,7 +3,7 @@
 ================================================================================
 Developer: Vale3neko / NEKO FAMILY TEAM SHIP 4 JP
 Project: Phantasy Star Online 2: New Genesis (PSO2:NGS) Item & Meseta Tracker
-Version: 6.1.0 (with WPF Native v7.0.0-alpha Preview)
+Version: 7.1.0 (Pure Python Modular Engine with ARKS War Room & Multi-Language Support)
 
 [EN] TERMS OF USE & LICENSE:
 This software is created for the public benefit of the PSO2:NGS gaming community.

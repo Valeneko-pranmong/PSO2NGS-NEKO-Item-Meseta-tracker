@@ -45,13 +45,14 @@ python installer/build_installer.py --skip-smoke
 ## 📦 ผลลัพธ์จากการบิลด์ (Build Artifacts)
 
 เมื่อกระบวนการเสร็จสิ้น ไฟล์ติดตั้งจะถูกสร้างขึ้นที่:
-* **ไฟล์ตัวติดตั้ง:** `artifacts/release-v6.1.0/NekoTracker-Setup-v6.1.0.exe`
-* **ไฟล์แฮชความปลอดภัย:** `artifacts/release-v6.1.0/SHA256SUMS.txt`
+* **ไฟล์ตัวติดตั้ง:** `artifacts/release-v7.1.0/NekoTracker-Setup-v7.1.0.exe`
+* **ไฟล์แฮชความปลอดภัย:** `artifacts/release-v7.1.0/SHA256SUMS.txt`
 
 ---
 
 ## 🛡️ กฎระเบียบและมาตรฐานความปลอดภัย (Invariants)
 
 1. **Per-User Installation:** ติดตั้งที่ `%LOCALAPPDATA%\NEKO FAMILY\NekoTracker` โดยใช้ `PrivilegesRequired=lowest` เพื่อไม่ให้เด้ง UAC และไม่เสี่ยงต่อปัญหา Permission Denied
-2. **Primary Application Integrity:** ตัวโปรแกรมหลักที่ติดตั้งคือ **Python Tracker V6.1.0 (พร้อมโหมด ARKS War Room)** เสมอ
-3. **Fail-Closed:** หากมีชุดทดสอบใดๆ ล้มเหลว กระบวนการบิลด์จะหยุดทำงานทันที ไม่ปล่อยให้มีตัวติดตั้งที่มีบั๊กหลุดออกไป
+2. **Primary Application Integrity:** ตัวโปรแกรมหลักที่ติดตั้งคือ **Python Tracker V7.1.0 (พร้อมโหมด ARKS War Room & Multi-Language Support)** เสมอ
+3. **Dedicated Test Suite for Clean Machines:** บรรจุ `tools/NekoLogSimulator.exe`, โฟลเดอร์ `sample_logs/`, และตัวเรียกทดสอบ `Quick_Test_All_In_One.bat` เพื่อให้เครื่องเทสอื่นทดสอบการทำงานได้ทันทีโดยไม่ต้องติดตั้ง Python หรือเปิดตัวเกม
+4. **Fail-Closed:** หากมีชุดทดสอบใดๆ ล้มเหลว กระบวนการบิลด์จะหยุดทำงานทันที ไม่ปล่อยให้มีตัวติดตั้งที่มีบั๊กหลุดออกไป

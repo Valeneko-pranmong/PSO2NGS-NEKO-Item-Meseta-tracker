@@ -361,6 +361,13 @@ def test_war_view_realtime_sync_ui_labels(shared_app):
     assert ("ล่าสุด" in txt_completed or "synced" in txt_completed.lower() or "last" in txt_completed.lower())
     assert "150,000" in txt_completed
 
+    # Regression: Ensure sync label and save button are in distinct vertical rows
+    app.update()
+    assert wv.lbl_sync_time.master != wv.btn_save_coord.master
+    sync_row_y = wv.lbl_sync_time.master.winfo_y()
+    coord_row_y = wv.btn_save_coord.master.winfo_y()
+    assert sync_row_y < coord_row_y
+
     app.show_offline_view()
 
 

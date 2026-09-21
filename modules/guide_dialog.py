@@ -14,6 +14,7 @@ import tkinter as tk
 import customtkinter as ctk
 from PIL import Image
 
+from modules.utils import WindowMover, start_native_drag
 from config import (
     FONT_FAMILY,
     COLOR_PINK_HEADER,
@@ -33,7 +34,7 @@ from config import (
     DISCORD_CREDIT_FULL,
     DEFAULT_WAR_ROOM_URL,
 )
-from modules.i18n import i18n, t
+from modules.i18n import i18n, t, tr
 from modules.event_bus import event_bus
 
 
@@ -796,17 +797,12 @@ class GuideWindow(ctk.CTkToplevel):
         self.lbl_lang_hint.pack(side="right", padx=(0, 4))
 
         # Make header draggable
+        guide_mover = WindowMover(self)
         def start_move(event):
-            self._drag_x = event.x
-            self._drag_y = event.y
+            guide_mover.start_move(event)
 
         def do_move(event):
-            try:
-                x = self.winfo_x() + (event.x - self._drag_x)
-                y = self.winfo_y() + (event.y - self._drag_y)
-                self.geometry(f"+{x}+{y}")
-            except Exception:
-                pass
+            guide_mover.do_move(event)
 
         self.header_bar.bind("<ButtonPress-1>", start_move)
         self.header_bar.bind("<B1-Motion>", do_move)
@@ -867,7 +863,7 @@ class GuideWindow(ctk.CTkToplevel):
         )
         self.lbl_toast.pack(side="left", padx=5, pady=8)
 
-        # Right side action buttons: Copy Link & Join Discord
+        # Right side action buttons: Uninstall, Copy Link & Join Discord
         self.btn_join_discord_footer = ctk.CTkButton(
             self.footer_frame,
             text=t("btn_discord"),
@@ -894,7 +890,20 @@ class GuideWindow(ctk.CTkToplevel):
             corner_radius=UI_RADIUS,
             command=self.copy_discord_link,
         )
-        self.btn_copy_link_footer.pack(side="right", padx=(0, 4), pady=8)
+        self.btn_copy_link_footer.pack(side="right", padx=(4, 4), pady=8)
+
+        self.btn_uninstall_footer = ctk.CTkButton(
+            self.footer_frame,
+            text="🗑️ " + t("btn_uninstall"),
+            font=(FONT_FAMILY, 11, "bold"),
+            fg_color="#F43F5E",
+            hover_color="#E11D48",
+            text_color="white",
+            height=32,
+            corner_radius=UI_RADIUS,
+            command=self._confirm_and_uninstall,
+        )
+        self.btn_uninstall_footer.pack(side="right", padx=(0, 4), pady=8)
 
         # 4. Scrollable Content Body
         self.scroll_body = ctk.CTkScrollableFrame(
@@ -956,11 +965,71 @@ class GuideWindow(ctk.CTkToplevel):
             self.lbl_credit_footer.configure(text=f"🌸 {DISCORD_CREDIT_FULL}")
             self.btn_join_discord_footer.configure(text=t("btn_discord"))
             self.btn_copy_link_footer.configure(text=t("guide_btn_copy_link"))
+            if hasattr(self, "btn_uninstall_footer"):
+                self.btn_uninstall_footer.configure(
+                    text="🗑️ " + t("btn_uninstall")
+                )
 
             # Re-render active tab content
             self.render_tab_content(self.current_tab)
         except Exception:
             pass
+
+    def _confirm_and_uninstall(self) -> None:
+        """Confirm with user and launch the uninstaller cleanly."""
+        import sys
+        import subprocess
+        from tkinter import messagebox
+        lang = getattr(i18n, "current_language", "en")
+        title = "Confirm Uninstall" if lang == "en" else ("ยืนยันการถอนการติดตั้ง" if lang == "th" else "アンインストールの確認")
+        msg = (
+            "Are you sure you want to uninstall NEKO Item & Meseta Tracker?\n"
+            "The application will close and launch the uninstaller."
+            if lang == "en" else
+            ("คุณแน่ใจหรือไม่ว่าต้องการถอนการติดตั้ง NEKO Item & Meseta Tracker?\n"
+             "โปรแกรมจะปิดตัวลงและเริ่มหน้าต่างถอนการติดตั้ง"
+            if lang == "th" else
+            "NEKO Item & Meseta Tracker をアンインストールしますか？\n"
+            "アプリケーションを終了してアンインストーラーを起動します。")
+        )
+        if not messagebox.askyesno(title, msg):
+            return
+
+        app_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
+        candidates = [
+            os.path.join(app_dir, "unins000.exe"),
+            os.path.join(os.path.expandvars(r"%LOCALAPPDATA%\NEKO FAMILY\NekoTracker"), "unins000.exe"),
+            os.path.join(app_dir, "Uninstall.bat"),
+            os.path.join(os.path.expandvars(r"%LOCALAPPDATA%\NEKO FAMILY\NekoTracker"), "Uninstall.bat"),
+        ]
+        uninstaller = next((c for c in candidates if os.path.isfile(c)), None)
+        if not uninstaller:
+            not_found = (
+                "Uninstaller (unins000.exe) not found in application folder.\n"
+                "Please uninstall via Windows Settings > Apps > Installed apps."
+                if lang == "en" else
+                ("ไม่พบไฟล์ถอนการติดตั้ง (unins000.exe) ในโฟลเดอร์โปรแกรม\n"
+                 "กรุณาถอนการติดตั้งผ่าน Windows Settings > Apps > Installed apps"
+                if lang == "th" else
+                "アンインストーラー (unins000.exe) が見つかりませんでした。\n"
+                "Windowsの設定 > アプリ > インストールされているアプリからアンインストールしてください。")
+            )
+            messagebox.showwarning(title, not_found)
+            return
+
+        try:
+            subprocess.Popen([uninstaller])
+        except Exception as e:
+            messagebox.showerror(title, f"Failed to start uninstaller: {e}")
+            return
+
+        try:
+            if hasattr(self, "master") and hasattr(self.master, "destroy"):
+                self.master.destroy()
+            else:
+                self.destroy()
+        except Exception:
+            sys.exit(0)
 
     def render_tab_content(self, tab_id: str) -> None:
         """Render card list for selected tab."""

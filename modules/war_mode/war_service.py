@@ -952,10 +952,12 @@ class WarService:
 
         # 3. Cloud Database Sync (Firebase Realtime Database)
         cloud_ok = False
+        cloud_msg = ""
         if self.firebase_url:
             try:
-                cloud_ok, _ = self.sync_to_cloud_database()
+                cloud_ok, cloud_msg = self.sync_to_cloud_database()
             except Exception as exc:
+                cloud_msg = str(exc)
                 print(f"[WarService] Cloud database sync exception: {exc}")
 
         self._last_sync_time = now

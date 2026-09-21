@@ -1,13 +1,13 @@
 ; ==============================================================================
-; NEKO Item & Meseta Tracker - Inno Setup Script
+; NEKO Item & Meseta Tracker - Inno Setup Script (Production E2E Release)
 ; Author: NEKO FAMILY TEAM SHIP 4 JP / Vale3neko
 ; Target Platform: Windows 10 / Windows 11 (64-bit)
 ; Architecture: Per-User Local AppData (NEKO FAMILY Standard)
-; Version: 7.1.0 (Python Modular Engine with ARKS War Room & Cloud Sync)
+; Version: 7.1.0 (Python Modular Engine with ARKS War Room & Multi-Language)
 ; ==============================================================================
 
 #define MyAppName "NEKO Item & Meseta Tracker"
-#define MyAppVersion "6.1.0"
+#define MyAppVersion "7.1.0"
 #define MyAppPublisher "NEKO FAMILY"
 #define MyAppURL "https://github.com/Vale3neko/PSO2NGS-NEKO-Item-Meseta-tracker"
 #define MyAppExeName "NekoTracker.exe"
@@ -39,12 +39,13 @@ Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
 
-OutputDir=..\artifacts\release-v6.1.0
-OutputBaseFilename=NekoTracker-Setup-v6.1.0
+OutputDir=..\artifacts\release-v7.1.0
+OutputBaseFilename=NekoTracker-Setup-v7.1.0
 SetupIconFile=..\icon.ico
-UninstallDisplayName={#MyAppName}
+UninstallDisplayName={#MyAppName} (v{#MyAppVersion})
 UninstallDisplayIcon={app}\{#MyAppExeName}
 Uninstallable=yes
+CreateUninstallRegKey=yes
 CloseApplications=no
 
 [Languages]
@@ -59,15 +60,21 @@ Source: "..\dist\NekoTracker\*"; DestDir: "{app}"; Flags: ignoreversion recurses
 ; Root Assets and Icons
 Source: "..\icon.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\logo.png"; DestDir: "{app}"; Flags: ignoreversion
-; Documentation & License
+; User Documentation & License
+Source: "..\Doc\current\HOW_TO_USE.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "LICENSE.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\README.md"; DestDir: "{app}"; DestName: "README.md"; Flags: ignoreversion
+; Uninstaller Helper Launcher
+Source: "Uninstall.bat"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 ; Start Menu Shortcuts
-Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\icon.ico"; WorkingDir: "{app}"
-Name: "{autoprograms}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
-; Desktop Shortcut
+Name: "{autoprograms}\{#MyAppName}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\icon.ico"; WorkingDir: "{app}"
+Name: "{autoprograms}\{#MyAppName}\User Guide (HOW TO USE)"; Filename: "{app}\HOW_TO_USE.md"; WorkingDir: "{app}"
+Name: "{autoprograms}\{#MyAppName}\Uninstall (ถอนการติดตั้ง) {#MyAppName}"; Filename: "{uninstallexe}"; IconFilename: "{app}\icon.ico"
+Name: "{autoprograms}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"; IconFilename: "{app}\icon.ico"
+
+; Desktop Shortcuts (Strict single-app icon on desktop)
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\icon.ico"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
@@ -78,7 +85,9 @@ Type: files; Name: "{app}\*.log"
 
 [UninstallDelete]
 Type: files; Name: "{app}\*.log"
+Type: files; Name: "{app}\*.bat"
 Type: files; Name: "{app}\ngs_tracker_config.json"
+Type: filesandordirs; Name: "{app}\fonts"
 Type: filesandordirs; Name: "{app}\__pycache__"
 Type: filesandordirs; Name: "{app}\_internal"
 Type: dirifempty; Name: "{app}"

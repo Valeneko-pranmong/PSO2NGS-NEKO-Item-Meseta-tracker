@@ -19,7 +19,7 @@ from modules.event_bus import event_bus
 from modules.i18n import i18n, t, tr
 from modules.war_mode.war_service import WarService
 from modules.war_mode.war_view import WarDashboardFrame
-from modules.utils import extract_character_info
+from modules.utils import extract_character_info, WindowMover, start_native_drag
 from modules.security import (
     AntiTamperGuard,
     TamperViolation,
@@ -52,6 +52,7 @@ class NGSTrackerApp(ctk.CTk):
         self.title(t("app_window_title")) 
         self.configure(fg_color=COLOR_BG_MAIN) 
         self.setup_icon()
+        self._window_mover = WindowMover(self)
         
         self.after(200, self.force_taskbar_icon)
 
@@ -80,11 +81,14 @@ class NGSTrackerApp(ctk.CTk):
 
         # Modular Subsystems & Security
         self.event_bus = event_bus
+        self.is_test_mode = getattr(config, "IS_TEST_MODE", False) if "config" in globals() else IS_TEST_MODE
         self.anti_tamper = AntiTamperGuard(
             enforce_process_validation=ENFORCE_PROCESS_VALIDATION,
             enforce_file_handle_validation=ENFORCE_FILE_HANDLE_VALIDATION,
             enforce_canonical_path=ENFORCE_CANONICAL_PATH_GATING,
             enforce_cadence_validation=ENFORCE_CADENCE_VALIDATION,
+            enforce_timestamp_validation=ENFORCE_TIMESTAMP_VALIDATION,
+            enforce_velocity_validation=ENFORCE_VELOCITY_VALIDATION,
             min_cadence_sample_size=MIN_CADENCE_SAMPLE_SIZE,
             min_cadence_stddev=MIN_CADENCE_STDDEV_SEC,
             max_single_meseta_drop=MAX_SINGLE_MESETA_DROP,
@@ -291,6 +295,7 @@ class NGSTrackerApp(ctk.CTk):
                 icon_lbl.pack(side="left", padx=(15, 5), pady=5)
                 icon_lbl.bind("<ButtonPress-1>", self.start_move)
                 icon_lbl.bind("<B1-Motion>", self.do_move)
+                icon_lbl.bind("<Double-Button-1>", self.toggle_maximize)
             except Exception:
                 pass
 
@@ -303,10 +308,43 @@ class NGSTrackerApp(ctk.CTk):
         )
         self.title_label.pack(side="left", padx=5, pady=5)
 
+        self.version_label = ctk.CTkLabel(
+            self.title_bar,
+            text=f"v{CLIENT_VERSION}",
+            font=(FONT_FAMILY, 10, "bold"),
+            text_color="#9F1239",
+            fg_color="#FFE4E6",
+            corner_radius=4,
+            padx=5,
+            pady=2,
+        )
+        self.version_label.pack(side="left", padx=(2, 6), pady=5)
+        self.version_label.bind("<ButtonPress-1>", self.start_move)
+        self.version_label.bind("<B1-Motion>", self.do_move)
+        self.version_label.bind("<Double-Button-1>", self.toggle_maximize)
+
+        self.test_mode_badge = ctk.CTkLabel(
+            self.title_bar,
+            text="🧪 TEST MODE",
+            font=(FONT_FAMILY, 10, "bold"),
+            text_color="#0369A1",
+            fg_color="#E0F2FE",
+            corner_radius=4,
+            padx=6,
+            pady=2,
+        )
+        if self.is_test_mode:
+            self.test_mode_badge.pack(side="left", padx=6, pady=5)
+
         close_btn = ctk.CTkButton(self.title_bar, text="✕", width=30, height=30, corner_radius=0,
                                   fg_color="white", text_color="#D81B60", hover_color="#FFE4E1",
                                   font=("Arial", 14, "bold"), command=self.on_close)
         close_btn.pack(side="right", padx=(0, 15), pady=5)
+
+        self.max_btn = ctk.CTkButton(self.title_bar, text="□", width=30, height=30, corner_radius=0,
+                                     fg_color="white", text_color="#D81B60", hover_color="#FFE4E1",
+                                     font=("Arial", 14, "bold"), command=self.toggle_maximize)
+        self.max_btn.pack(side="right", padx=(0, 5), pady=5)
 
         min_btn = ctk.CTkButton(self.title_bar, text="─", width=30, height=30, corner_radius=0,
                                 fg_color="white", text_color="#D81B60", hover_color="#FFE4E1",
@@ -332,8 +370,10 @@ class NGSTrackerApp(ctk.CTk):
 
         self.title_bar.bind("<ButtonPress-1>", self.start_move)
         self.title_bar.bind("<B1-Motion>", self.do_move)
+        self.title_bar.bind("<Double-Button-1>", self.toggle_maximize)
         self.title_label.bind("<ButtonPress-1>", self.start_move)
         self.title_label.bind("<B1-Motion>", self.do_move)
+        self.title_label.bind("<Double-Button-1>", self.toggle_maximize)
 
     def update_board_coordinate(self, new_coord: Any, slot: Optional[int] = None) -> str:
         parsed = self.war_service.set_target_coord(new_coord, slot=slot)
@@ -403,27 +443,63 @@ class NGSTrackerApp(ctk.CTk):
         self.war_view.grid(row=1, column=0, sticky="nsew")
         self.war_view.update_view()
 
+    def toggle_maximize(self, event=None):
+        if self.state() == "zoomed":
+            self.state("normal")
+            if hasattr(self, "max_btn") and self.max_btn.winfo_exists():
+                self.max_btn.configure(text="□")
+        else:
+            self.state("zoomed")
+            if hasattr(self, "max_btn") and self.max_btn.winfo_exists():
+                self.max_btn.configure(text="❐")
+
     def start_move(self, event):
-        self.x = event.x
-        self.y = event.y
+        if self.state() == "zoomed":
+            self.state("normal")
+            if hasattr(self, "max_btn") and self.max_btn.winfo_exists():
+                self.max_btn.configure(text="□")
+            self.update_idletasks()
+        self.x = getattr(event, "x", 0)
+        self.y = getattr(event, "y", 0)
+        self._window_mover.start_move(event)
 
     def do_move(self, event):
-        x = self.winfo_x() + (event.x - self.x)
-        y = self.winfo_y() + (event.y - self.y)
-        self.geometry(f"+{x}+{y}")
+        self._window_mover.do_move(event)
 
     def minimize_window(self):
+        self.bind("<Map>", self._on_restore_window)
         self.overrideredirect(False)
         self.iconify()
-        self.bind("<Map>", self._on_restore_window)
 
     def _on_restore_window(self, event=None):
+        if self.state() == "iconic":
+            return
         self.overrideredirect(True)
         try:
             self.unbind("<Map>")
         except Exception:
             pass
         self.after(50, self.force_taskbar_icon)
+
+    def _enable_test_mode_bypasses(self):
+        """Bypasses anti-tamper constraints when running mock tests or sample logs on test machines."""
+        self.is_test_mode = True
+        if hasattr(self, "anti_tamper"):
+            self.anti_tamper.enforce_process_validation = False
+            self.anti_tamper.enforce_file_handle_validation = False
+            self.anti_tamper.enforce_canonical_path = False
+            self.anti_tamper.enforce_cadence_validation = False
+            self.anti_tamper.enforce_timestamp_validation = False
+            self.anti_tamper.enforce_velocity_validation = False
+            self.anti_tamper.enforce_ceiling_validation = False
+            self.anti_tamper.is_compromised = False
+        if hasattr(self, "war_service"):
+            self.war_service.is_tamper_compromised = False
+        if hasattr(self, "test_mode_badge") and self.test_mode_badge.winfo_exists():
+            try:
+                self.test_mode_badge.pack(side="left", padx=6, pady=5)
+            except Exception:
+                pass
             
     def confirm_reset(self):
         if self.confirm_dialog is not None and self.confirm_dialog.winfo_exists():
@@ -484,10 +560,15 @@ class NGSTrackerApp(ctk.CTk):
                 self.anti_tamper.reset()
         
         if self.log_path and os.path.exists(self.log_path):
+            norm_path = self.log_path.replace("\\", "/").lower()
+            is_sample = self.is_test_mode or ("sample_logs" in norm_path or "/mock" in norm_path or "/test" in norm_path)
             try:
                 with open(self.log_path, 'r', encoding=self.active_encoding, errors='replace') as f:
-                    f.seek(0, 2)
-                    self.last_file_pos = f.tell()
+                    if is_sample:
+                        self.last_file_pos = 0
+                    else:
+                        f.seek(0, 2)
+                        self.last_file_pos = f.tell()
             except OSError:
                 pass
         self.event_bus.emit("tracker_reset")
@@ -643,6 +724,9 @@ class NGSTrackerApp(ctk.CTk):
     def select_log_folder(self):
         folder_path = filedialog.askdirectory()
         if folder_path:
+            norm_folder = folder_path.replace("\\", "/").lower()
+            if "sample_logs" in norm_folder or "/mock" in norm_folder or "/test" in norm_folder:
+                self._enable_test_mode_bypasses()
             self.log_folder = folder_path
             self.save_settings() 
             self.find_latest_log_file()
@@ -663,6 +747,9 @@ class NGSTrackerApp(ctk.CTk):
             return
 
         latest_file = max(target_files, key=os.path.getmtime)
+        norm_file = latest_file.replace("\\", "/").lower()
+        if "sample_logs" in norm_file or "/mock" in norm_file or "/test" in norm_file:
+            self._enable_test_mode_bypasses()
         if latest_file != self.log_path:
             self.log_path = latest_file
             self.pending_status_text = t("status_reading_file", file=os.path.basename(latest_file))
@@ -735,13 +822,12 @@ class NGSTrackerApp(ctk.CTk):
                                       font=("Arial", 14, "bold"), command=self.watchlist_window.destroy)
             close_btn.pack(side="right", padx=15, pady=5)
 
+            watchlist_mover = WindowMover(self.watchlist_window)
             def start_move(event):
-                self.watchlist_window.x = event.x
-                self.watchlist_window.y = event.y
+                watchlist_mover.start_move(event)
+
             def do_move(event):
-                x = self.watchlist_window.winfo_x() + (event.x - self.watchlist_window.x)
-                y = self.watchlist_window.winfo_y() + (event.y - self.watchlist_window.y)
-                self.watchlist_window.geometry(f"+{x}+{y}")
+                watchlist_mover.do_move(event)
 
             title_bar.bind("<ButtonPress-1>", start_move)
             title_bar.bind("<B1-Motion>", do_move)

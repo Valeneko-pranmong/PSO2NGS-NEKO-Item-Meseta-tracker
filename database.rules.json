@@ -34,7 +34,10 @@
         ".write": "newData.hasChildren(['client_version']) && newData.child('client_version').val() != '7.0.0-alpha'"
       },
       "war_logs": {
-        ".write": "newData.hasChildren(['client_version']) && newData.child('client_version').val() != '7.0.0-alpha'"
+        ".write": "newData.hasChildren(['client_version']) && newData.child('client_version').val() != '7.0.0-alpha'",
+        "$log_id": {
+          ".write": "newData.hasChildren(['client_version']) && newData.child('client_version').val() != '7.0.0-alpha'"
+        }
       }
     }
   }

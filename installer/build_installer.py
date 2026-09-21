@@ -2,8 +2,9 @@
 """
 NEKO Item & Meseta Tracker - Automated Build & Installer Pipeline
 Standard: NEKO FAMILY Per-User Architecture (PrivilegesRequired=lowest)
-Builds Python Tracker (PyInstaller), compiles Inno Setup installer,
-generates SHA-256 digests, and executes process smoke tests.
+Target Version: 7.1.0 (Modular Python Engine with ARKS War Room, i18n & Test Suite)
+Builds Python Tracker, compiles NekoLogSimulator, compiles Inno Setup installer,
+generates SHA-256 digests, and executes complete lifecycle process smoke tests.
 """
 
 import argparse
@@ -17,9 +18,9 @@ import time
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 BUILD_DIR = os.path.join(ROOT_DIR, "build")
 DIST_DIR = os.path.join(ROOT_DIR, "dist")
-ARTIFACTS_DIR = os.path.join(ROOT_DIR, "artifacts", "release-v6.1.0")
+ARTIFACTS_DIR = os.path.join(ROOT_DIR, "artifacts", "release-v7.1.0")
 INSTALLER_ISS = os.path.join(ROOT_DIR, "installer", "NekoTracker.iss")
-OUTPUT_SETUP_EXE = os.path.join(ARTIFACTS_DIR, "NekoTracker-Setup-v6.1.0.exe")
+OUTPUT_SETUP_EXE = os.path.join(ARTIFACTS_DIR, "NekoTracker-Setup-v7.1.0.exe")
 SHA256_FILE = os.path.join(ARTIFACTS_DIR, "SHA256SUMS.txt")
 
 def log(msg: str) -> None:
@@ -51,14 +52,12 @@ def run_cmd(cmd: list, cwd: str = ROOT_DIR, check: bool = True) -> subprocess.Co
 
 def run_test_suites() -> None:
     log("Running pre-flight automated test suites...")
-    
-    # Python unit tests
-    log("Running Python unit tests (pytest)...")
-    run_cmd([sys.executable, "-m", "pytest", "-v", "tests/test_tracker_modules.py"])
+    log("Running all unit and integration test suites (pytest tests/)...")
+    run_cmd([sys.executable, "-m", "pytest", "-v", "tests/"])
     log("All pre-flight test suites passed successfully!")
 
 def build_python_tracker() -> None:
-    log("Packaging Python Tracker with PyInstaller...")
+    log("Packaging Python Tracker (V7.1.0) with PyInstaller...")
     pyinstaller_cmd = [
         sys.executable, "-m", "PyInstaller",
         "--noconfirm",
@@ -78,6 +77,7 @@ def build_python_tracker() -> None:
         "--hidden-import", "modules.guide_dialog",
         "--hidden-import", "modules.utils",
         "--hidden-import", "modules.security",
+        "--hidden-import", "modules.anti_tamper",
         "--hidden-import", "modules.war_mode.war_service",
         "--hidden-import", "modules.war_mode.war_view",
         "--hidden-import", "tools.firebase_war_sync",
@@ -90,8 +90,34 @@ def build_python_tracker() -> None:
         raise RuntimeError(f"PyInstaller failed to create {out_exe}")
     log(f"Python Tracker build completed: {out_exe}")
 
+def build_mock_simulator() -> None:
+    log("Packaging NekoLogSimulator standalone executable for test machines...")
+    sim_cmd = [
+        sys.executable, "-m", "PyInstaller",
+        "--noconfirm",
+        "--onefile",
+        "--console",
+        "--name", "NekoLogSimulator",
+        "--icon", "icon.ico",
+        os.path.join(ROOT_DIR, "tools", "mock_log_simulator.py")
+    ]
+    run_cmd(sim_cmd)
+    
+    # Remove leftover spec if created
+    leftover_spec = os.path.join(ROOT_DIR, "NekoLogSimulator.spec")
+    if os.path.exists(leftover_spec):
+        try:
+            os.remove(leftover_spec)
+        except OSError:
+            pass
+
+    out_sim_exe = os.path.join(DIST_DIR, "NekoLogSimulator.exe")
+    if not os.path.isfile(out_sim_exe):
+        raise RuntimeError(f"PyInstaller failed to create {out_sim_exe}")
+    log(f"NekoLogSimulator build completed: {out_sim_exe}")
+
 def compile_installer() -> None:
-    log("Compiling Inno Setup distribution installer...")
+    log("Compiling Inno Setup distribution installer (V7.1.0)...")
     iscc_path = find_iscc()
     log(f"Using Inno Setup compiler: {iscc_path}")
     
@@ -141,13 +167,24 @@ def smoke_test_installer() -> None:
     
     installed_main_exe = os.path.join(sandbox_dir, "NekoTracker.exe")
     uninstaller_exe = os.path.join(sandbox_dir, "unins000.exe")
+    uninstall_bat = os.path.join(sandbox_dir, "Uninstall.bat")
+    how_to_use_file = os.path.join(sandbox_dir, "HOW_TO_USE.md")
     
     assert os.path.isfile(installed_main_exe), f"Missing {installed_main_exe}"
     assert os.path.isfile(uninstaller_exe), f"Missing {uninstaller_exe}"
-    log("Clean installation verified! Primary Python Tracker extracted properly.")
+    assert os.path.isfile(uninstall_bat), f"Missing {uninstall_bat}"
+    assert os.path.isfile(how_to_use_file), f"Missing {how_to_use_file}"
+
+    # Strict Production E2E Check: Ensure ZERO test/mock artifacts leaked into installer
+    assert not os.path.exists(os.path.join(sandbox_dir, "tools")), "Test simulator leaked into production installer!"
+    assert not os.path.exists(os.path.join(sandbox_dir, "sample_logs")), "Sample logs leaked into production installer!"
+    assert not os.path.exists(os.path.join(sandbox_dir, "Quick_Test_All_In_One.bat")), "Test runner leaked into production installer!"
+    assert not os.path.exists(os.path.join(sandbox_dir, "Run_Test_Mode.bat")), "Test runner leaked into production installer!"
+    assert not os.path.exists(os.path.join(sandbox_dir, "Start_Mock_Stream.bat")), "Test streamer leaked into production installer!"
+    log("Production E2E installation verified! Only genuine application payload & uninstaller extracted.")
     
     # 2. Main Python Tracker Process Smoke
-    log("2. Verifying Main Python Tracker (V6.1.0) process smoke...")
+    log("2. Verifying Main Python Tracker (V7.1.0) process smoke...")
     py_proc = subprocess.Popen([installed_main_exe])
     time.sleep(3)
     py_poll = py_proc.poll()
@@ -159,7 +196,7 @@ def smoke_test_installer() -> None:
     except subprocess.TimeoutExpired:
         py_proc.kill()
     log("Main Python Tracker process smoke PASS (PID started and stayed alive cleanly).")
-    
+
     # 3. Clean Uninstallation Check
     log("3. Running clean silent uninstallation...")
     unins_cmd = [
@@ -175,6 +212,8 @@ def smoke_test_installer() -> None:
     # Check if core executable was removed
     if not os.path.exists(installed_main_exe):
         log("Uninstaller cleanly purged primary executable payload!")
+    if not os.path.exists(uninstaller_exe):
+        log("Uninstaller cleanly purged uninstaller binary!")
     
     # Cleanup remaining sandbox
     shutil.rmtree(sandbox_dir, ignore_errors=True)
@@ -188,7 +227,7 @@ def main() -> None:
     args = parser.parse_args()
     
     start_time = time.time()
-    log("Starting NEKO Item & Meseta Tracker Installer Build Pipeline")
+    log("Starting NEKO Item & Meseta Tracker Installer Build Pipeline (V7.1.0)")
     
     if not args.skip_tests:
         run_test_suites()

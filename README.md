@@ -54,7 +54,7 @@ E:\PSO2NGS-NEKO-Item-Meseta-tracker\
 │   ├── LICENSE.txt                         # ข้อกำหนดและสิทธิ์การใช้งาน (Non-Commercial)
 │   └── README.md                           # คู่มือการทำงานของระบบตัวติดตั้ง
 ├── 📂 artifacts/                           # [CURRENT] 🟢 คลังอาร์ติแฟกต์ทางการ
-│   └── 📂 release-v6.1.0/                  # [CURRENT] 🟢 โฟลเดอร์ Release หลัก (Python Tracker Setup.exe, SHA256, Docs)
+│   └── 📂 release-v7.1.0/                  # [CURRENT] 🟢 โฟลเดอร์ Release หลัก (Python Tracker Setup.exe, SHA256, Docs)
 ├── 📂 archive/                             # [ARCHIVE] 🔴 ซอร์สโค้ดเก่าที่ปลดระวาง (ห้ามใช้งาน)
 │   ├── README.md                           # บันทึกชี้แจงเหตุผลการปลดระวางโค้ด
 │   ├── 📂 legacy_auth/                     # โค้ดระบบ Login เก่าที่ยกเลิกไปแล้ว
@@ -104,7 +104,7 @@ E:\PSO2NGS-NEKO-Item-Meseta-tracker\
 ## 🚀 วิธีการใช้งาน (Getting Started)
 
 ### การติดตั้งและใช้งานสำหรับผู้เล่นทั่วไป
-1. ดาวน์โหลดตัวติดตั้ง **`NekoTracker-Setup-v6.1.0.exe`** จากโฟลเดอร์ [`artifacts/release-v6.1.0/`](artifacts/release-v6.1.0/)
+1. ดาวน์โหลดตัวติดตั้ง **`NekoTracker-Setup-v7.1.0.exe`** จากโฟลเดอร์ [`artifacts/release-v7.1.0/`](artifacts/release-v7.1.0/)
 2. ดับเบิลคลิกติดตั้งตามวิซาร์ด (ระบบจะสร้างไอคอนทางลัดบน Desktop และ Start Menu ให้โดยอัตโนมัติ ติดตั้งในระดับผู้ใช้ ไม่ต้องใช้สิทธิ์ Admin)
 3. เปิดโปรแกรม แล้วคลิกปุ่ม **"📂 จิ้มเลือกโฟลเดอร์ Log"** เลือกโฟลเดอร์ Log ของเกม PSO2:NGS
    * *พาธเริ่มต้น: `Documents\SEGA\PHANTASYSTARONLINE2\log_ngs`*

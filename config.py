@@ -115,11 +115,30 @@ MAX_MESETA_PER_MINUTE = 250_000           # ~15M/hr ceiling (physically impossib
 MAX_FUTURE_TIMESTAMP_SKEW_SEC = 60.0      # Max allowable future clock skew (seconds)
 MAX_PAST_TIMESTAMP_SKEW_SEC = 300.0       # 5 minutes max historical replay (seconds)
 MAX_SEQUENCE_JUMP_ALERT = 5000            # Sequence jump threshold for anomaly warning
-ENFORCE_PROCESS_VALIDATION = os.getenv("NEKO_PROCESS_VALIDATION", "1").lower() not in ("0", "false", "no")
-ENFORCE_FILE_HANDLE_VALIDATION = os.getenv("NEKO_FILE_HANDLE_VALIDATION", "1").lower() not in ("0", "false", "no")
-ENFORCE_CANONICAL_PATH_GATING = os.getenv("NEKO_CANONICAL_PATH_GATING", "0").lower() in ("1", "true", "yes")
-ENFORCE_CADENCE_VALIDATION = os.getenv("NEKO_CADENCE_VALIDATION", "1").lower() not in ("0", "false", "no")
 MIN_CADENCE_SAMPLE_SIZE = 10
 MIN_CADENCE_STDDEV_SEC = 0.05
+
+# Test Mode detection (CLI flag or environment variable)
+IS_TEST_MODE = (
+    os.getenv("NEKO_TEST_MODE", "0").lower() in ("1", "true", "yes")
+    or "--test" in sys.argv
+    or "--test-mode" in sys.argv
+    or "--mock" in sys.argv
+)
+
+if IS_TEST_MODE:
+    ENFORCE_PROCESS_VALIDATION = os.getenv("NEKO_PROCESS_VALIDATION", "0").lower() in ("1", "true", "yes")
+    ENFORCE_FILE_HANDLE_VALIDATION = os.getenv("NEKO_FILE_HANDLE_VALIDATION", "0").lower() in ("1", "true", "yes")
+    ENFORCE_CANONICAL_PATH_GATING = os.getenv("NEKO_CANONICAL_PATH_GATING", "0").lower() in ("1", "true", "yes")
+    ENFORCE_CADENCE_VALIDATION = os.getenv("NEKO_CADENCE_VALIDATION", "0").lower() in ("1", "true", "yes")
+    ENFORCE_TIMESTAMP_VALIDATION = os.getenv("NEKO_TIMESTAMP_VALIDATION", "0").lower() in ("1", "true", "yes")
+    ENFORCE_VELOCITY_VALIDATION = os.getenv("NEKO_VELOCITY_VALIDATION", "0").lower() in ("1", "true", "yes")
+else:
+    ENFORCE_PROCESS_VALIDATION = os.getenv("NEKO_PROCESS_VALIDATION", "1").lower() not in ("0", "false", "no")
+    ENFORCE_FILE_HANDLE_VALIDATION = os.getenv("NEKO_FILE_HANDLE_VALIDATION", "1").lower() not in ("0", "false", "no")
+    ENFORCE_CANONICAL_PATH_GATING = os.getenv("NEKO_CANONICAL_PATH_GATING", "0").lower() in ("1", "true", "yes")
+    ENFORCE_CADENCE_VALIDATION = os.getenv("NEKO_CADENCE_VALIDATION", "1").lower() not in ("0", "false", "no")
+    ENFORCE_TIMESTAMP_VALIDATION = os.getenv("NEKO_TIMESTAMP_VALIDATION", "1").lower() not in ("0", "false", "no")
+    ENFORCE_VELOCITY_VALIDATION = os.getenv("NEKO_VELOCITY_VALIDATION", "1").lower() not in ("0", "false", "no")
 
 

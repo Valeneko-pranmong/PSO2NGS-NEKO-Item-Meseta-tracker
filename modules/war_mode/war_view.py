@@ -113,33 +113,42 @@ class WarDashboardFrame(ctk.CTkFrame):
         self.grid_columnconfigure(0, weight=1)
 
         # 1. Top War Room Banner: Operative Info (Primary Key) + Board Coordinate Entry + Sync Status
-        self.top_banner = ctk.CTkFrame(self, fg_color=COLOR_PINK_SOFT, corner_radius=UI_RADIUS, height=52)
+        self.top_banner = ctk.CTkFrame(self, fg_color=COLOR_PINK_SOFT, corner_radius=UI_RADIUS, height=72)
         self.top_banner.grid(row=0, column=0, sticky="ew", padx=15, pady=(8, 6))
         self.top_banner.pack_propagate(False)
 
-        top_left = ctk.CTkFrame(self.top_banner, fg_color="transparent")
-        top_left.pack(side="left", padx=(15, 10), pady=4)
+        # Top Row: Operative Info (Left) + Cloud Sync Status (Right)
+        top_status_row = ctk.CTkFrame(self.top_banner, fg_color="transparent")
+        top_status_row.pack(fill="x", padx=14, pady=(5, 2))
 
         self.lbl_op_title = ctk.CTkLabel(
-            top_left,
+            top_status_row,
             text=t("war_op_title", name="-"),
-            font=(FONT_FAMILY, 13, "bold"),
+            font=(FONT_FAMILY, 12, "bold"),
             text_color=COLOR_TEXT_MAIN,
         )
-        self.lbl_op_title.pack(anchor="w")
+        self.lbl_op_title.pack(side="left")
         self.lbl_op_name = self.lbl_op_title
 
         self.lbl_op_sub = ctk.CTkLabel(
-            top_left,
-            text=t("war_op_sub"),
+            top_status_row,
+            text=f"• {t('war_op_sub')}",
             font=(FONT_FAMILY, 10),
             text_color="#64748B",
         )
-        self.lbl_op_sub.pack(anchor="w")
+        self.lbl_op_sub.pack(side="left", padx=(8, 0))
 
-        # Top Center: Board Coordinate Input (พิกัดบนกระดานที่ user เป็นคนกรอก)
+        self.lbl_sync_time = ctk.CTkLabel(
+            top_status_row,
+            text=t("war_sync_ready"),
+            font=(FONT_FAMILY, 10, "bold"),
+            text_color=COLOR_TEXT_SUB,
+        )
+        self.lbl_sync_time.pack(side="right")
+
+        # Bottom Row: Board Coordinate Input Toolbar
         self.coord_frame = ctk.CTkFrame(self.top_banner, fg_color="transparent")
-        self.coord_frame.pack(side="left", padx=(15, 0), pady=4)
+        self.coord_frame.pack(fill="x", padx=14, pady=(0, 5))
 
         self.lbl_coord_title = ctk.CTkLabel(
             self.coord_frame,
@@ -244,18 +253,6 @@ class WarDashboardFrame(ctk.CTkFrame):
         self._setup_coord_entry_support()
         if hasattr(self.war_service, "target_coord"):
             self.set_active_slot_ui(getattr(self.war_service.target_coord, "slot", 1))
-
-        # Top Right: Firebase Sync Status
-        top_right = ctk.CTkFrame(self.top_banner, fg_color="transparent")
-        top_right.pack(side="right", padx=15, pady=4)
-
-        self.lbl_sync_time = ctk.CTkLabel(
-            top_right,
-            text=t("war_sync_ready"),
-            font=(FONT_FAMILY, 10, "bold"),
-            text_color=COLOR_TEXT_SUB,
-        )
-        self.lbl_sync_time.pack(anchor="e", pady=8)
 
         # 2. Main Content Grid (Left: Sidebar Menu, Right: Full Tracker Dashboard)
         self.main_split = ctk.CTkFrame(self, fg_color="transparent")
@@ -723,7 +720,7 @@ class WarDashboardFrame(ctk.CTkFrame):
             if hasattr(self, "lbl_op_title") and self.lbl_op_title.winfo_exists():
                 self.lbl_op_title.configure(text=t("war_op_title", name=op_name))
             if hasattr(self, "lbl_op_sub") and self.lbl_op_sub.winfo_exists():
-                self.lbl_op_sub.configure(text=t("war_op_sub"))
+                self.lbl_op_sub.configure(text=f"• {t('war_op_sub')}")
             if hasattr(self, "lbl_coord_title") and self.lbl_coord_title.winfo_exists():
                 self.lbl_coord_title.configure(text=t("war_coord_label"))
             if hasattr(self, "btn_paste_coord") and self.btn_paste_coord.winfo_exists():

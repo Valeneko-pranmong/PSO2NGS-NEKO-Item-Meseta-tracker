@@ -44,7 +44,7 @@ python installer/build_installer.py
 # หรือรันผ่าน Batch Script บน Windows
 build_installer.bat
 ```
-> **ผลลัพธ์:** ไฟล์ติดตั้ง `artifacts/release-v6.1.0/NekoTracker-Setup-v6.1.0.exe` พร้อมค่าแฮช `SHA256SUMS.txt`  
+> **ผลลัพธ์:** ไฟล์ติดตั้ง `artifacts/release-v7.1.0/NekoTracker-Setup-v7.1.0.exe` พร้อมค่าแฮช `SHA256SUMS.txt`  
 > **มาตรฐาน:** ถอดแบบตามมาตรฐานกลาง [`Doc/reference/INSTALLER_STANDARD.md`](../reference/INSTALLER_STANDARD.md) (Per-User `%LOCALAPPDATA%\NEKO FAMILY\NekoTracker`, Non-elevated `PrivilegesRequired=lowest`, บล็อก non-x64, และตัวโปรแกรมหลักคือ Python Tracker)
 
 ---
@@ -60,7 +60,7 @@ build_installer.bat
 | **ARKS War Subsystem** | `modules/war_mode/war_service.py`<br>`modules/war_mode/war_view.py` | จัดการข้อมูล Telemetry, คลาส `TargetCoord`, Smart Coordinate Parser, Background Sync Worker |
 | **Firebase Broadcaster** | `tools/firebase_war_sync.py` | ตัวส่งข้อมูลขึ้น Google Firebase Realtime Database รองรับทั้ง Admin SDK และ REST Fallback |
 | **Installer Pipeline** | `installer/build_installer.py`<br>`installer/NekoTracker.iss`<br>`installer/README.md`<br>`build_installer.bat` | ระบบคอมไพล์และสร้างชุดติดตั้ง Windows (Inno Setup 6) ตามมาตรฐานกลาง พร้อมทดสอบ Process Smoke อัตโนมัติ |
-| **Distribution Artifacts** | `artifacts/release-v6.1.0/` | โฟลเดอร์เก็บอาร์ติแฟกต์ทางการ (`NekoTracker-Setup-v6.1.0.exe`, `SHA256SUMS.txt`, `README.md`) |
+| **Distribution Artifacts** | `artifacts/release-v7.1.0/` | โฟลเดอร์เก็บอาร์ติแฟกต์ทางการ (`NekoTracker-Setup-v7.1.0.exe`, `SHA256SUMS.txt`, `README.md`) |
 | **Archived Auth** | `archive/legacy_auth/` | **[ห้ามแตะต้อง]** ซอร์สโค้ดระบบล็อกอินเดิมที่ปลดระวางแล้ว ห้ามนำกลับมา import เด็ดขาด |
 | **Archived WPF** | `archive/legacy_wpf/` | **[ห้ามแตะต้อง]** ซอร์สโค้ดเนทีฟ C# WPF และชุดทดสอบที่ยกเลิกการพัฒนาแล้ว ห้ามนำมาบิลด์ใน Production |
 

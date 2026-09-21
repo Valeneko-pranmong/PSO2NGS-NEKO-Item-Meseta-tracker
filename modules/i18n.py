@@ -57,6 +57,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "btn_overlay_full": "Item & Meseta",
         "btn_overlay_mini": "Meseta",
         "btn_discord": "DISCORD NEKO FAMILY",
+        "btn_uninstall": "Uninstall",
         "label_language": "Language",
 
         # Log Status & Folder Picker
@@ -164,6 +165,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "btn_overlay_full": "Item & Meseta",
         "btn_overlay_mini": "Meseta",
         "btn_discord": "DISCORD NEKO FAMILY",
+        "btn_uninstall": "ถอนการติดตั้ง",
         "label_language": "ภาษา",
 
         # Log Status & Folder Picker
@@ -271,6 +273,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "btn_overlay_full": "Item & Meseta",
         "btn_overlay_mini": "Meseta",
         "btn_discord": "DISCORD NEKO FAMILY",
+        "btn_uninstall": "アンインストール",
         "label_language": "言語",
 
         # Log Status & Folder Picker

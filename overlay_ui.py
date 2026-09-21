@@ -8,6 +8,8 @@ from modules.utils import (
     format_rate,
     format_duration,
     filter_and_sort_items,
+    WindowMover,
+    start_native_drag,
 )
 from modules.i18n import t
 from modules.event_bus import event_bus
@@ -31,6 +33,7 @@ class OverlayWindow(ctk.CTkToplevel):
 
         self.overrideredirect(True)
         self.attributes("-topmost", True)
+        self._window_mover = WindowMover(self)
         self._opacity_high = True
         self.attributes("-alpha", self.OPACITY_HIGH)
         self.configure(fg_color=COLOR_BG_MAIN)
@@ -393,10 +396,7 @@ class OverlayWindow(ctk.CTkToplevel):
             w.bind("<B1-Motion>", self.do_move)
 
     def start_move(self, event):
-        self._drag_offset_x = event.x_root - self.winfo_x()
-        self._drag_offset_y = event.y_root - self.winfo_y()
+        self._window_mover.start_move(event)
 
     def do_move(self, event):
-        x = event.x_root - self._drag_offset_x
-        y = event.y_root - self._drag_offset_y
-        self.geometry(f"+{x}+{y}")
+        self._window_mover.do_move(event)
