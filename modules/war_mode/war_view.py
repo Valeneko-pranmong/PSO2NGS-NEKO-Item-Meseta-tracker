@@ -104,7 +104,8 @@ class WarDashboardFrame(ctk.CTkFrame):
         t_val = timestamp or time.time()
         t_str = time.strftime("%H:%M:%S", time.localtime(t_val))
         if success:
-            contrib = contribution if contribution > 0 else getattr(self.war_service, "session_contribution", 0)
+            active_val = max(getattr(self.war_service, "total_farmed", 0), getattr(self.war_service, "session_contribution", 0))
+            contrib = contribution if contribution > 0 else active_val
             self._last_display_contrib = contrib
             new_text = t("war_synced", time=t_str, contrib=f"{contrib:,}")
             new_color = "#10B981"
@@ -915,7 +916,7 @@ class WarDashboardFrame(ctk.CTkFrame):
                 if getattr(self, "_last_display_contrib", None) is not None:
                     display_contrib = self._last_display_contrib
                 else:
-                    display_contrib = getattr(self.war_service, "session_contribution", 0)
+                    display_contrib = max(getattr(self.war_service, "total_farmed", 0), getattr(self.war_service, "session_contribution", 0))
                 new_text = t("war_synced", time=t_str, contrib=f"{display_contrib:,}")
                 if self.lbl_sync_time.cget("text") != new_text or self.lbl_sync_time.cget("text_color") != "#10B981":
                     self.lbl_sync_time.configure(
@@ -938,8 +939,9 @@ class WarDashboardFrame(ctk.CTkFrame):
         color = "#10B981" if success else "#EF4444"
         now_str = time.strftime("%H:%M:%S")
         if success:
+            active_c = max(getattr(self.war_service, "total_farmed", 0), getattr(self.war_service, "session_contribution", 0))
             self.lbl_sync_time.configure(
-                text=t("war_synced", time=now_str, contrib=f"{self.war_service.session_contribution:,}"),
+                text=t("war_synced", time=now_str, contrib=f"{active_c:,}"),
                 text_color=color,
             )
         else:

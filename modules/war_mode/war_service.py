@@ -52,63 +52,7 @@ except Exception:
     REVOKED_VERSIONS = ["7.0.0-alpha", "7.0.0"]
 
 
-def parse_semver(v: str) -> Tuple[int, int, int, str]:
-    """Parse semantic version string into (major, minor, patch, pre_release)."""
-    if not v or not isinstance(v, str):
-        return (0, 0, 0, "")
-    clean = v.strip().lstrip("vV").strip()
-    pre = ""
-    if "-" in clean:
-        parts_pre = clean.split("-", 1)
-        clean = parts_pre[0].strip()
-        pre = parts_pre[1].strip()
-    nums = clean.split(".")
-    major = int(nums[0]) if len(nums) > 0 and nums[0].isdigit() else 0
-    minor = int(nums[1]) if len(nums) > 1 and nums[1].isdigit() else 0
-    patch = int(nums[2]) if len(nums) > 2 and nums[2].isdigit() else 0
-    return (major, minor, patch, pre)
-
-
-def compare_semver(v1: str, v2: str) -> int:
-    """
-    Compare two semantic version strings.
-    Returns: -1 if v1 < v2, 0 if equal, 1 if v1 > v2.
-    Pre-release versions (e.g. 7.0.0-alpha) have lower precedence than core release.
-    """
-    p1 = parse_semver(v1)
-    p2 = parse_semver(v2)
-    if p1[:3] > p2[:3]:
-        return 1
-    if p1[:3] < p2[:3]:
-        return -1
-    if p1[3] and not p2[3]:
-        return -1
-    if not p1[3] and p2[3]:
-        return 1
-    if p1[3] and p2[3]:
-        if p1[3] < p2[3]:
-            return -1
-        if p1[3] > p2[3]:
-            return 1
-    return 0
-
-
-def is_version_secure(
-    version: str,
-    min_version: str = MIN_SECURE_VERSION,
-    revoked_versions: Optional[Any] = None,
-) -> bool:
-    """
-    Verify client version against security policy.
-    Rejects revoked versions (e.g. 7.0.0-alpha) and versions below MIN_SECURE_VERSION.
-    """
-    if not version or not isinstance(version, str):
-        return False
-    v_clean = version.strip().lower().lstrip("v").strip()
-    rev_set = {r.lower().lstrip("v").strip() for r in (revoked_versions or REVOKED_VERSIONS)}
-    if v_clean in rev_set:
-        return False
-    return compare_semver(version, min_version) >= 0
+from modules.version import parse_semver, compare_semver, is_version_secure
 
 # Canonical landmark coordinates for ARKS galaxy presets
 LANDMARK_COORDINATES: Dict[str, Dict[str, Any]] = {
@@ -242,6 +186,7 @@ class WarService:
         self.first_farming_time: Optional[float] = None
         self.war_logs: List[Dict[str, Any]] = []
         self._logs_lock = threading.Lock()
+        self._state_lock = threading.RLock()
 
         # Remote Version Control Policy (Dynamic Firebase RTDB Sync)
         self.remote_policy: Dict[str, Any] = {}
@@ -264,6 +209,9 @@ class WarService:
         self._last_sync_time: float = 0.0
         self._last_sync_status: Tuple[bool, str] = (True, "พร้อมทำงาน")
         self._last_logged_contribution: int = 0
+        self._last_synced_coord_key: Optional[str] = None
+        self._last_synced_slot: Optional[int] = None
+        self._last_synced_operative: Optional[str] = None
         self._sync_lock = threading.Lock()
         self._sync_event = threading.Event()
         self._stop_event = threading.Event()
@@ -292,10 +240,11 @@ class WarService:
     def on_tamper_violation(self, violation: Any = None, **kwargs) -> None:
         """Handles anti-tamper violation events from tracker engine."""
         if violation:
-            self.tamper_violations_count += 1
             is_fatal = getattr(violation, "is_fatal", True)
-            if is_fatal:
-                self.is_tamper_compromised = True
+            with self._state_lock:
+                self.tamper_violations_count += 1
+                if is_fatal:
+                    self.is_tamper_compromised = True
             msg = f"🛡️ [ANTI-TAMPER] {getattr(violation, 'message', str(violation))}"
             self.add_log(msg, "warning" if not is_fatal else "danger")
             if is_fatal:
@@ -303,8 +252,10 @@ class WarService:
 
     def on_character_detected(self, character_name: str = "", player_id: str = "", **kwargs) -> None:
         if character_name and character_name != self.operative_name:
-            self.operative_name = character_name
+            with self._state_lock:
+                self.operative_name = character_name
             self.add_log(f"ตรวจพบชื่อในเกมจาก Log (Primary Key): {character_name}", "info")
+            self._load_saved_stats()
             self._save_stats()
             self.trigger_realtime_sync()
 
@@ -402,17 +353,24 @@ class WarService:
         if slot is not None and 1 <= slot <= 4:
             parsed = TargetCoord(parsed.x, parsed.y, slot)
 
-        if parsed != self.target_coord:
-            self.target_coord = parsed
-            gx, gy, cslot = parsed.x, parsed.y, parsed.slot
-            slot_label = parsed.slot_label
+        with self._state_lock:
+            if parsed != self.target_coord:
+                self.target_coord = parsed
+                gx, gy, cslot = parsed.x, parsed.y, parsed.slot
+                slot_label = parsed.slot_label
+                changed = True
+            else:
+                changed = False
+
+        if changed:
             self.add_log(f"อัปเดตพิกัดบนกระดานเป็น [{gx}, {gy}] ช่อง #{cslot} ({slot_label})", "info")
             self._save_stats()
             self.trigger_realtime_sync()
         return self.target_coord
 
     def set_operative(self, name: str, *args: Any, **kwargs: Any) -> None:
-        self.operative_name = name or "Operative"
+        with self._state_lock:
+            self.operative_name = name or "Operative"
         self._load_saved_stats()
         self.trigger_realtime_sync()
 
@@ -438,34 +396,38 @@ class WarService:
 
     def on_meseta_earned(self, amount: int, wallet: int = 0, sequence_number: int = -1, **kwargs) -> None:
         if amount > 0:
-            if self.is_tamper_compromised:
-                return
-            # Sequence deduplication guard: ignore replayed or duplicated sequence numbers
-            if sequence_number >= 0:
-                if self._last_processed_sequence >= 0 and sequence_number <= self._last_processed_sequence:
+            with self._state_lock:
+                if self.is_tamper_compromised:
                     return
-                self._last_processed_sequence = sequence_number
+                # Sequence deduplication guard: ignore replayed or duplicated sequence numbers
+                if sequence_number >= 0:
+                    if self._last_processed_sequence >= 0 and sequence_number <= self._last_processed_sequence:
+                        return
+                    self._last_processed_sequence = sequence_number
 
-            if self.first_farming_time is None:
-                self.first_farming_time = time.time()
-            self.session_contribution += amount
-            self.total_farmed += amount
-            gx, gy, slot = self.target_coord.x, self.target_coord.y, self.target_coord.slot
+                if self.first_farming_time is None:
+                    self.first_farming_time = time.time()
+                self.session_contribution += amount
+                self.total_farmed += amount
+                gx, gy, slot = self.target_coord.x, self.target_coord.y, self.target_coord.slot
+                current_contrib = self.session_contribution
+
             self.add_log(
-                f"+{amount:,} ℳ พิกัด [{gx}, {gy}] #{slot} (ยอดสะสม: {self.session_contribution:,} ℳ)",
+                f"+{amount:,} ℳ พิกัด [{gx}, {gy}] #{slot} (ยอดสะสม: {current_contrib:,} ℳ)",
                 "income",
             )
             self._save_stats()
             self.trigger_realtime_sync()
 
     def on_tracker_reset(self) -> None:
-        self.session_contribution = 0
-        self.session_start_time = time.time()
-        self.first_farming_time = None
-        self._last_logged_contribution = max(self.total_farmed, 0)
-        self._last_processed_sequence = -1
-        self.is_tamper_compromised = False
-        self.tamper_violations_count = 0
+        with self._state_lock:
+            self.session_contribution = 0
+            self.session_start_time = time.time()
+            self.first_farming_time = None
+            self._last_logged_contribution = max(self.total_farmed, 0)
+            self._last_processed_sequence = -1
+            self.is_tamper_compromised = False
+            self.tamper_violations_count = 0
         self.add_log("รีเซ็ตสถิติรอบการฟาร์ม (คงสถานะความคืบหน้ากระดานสงคราม)", "reset")
         self._save_stats()
         self.trigger_realtime_sync()
@@ -492,14 +454,16 @@ class WarService:
         Applies a minimum duration floor (30s) to prevent erratic spikes.
         Returns 0.0 if session is compromised or client version is insecure.
         """
-        if self.is_tamper_compromised or not self.is_version_secure():
-            return 0.0
-        if self.session_contribution <= 0:
-            return 0.0
+        with self._state_lock:
+            if self.is_tamper_compromised or not self.is_version_secure():
+                return 0.0
+            if self.session_contribution <= 0:
+                return 0.0
 
-        ref_time = self.first_farming_time or self.session_start_time
+            ref_time = self.first_farming_time or self.session_start_time
+            contrib = self.session_contribution
         duration = time.time() - ref_time
-        return calculate_live_rate(self.session_contribution, duration, min_smoothing_seconds=30.0)
+        return calculate_live_rate(contrib, duration, min_smoothing_seconds=30.0)
 
     def fetch_remote_version_policy(self, timeout: float = 3.0) -> Dict[str, Any]:
         """
@@ -610,49 +574,51 @@ class WarService:
         - slot: 1-4
         - lastUpdated: Unix timestamp in ms
         """
-        gx, gy, slot = self.target_coord.x, self.target_coord.y, self.target_coord.slot
-        now_ms = int(time.time() * 1000)
-        is_secure = self.is_version_secure() and not self.is_tamper_compromised
+        with self._state_lock:
+            gx, gy, slot = self.target_coord.x, self.target_coord.y, self.target_coord.slot
+            now_ms = int(time.time() * 1000)
+            is_secure = self.is_version_secure() and not self.is_tamper_compromised
 
-        # Security gate: Insecure/revoked versions or compromised tamper do NOT count meseta.
-        # Preserve board meseta across session resets using cumulative total_farmed.
-        effective_meseta = max(self.total_farmed, self.session_contribution)
-        counted_meseta = effective_meseta if is_secure else 0
-        if self.is_tamper_compromised:
-            sec_status = "TAMPER_COMPROMISED"
-        elif is_secure:
-            sec_status = "SECURE"
-        else:
-            sec_status = "REVOKED_VERSION_INSECURE"
+            # Security gate: Insecure/revoked versions or compromised tamper do NOT count meseta.
+            # Preserve board meseta across session resets using cumulative total_farmed.
+            effective_meseta = max(self.total_farmed, self.session_contribution)
+            counted_meseta = effective_meseta if is_secure else 0
+            if self.is_tamper_compromised:
+                sec_status = "TAMPER_COMPROMISED"
+            elif is_secure:
+                sec_status = "SECURE"
+            else:
+                sec_status = "REVOKED_VERSION_INSECURE"
 
-        rate_mhr = round(self.get_live_rate()) if is_secure else 0
+            rate_mhr = round(self.get_live_rate()) if is_secure else 0
 
-        return {
-            "character_name": self.operative_name,
-            "meseta": counted_meseta,
-            "raw_meseta": effective_meseta,
-            "session_meseta": self.session_contribution,
-            "total_farmed": self.total_farmed,
-            "client_version": self.client_version,
-            "version": self.client_version,
-            "app_version": self.client_version,
-            "security_status": sec_status,
-            "version_security_valid": is_secure,
-            "sector_coord": {"x": gx, "y": gy, "slot": slot},
-            "target_coord": {"x": gx, "y": gy, "slot": slot},
-            "coord_key": f"{gx},{gy}",
-            "slot": slot,
-            "lastUpdated": now_ms,
-            "farming_rate_mhr": rate_mhr,
-            "farmingRateMhr": rate_mhr,
-            "meseta_per_hour": rate_mhr,
-            "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "timestamp": now_ms,
-        }
+            return {
+                "character_name": self.operative_name,
+                "meseta": counted_meseta,
+                "raw_meseta": effective_meseta,
+                "session_meseta": self.session_contribution,
+                "total_farmed": self.total_farmed,
+                "client_version": self.client_version,
+                "version": self.client_version,
+                "app_version": self.client_version,
+                "security_status": sec_status,
+                "version_security_valid": is_secure,
+                "sector_coord": {"x": gx, "y": gy, "slot": slot},
+                "target_coord": {"x": gx, "y": gy, "slot": slot},
+                "coord_key": f"{gx},{gy}",
+                "slot": slot,
+                "lastUpdated": now_ms,
+                "farming_rate_mhr": rate_mhr,
+                "farmingRateMhr": rate_mhr,
+                "meseta_per_hour": rate_mhr,
+                "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "timestamp": now_ms,
+            }
 
     def trigger_realtime_sync(self, force: bool = False) -> None:
         """Queue or immediately signal a realtime sync event."""
-        self._is_dirty = True
+        with self._state_lock:
+            self._is_dirty = True
         if not self.realtime_sync_enabled and not force:
             return
         self._sync_event.set()
@@ -661,49 +627,57 @@ class WarService:
         """Background thread that executes non-blocking realtime syncs with debouncing."""
         min_cooldown = 1.2  # Cooldown between consecutive cloud sync cycles to prevent rapid thrashing
         while not self._stop_event.is_set():
-            woken_by_event = self._sync_event.wait(timeout=self.sync_heartbeat_interval)
-            if self._stop_event.is_set():
-                break
-
-            if woken_by_event:
-                self._sync_event.clear()
-                # Trailing-edge debounce: wait for rapid consecutive events to settle
-                debounce_start = time.time()
-                while not self._stop_event.is_set():
-                    new_event = self._sync_event.wait(timeout=self.sync_debounce_seconds)
-                    if not new_event or (time.time() - debounce_start >= 1.5):
-                        self._sync_event.clear()
-                        break
-                    self._sync_event.clear()
-
-            # Enforce cooldown since last sync completion to avoid rapid back-to-back network churn
-            elapsed_since_last = time.time() - self._last_sync_time
-            if elapsed_since_last < min_cooldown:
-                wait_needed = min_cooldown - elapsed_since_last
-                if self._stop_event.wait(timeout=wait_needed):
+            try:
+                woken_by_event = self._sync_event.wait(timeout=self.sync_heartbeat_interval)
+                if self._stop_event.is_set():
                     break
 
-            now = time.time()
-            time_since_sync = now - self._last_sync_time
-            has_activity = (self.session_contribution > 0 or self.operative_name != "Operative")
-            needs_heartbeat = has_activity and (time_since_sync >= self.sync_heartbeat_interval)
+                if woken_by_event:
+                    self._sync_event.clear()
+                    # Trailing-edge debounce: wait for rapid consecutive events to settle
+                    debounce_start = time.time()
+                    while not self._stop_event.is_set():
+                        new_event = self._sync_event.wait(timeout=self.sync_debounce_seconds)
+                        if not new_event or (time.time() - debounce_start >= 1.5):
+                            self._sync_event.clear()
+                            break
+                        self._sync_event.clear()
 
-            if self.realtime_sync_enabled and (self._is_dirty or needs_heartbeat):
-                is_heartbeat = (not self._is_dirty and needs_heartbeat)
-                self._execute_realtime_cycle(is_heartbeat=is_heartbeat)
+                # Enforce cooldown since last sync completion to avoid rapid back-to-back network churn
+                elapsed_since_last = time.time() - self._last_sync_time
+                if elapsed_since_last < min_cooldown:
+                    wait_needed = min_cooldown - elapsed_since_last
+                    if self._stop_event.wait(timeout=wait_needed):
+                        break
+
+                now = time.time()
+                time_since_sync = now - self._last_sync_time
+                with self._state_lock:
+                    is_dirty = self._is_dirty
+                    has_activity = (self.session_contribution > 0 or self.total_farmed > 0 or self.operative_name != "Operative")
+                needs_heartbeat = has_activity and (time_since_sync >= self.sync_heartbeat_interval)
+
+                if self.realtime_sync_enabled and (is_dirty or needs_heartbeat):
+                    is_heartbeat = (not is_dirty and needs_heartbeat)
+                    self._execute_realtime_cycle(is_heartbeat=is_heartbeat)
+            except Exception as loop_exc:
+                print(f"[WarService] Realtime sync worker loop exception: {loop_exc}")
+                time.sleep(1.0)
 
     def _execute_realtime_cycle(self, is_heartbeat: bool = False) -> Tuple[bool, str]:
         """Execute one complete telemetry sync cycle under lock."""
         with self._sync_lock:
-            self._is_dirty = False
-            self._is_syncing = True
+            with self._state_lock:
+                self._is_dirty = False
+                self._is_syncing = True
             if not is_heartbeat:
                 self.event_bus.emit("realtime_sync_started")
             try:
                 ok, msg = self.sync_to_war_room()
                 self._last_sync_time = time.time()
                 self._last_sync_status = (ok, msg)
-                active_contrib = max(self.total_farmed, self.session_contribution)
+                with self._state_lock:
+                    active_contrib = max(self.total_farmed, self.session_contribution)
                 if not is_heartbeat:
                     self.event_bus.emit(
                         "realtime_sync_completed",
@@ -715,7 +689,8 @@ class WarService:
                 return ok, msg
             except Exception as exc:
                 self._last_sync_status = (False, str(exc))
-                active_contrib = max(self.total_farmed, self.session_contribution)
+                with self._state_lock:
+                    active_contrib = max(self.total_farmed, self.session_contribution)
                 if not is_heartbeat:
                     self.event_bus.emit(
                         "realtime_sync_completed",
@@ -726,7 +701,8 @@ class WarService:
                     )
                 return False, str(exc)
             finally:
-                self._is_syncing = False
+                with self._state_lock:
+                    self._is_syncing = False
 
     def stop(self) -> None:
         """Cleanly stop background realtime sync worker and unsubscribe."""
@@ -827,6 +803,59 @@ class WarService:
             "meseta_per_hour": rate_mhr,
             "lastUpdated": now_ms,
         }
+
+        # Check if operative relocated from a previously synced coordinate or slot
+        if self._last_synced_operative and self._last_synced_operative != char_name:
+            self._last_synced_coord_key = None
+            self._last_synced_slot = None
+
+        relocated_from = None
+        if self._last_synced_coord_key and self._last_synced_slot:
+            if (self._last_synced_coord_key != coord_key) or (self._last_synced_slot != slot):
+                relocated_from = (self._last_synced_coord_key, self._last_synced_slot)
+
+        if relocated_from:
+            old_ck, old_sl = relocated_from
+            departed_payload = {
+                "character_name": char_name,
+                "meseta": 0,
+                "raw_meseta": 0,
+                "farming_rate_mhr": 0,
+                "farmingRateMhr": 0,
+                "meseta_per_hour": 0,
+                "client_version": client_ver,
+                "security_status": "SECURE",
+                "status": "departed",
+                "lastUpdated": now_ms,
+            }
+            # Clear old sub-cell challenger
+            url_old_sub = f"{base_url}/arks_war_room/sectors/{urllib.parse.quote(old_ck)}/sub_cells/{old_sl}/challengers/{urllib.parse.quote(safe_key)}.json"
+            try:
+                req_old_sub = urllib.request.Request(
+                    url_old_sub,
+                    data=json.dumps(departed_payload).encode("utf-8"),
+                    headers={"Content-Type": "application/json", "User-Agent": f"NEKOTracker/{client_ver}"},
+                    method="PUT",
+                )
+                with urllib.request.urlopen(req_old_sub, timeout=min(2.0, timeout)) as resp:
+                    pass
+            except Exception:
+                pass
+
+            # If sector changed, also clear old sector-level challenger
+            if old_ck != coord_key:
+                url_old_sec = f"{base_url}/arks_war_room/sectors/{urllib.parse.quote(old_ck)}/challengers/{urllib.parse.quote(safe_key)}.json"
+                try:
+                    req_old_sec = urllib.request.Request(
+                        url_old_sec,
+                        data=json.dumps(departed_payload).encode("utf-8"),
+                        headers={"Content-Type": "application/json", "User-Agent": f"NEKOTracker/{client_ver}"},
+                        method="PUT",
+                    )
+                    with urllib.request.urlopen(req_old_sec, timeout=min(2.0, timeout)) as resp:
+                        pass
+                except Exception:
+                    pass
 
         try:
             # Multi-Path Atomic Update Optimization for Firebase RTDB
@@ -935,10 +964,14 @@ class WarService:
                 return False, f"ไคลเอนต์เวอร์ชัน {client_ver} มีช่องโหว่ความปลอดภัย ยอดเงินจะไม่ถูกนับเข้าสู่ฐานข้อมูล (กรุณาอัปเดตเป็น 7.1.0)"
 
             # 5. Add to live war logs when contribution increases
-            current_contrib = max(self.total_farmed, self.session_contribution)
-            if current_contrib > self._last_logged_contribution:
-                gain = current_contrib - self._last_logged_contribution
-                self._last_logged_contribution = current_contrib
+            with self._state_lock:
+                current_contrib = max(self.total_farmed, self.session_contribution)
+                if current_contrib > self._last_logged_contribution:
+                    gain = current_contrib - self._last_logged_contribution
+                    self._last_logged_contribution = current_contrib
+                else:
+                    gain = 0
+            if gain > 0:
                 gx, gy, cslot = self.target_coord.x, self.target_coord.y, self.target_coord.slot
                 log_entry = {
                     "time": time.strftime("%H:%M:%S"),
@@ -968,6 +1001,9 @@ class WarService:
                 except Exception:
                     pass
 
+            self._last_synced_coord_key = coord_key
+            self._last_synced_slot = slot
+            self._last_synced_operative = char_name
             return True, "ส่งข้อมูลขึ้นระบบคลาวด์สำเร็จ"
         except Exception as exc:
             return False, f"Cloud Sync Error: {exc}"
@@ -1070,13 +1106,25 @@ class WarService:
     def _save_stats(self) -> None:
         try:
             os.makedirs(os.path.dirname(self.stats_file), exist_ok=True)
-            data = {
-                "operative_name": self.operative_name,
-                "target_coord": list(self.target_coord),
-                "session_contribution": self.session_contribution,
-                "total_farmed": self.total_farmed,
-                "last_active": time.time(),
-            }
+            # Do not overwrite real character data with placeholder Operative
+            if self.operative_name == "Operative" and os.path.exists(self.stats_file):
+                try:
+                    with open(self.stats_file, "r", encoding="utf-8") as rf:
+                        existing = json.load(rf)
+                        existing_op = str(existing.get("operative_name", "")).strip()
+                        if existing_op and existing_op != "Operative":
+                            return
+                except Exception:
+                    pass
+
+            with self._state_lock:
+                data = {
+                    "operative_name": self.operative_name,
+                    "target_coord": list(self.target_coord),
+                    "session_contribution": self.session_contribution,
+                    "total_farmed": self.total_farmed,
+                    "last_active": time.time(),
+                }
             with open(self.stats_file, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
         except Exception as exc:
@@ -1088,14 +1136,19 @@ class WarService:
         try:
             with open(self.stats_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                if data.get("operative_name") == self.operative_name:
-                    self.total_farmed = data.get("total_farmed", 0)
-                    saved_session = data.get("session_contribution", 0)
-                    if saved_session > 0:
-                        self.session_contribution = saved_session
-                    elif self.session_contribution == 0 and self.total_farmed > 0:
-                        self.session_contribution = self.total_farmed
-                if "target_coord" in data:
+                saved_op = str(data.get("operative_name", "")).strip()
+                # If current operative_name is placeholder "Operative" and saved file has a named operative, adopt it!
+                if self.operative_name == "Operative" and saved_op and saved_op != "Operative":
+                    with self._state_lock:
+                        self.operative_name = saved_op
+
+                if data.get("operative_name") == self.operative_name or (self.operative_name == "Operative" and not saved_op):
+                    saved_total = int(data.get("total_farmed", 0) or 0)
+                    with self._state_lock:
+                        self.total_farmed = saved_total
+                # Only adopt saved target_coord if current target_coord is still at default (0, 0, 1)
+                # to prevent stomping on user-selected coordinates when loading stats.
+                if "target_coord" in data and self.target_coord == TargetCoord(0, 0, 1):
                     self.target_coord = self.parse_coordinate(data.get("target_coord"))
         except Exception as exc:
             print(f"[WarService] Failed loading war stats: {exc}")

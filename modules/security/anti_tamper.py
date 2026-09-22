@@ -183,15 +183,11 @@ class AntiTamperGuard:
             # 2. File Handle & Game Ownership Check
             if self.enforce_file_handle_validation:
                 is_held = self.file_handle_validator.is_file_held_by_game(file_path)
-                game_running = (
-                    self.process_validator.is_game_process_running()
-                    if self.process_validator
-                    else False
-                )
-                if not is_held and not game_running:
+                if not is_held:
                     violation = TamperViolation(
                         TamperViolationType.FILE_NOT_LOCKED_BY_GAME,
                         f"Log file '{os.path.basename(file_path)}' is not locked/opened by PSO2 game process. Suspected offline or fake log injection.",
+                        is_fatal=True,
                     )
                     self._record_violation(violation)
                     return False
@@ -223,7 +219,7 @@ class AntiTamperGuard:
 
         # Gate 0. Client Version Security Gate
         if self.enforce_version_validation:
-            from modules.war_mode.war_service import is_version_secure
+            from modules.version import is_version_secure
 
             if not is_version_secure(self.active_version):
                 self._record_violation(

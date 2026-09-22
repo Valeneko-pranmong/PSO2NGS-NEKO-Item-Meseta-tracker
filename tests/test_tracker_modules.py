@@ -1229,5 +1229,271 @@ def test_single_instance_guard():
     guard.release()
 
 
+def test_version_module_dry_extraction():
+    """
+    Regression test: Verifies DRY consolidation of semver and version security logic
+    into canonical `modules.version` without code duplication across modules.
+    """
+    import modules.version as mv
+    from modules.war_mode.war_service import (
+        parse_semver as ws_parse,
+        compare_semver as ws_comp,
+        is_version_secure as ws_sec,
+    )
+    from tools.firebase_war_sync import (
+        parse_semver as fb_parse,
+        compare_semver as fb_comp,
+        is_version_secure as fb_sec,
+    )
+
+    # Functions must be canonical singletons imported from modules.version
+    assert ws_parse is mv.parse_semver
+    assert ws_comp is mv.compare_semver
+    assert ws_sec is mv.is_version_secure
+
+    assert fb_parse is mv.parse_semver
+    assert fb_comp is mv.compare_semver
+    assert fb_sec is mv.is_version_secure
+
+    # Correct semver semantics
+    assert mv.parse_semver("7.1.0") == (7, 1, 0, "")
+    assert mv.compare_semver("7.1.0", "7.0.0") == 1
+    assert mv.compare_semver("7.0.0-alpha", "7.0.0") == -1
+    assert mv.is_version_secure("7.1.0") is True
+    assert mv.is_version_secure("7.0.0-alpha") is False
+
+
+def test_firebase_broadcaster_rest_failure_logging_and_return_false(caplog):
+    """
+    Regression test: Verifies that REST sync failures in ARKSFirebaseBroadcaster
+    are logged at WARNING/ERROR level and return False instead of silently swallowing.
+    """
+    import logging
+    from unittest.mock import patch
+    import urllib.error
+    from tools.firebase_war_sync import ARKSFirebaseBroadcaster
+
+    broadcaster = ARKSFirebaseBroadcaster(
+        database_url="https://mock-test-fail-rtdb.firebaseio.com"
+    )
+
+    with caplog.at_level(logging.WARNING):
+        # Simulate network timeout / error on urllib.request.urlopen
+        with patch("urllib.request.urlopen", side_effect=urllib.error.URLError("Connection refused")):
+            ok = broadcaster.sync_operative_sector(
+                character_name="FailTestHero",
+                meseta=5_000_000,
+                sector_x=0,
+                sector_y=0,
+                slot=1,
+                client_version="7.1.0",
+            )
+            # Must return False on network error
+            assert ok is False, "Broadcaster sync must return False when network write fails!"
+
+        # Must log warning/error about failure
+        warning_records = [r for r in caplog.records if r.levelno >= logging.WARNING]
+        assert len(warning_records) > 0, "Network failure must be logged as WARNING/ERROR instead of swallowed silently!"
+        assert any("Connection refused" in r.message or "Firebase" in r.message or "PATCH" in r.message for r in warning_records)
+
+
+def test_war_service_concurrent_thread_safety_and_atomic_state():
+    """
+    Regression test: Verifies thread-safety in WarService during concurrent meseta drops,
+    telemetry payload reads, live rate queries, and sequence deduplication.
+    """
+    import threading
+    from modules.war_mode.war_service import WarService
+
+    war = WarService(realtime_sync=False)
+    war.set_operative("ThreadSafeHero")
+    war.set_target_coord("2, 3, 1")
+
+    errors = []
+
+    def earner_thread(start_seq, count, drop_amt):
+        try:
+            for i in range(count):
+                seq = start_seq + i
+                war.on_meseta_earned(drop_amt, sequence_number=seq)
+                # Intentionally attempt a duplicate sequence
+                war.on_meseta_earned(drop_amt, sequence_number=seq)
+        except Exception as exc:
+            errors.append(exc)
+
+    def reader_thread(count):
+        try:
+            for _ in range(count):
+                _ = war.get_database_payload()
+                _ = war.get_live_rate()
+                war.trigger_realtime_sync()
+        except Exception as exc:
+            errors.append(exc)
+
+    # Launch concurrent earners and readers
+    t1 = threading.Thread(target=earner_thread, args=(100, 50, 1000))
+    t2 = threading.Thread(target=earner_thread, args=(200, 50, 2000))
+    t3 = threading.Thread(target=reader_thread, args=(100,))
+
+    t1.start()
+    t2.start()
+    t3.start()
+
+    t1.join()
+    t2.join()
+    t3.join()
+
+    war.stop()
+
+    assert len(errors) == 0, f"Concurrent execution produced errors: {errors}"
+    assert war.total_farmed > 0
+    assert hasattr(war, "_state_lock"), "WarService must provide _state_lock for atomic thread synchronization!"
+
+
+def test_war_service_on_character_detected_preserves_saved_stats(tmp_path):
+    """
+    Regression test: Verifies that on_character_detected does not clobber
+    pre-existing on-disk total_farmed with 0 upon app startup or character switch.
+    """
+    from modules.war_mode.war_service import WarService
+    import json
+
+    test_appdata = tmp_path / "appdata"
+    test_appdata.mkdir(parents=True, exist_ok=True)
+    stats_path = str(test_appdata / "war_stats.json")
+    with open(stats_path, "w", encoding="utf-8") as f:
+        json.dump({
+            "operative_name": "Vale3neko",
+            "target_coord": [0, 0, 1],
+            "session_contribution": 25000000,
+            "total_farmed": 25000000,
+            "last_active": 12345.0
+        }, f)
+
+    war = WarService(stats_file=stats_path, realtime_sync=False)
+    # WarService should immediately adopt operative name and stats
+    assert war.operative_name == "Vale3neko"
+    assert war.total_farmed == 25000000
+
+    # Trigger on_character_detected
+    war.on_character_detected(character_name="Vale3neko")
+    assert war.total_farmed == 25000000
+
+    # Ensure file on disk was NOT wiped to 0
+    with open(stats_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    assert data["total_farmed"] == 25000000
+    assert data["operative_name"] == "Vale3neko"
+
+    war.stop()
+
+
+def test_war_service_placeholder_does_not_clobber_real_player(tmp_path):
+    """
+    Verifies that placeholder 'Operative' will not clobber real player stats on disk.
+    """
+    from modules.war_mode.war_service import WarService
+    import json
+
+    test_appdata = tmp_path / "appdata"
+    test_appdata.mkdir(parents=True, exist_ok=True)
+    stats_path = str(test_appdata / "war_stats.json")
+    with open(stats_path, "w", encoding="utf-8") as f:
+        json.dump({
+            "operative_name": "Vale3neko",
+            "target_coord": [0, 0, 1],
+            "session_contribution": 10000000,
+            "total_farmed": 10000000,
+            "last_active": 12345.0
+        }, f)
+
+    war = WarService(stats_file=stats_path, realtime_sync=False)
+    # War with default "Operative" cannot overwrite Vale3neko
+    war.operative_name = "Operative"
+    war.total_farmed = 0
+    war._save_stats()
+
+    with open(stats_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    assert data["operative_name"] == "Vale3neko"
+    assert data["total_farmed"] == 10000000
+
+    war.stop()
+
+
+def test_war_service_coordinate_switching_cleans_up_previous_slot(monkeypatch):
+    """
+    Regression test: Verifies that switching coordinates or slots triggers departure
+    cleanup for the previous sub-cell and sector, preventing duplicate ghost slots.
+    """
+    from modules.war_mode.war_service import WarService
+    import urllib.request
+    import json
+
+    war = WarService(realtime_sync=False)
+    war.set_operative("SwitchHero")
+    war.set_target_coord("0, 0, 1")
+    war.session_contribution = 100000
+
+    sent_requests = []
+
+    class MockResponse:
+        status = 200
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            pass
+        def read(self):
+            return b"{}"
+
+    def mock_urlopen(req, timeout=None):
+        sent_requests.append(req)
+        return MockResponse()
+
+    monkeypatch.setattr(urllib.request, "urlopen", mock_urlopen)
+
+    # 1. First sync at 0, 0, 1
+    ok, msg = war.sync_to_cloud_database()
+    assert ok is True
+    assert war._last_synced_coord_key == "0,0"
+    assert war._last_synced_slot == 1
+    sent_requests.clear()
+
+    # 2. Switch to 0, 0, 2 (same sector, different slot)
+    war.set_target_coord("0, 0, 2")
+    ok, msg = war.sync_to_cloud_database()
+    assert ok is True
+    assert war._last_synced_coord_key == "0,0"
+    assert war._last_synced_slot == 2
+
+    # Verify that a departure request was sent for slot 1
+    departed_urls = [r.full_url for r in sent_requests if "sub_cells/1/challengers" in r.full_url]
+    assert len(departed_urls) >= 1, "Must send departure update to old sub-cell 1"
+
+    # Verify data in departure request
+    dep_req = [r for r in sent_requests if "sub_cells/1/challengers" in r.full_url][0]
+    dep_body = json.loads(dep_req.data.decode("utf-8"))
+    assert dep_body["meseta"] == 0
+    assert dep_body["status"] == "departed"
+    sent_requests.clear()
+
+    # 3. Switch to 8, -2, 3 (different sector and slot)
+    war.set_target_coord("8, -2, 3")
+    ok, msg = war.sync_to_cloud_database()
+    assert ok is True
+    assert war._last_synced_coord_key == "8,-2"
+    assert war._last_synced_slot == 3
+
+    # Verify departure was sent for sub_cells/2 AND old sector 0,0
+    old_sub_urls = [r.full_url for r in sent_requests if "0%2C0/sub_cells/2/challengers" in r.full_url or "0,0/sub_cells/2/challengers" in r.full_url]
+    assert len(old_sub_urls) >= 1, "Must send departure update to old sub-cell 2"
+    old_sec_urls = [r.full_url for r in sent_requests if "sectors/0%2C0/challengers" in r.full_url or "sectors/0,0/challengers" in r.full_url]
+    assert len(old_sec_urls) >= 1, "Must send departure update to old sector 0,0"
+
+    war.stop()
+
+
+
+
 
 

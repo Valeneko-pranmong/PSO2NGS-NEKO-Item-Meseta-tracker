@@ -130,3 +130,44 @@ def test_start_native_drag_backwards_compatibility():
     """Verify start_native_drag safe backwards compatibility wrapper."""
     from modules.utils import start_native_drag
     assert start_native_drag(None) is False
+
+
+def test_window_position_persistence_and_monitor_support(tmp_path, monkeypatch, shared_app):
+    """Verify that window and overlay positions persist across restarts and respect monitor bounds."""
+    import json
+    from modules.utils import is_position_on_screen, get_secondary_monitor_origin, WindowMover
+    import config
+
+    cfg_file = tmp_path / "test_tracker_config.json"
+    monkeypatch.setattr("meseta_tracker.CONFIG_FILE", str(cfg_file))
+
+    app = shared_app
+    app.window_pos = {"x": 2100, "y": 150}
+    app.overlay_pos = {"x": 2200, "y": 80}
+    app.save_settings()
+
+    assert cfg_file.exists()
+    with open(cfg_file, "r", encoding="utf-8") as f:
+        saved = json.load(f)
+    assert saved.get("window_pos") == {"x": 2100, "y": 150}
+    assert saved.get("overlay_pos") == {"x": 2200, "y": 80}
+
+    # Test load_settings restoring positions
+    app.window_pos = None
+    app.overlay_pos = None
+    app.load_settings()
+    assert app.window_pos == {"x": 2100, "y": 150}
+    assert app.overlay_pos == {"x": 2200, "y": 80}
+
+    # Test is_position_on_screen helper
+    assert is_position_on_screen(100, 100) is True
+    # Test invalid / offscreen coordinates (e.g. -32000 minimized)
+    assert is_position_on_screen(-32000, -32000) is False
+
+    # Test WindowMover on_move_end callback
+    callback_called = []
+    mover = WindowMover(app, on_move_end=lambda x, y: callback_called.append((x, y)))
+    mover.end_move()
+    assert len(callback_called) == 1
+    assert isinstance(callback_called[0][0], int)
+

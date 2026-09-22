@@ -236,18 +236,19 @@ def test_config_persistence_of_language(tmp_path, monkeypatch):
 
     # Save Japanese config
     i18n.set_language("ja")
-    app = MagicMock()
-    app.watchlist_items = ["Arms Refiner II"]
-    app.log_folder = ""
-    app.board_coord = "0, 0, 1"
+    try:
+        app = MagicMock()
+        app.watchlist_items = ["Arms Refiner II"]
+        app.log_folder = ""
+        app.board_coord = "0, 0, 1"
 
-    from meseta_tracker import NGSTrackerApp
-    # Test save_settings directly
-    NGSTrackerApp.save_settings(app)
+        from meseta_tracker import NGSTrackerApp
+        # Test save_settings directly
+        NGSTrackerApp.save_settings(app)
 
-    with open(config_path, "r", encoding="utf-8") as f:
-        saved = json.load(f)
-    assert saved["language"] == "ja"
-
-    # Reset back to English
-    i18n.set_language("en")
+        with open(config_path, "r", encoding="utf-8") as f:
+            saved = json.load(f)
+        assert saved["language"] == "ja"
+    finally:
+        # Reset back to English
+        i18n.set_language("en")

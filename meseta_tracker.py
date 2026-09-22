@@ -19,7 +19,13 @@ from modules.event_bus import event_bus
 from modules.i18n import i18n, t, tr
 from modules.war_mode.war_service import WarService
 from modules.war_mode.war_view import WarDashboardFrame
-from modules.utils import extract_character_info, WindowMover, start_native_drag
+from modules.utils import (
+    extract_character_info,
+    WindowMover,
+    start_native_drag,
+    is_position_on_screen,
+    get_secondary_monitor_origin,
+)
 from modules.security import (
     AntiTamperGuard,
     TamperViolation,
@@ -52,7 +58,9 @@ class NGSTrackerApp(ctk.CTk):
         self.title(t("app_window_title"))
         self.configure(fg_color=COLOR_BG_MAIN) 
         self.setup_icon()
-        self._window_mover = WindowMover(self)
+        self.window_pos = None
+        self.overlay_pos = None
+        self._window_mover = WindowMover(self, on_move_end=self._on_window_moved)
         
         self.after(200, self.force_taskbar_icon)
 
@@ -296,6 +304,7 @@ class NGSTrackerApp(ctk.CTk):
                 icon_lbl.pack(side="left", padx=(15, 5), pady=5)
                 icon_lbl.bind("<ButtonPress-1>", self.start_move)
                 icon_lbl.bind("<B1-Motion>", self.do_move)
+                icon_lbl.bind("<ButtonRelease-1>", self.end_move)
                 icon_lbl.bind("<Double-Button-1>", self.toggle_maximize)
             except Exception:
                 pass
@@ -322,6 +331,7 @@ class NGSTrackerApp(ctk.CTk):
         self.version_label.pack(side="left", padx=(2, 6), pady=5)
         self.version_label.bind("<ButtonPress-1>", self.start_move)
         self.version_label.bind("<B1-Motion>", self.do_move)
+        self.version_label.bind("<ButtonRelease-1>", self.end_move)
         self.version_label.bind("<Double-Button-1>", self.toggle_maximize)
 
         self.test_mode_badge = ctk.CTkLabel(
@@ -371,9 +381,11 @@ class NGSTrackerApp(ctk.CTk):
 
         self.title_bar.bind("<ButtonPress-1>", self.start_move)
         self.title_bar.bind("<B1-Motion>", self.do_move)
+        self.title_bar.bind("<ButtonRelease-1>", self.end_move)
         self.title_bar.bind("<Double-Button-1>", self.toggle_maximize)
         self.title_label.bind("<ButtonPress-1>", self.start_move)
         self.title_label.bind("<B1-Motion>", self.do_move)
+        self.title_label.bind("<ButtonRelease-1>", self.end_move)
         self.title_label.bind("<Double-Button-1>", self.toggle_maximize)
 
     def update_board_coordinate(self, new_coord: Any, slot: Optional[int] = None) -> str:
@@ -466,6 +478,32 @@ class NGSTrackerApp(ctk.CTk):
 
     def do_move(self, event):
         self._window_mover.do_move(event)
+
+    def end_move(self, event=None):
+        self._window_mover.end_move(event)
+        self._on_window_moved(self.winfo_x(), self.winfo_y())
+
+    def _on_window_moved(self, x: int, y: int) -> None:
+        if x > -10000 and y > -10000 and not getattr(self, "is_maximized", False):
+            self.window_pos = {"x": x, "y": y}
+            self.save_settings()
+
+    def apply_initial_geometry(self) -> None:
+        """Applies saved window coordinates across restarts or selects secondary monitor if available."""
+        pos = getattr(self, "window_pos", None)
+        if pos and isinstance(pos, dict):
+            wx = pos.get("x")
+            wy = pos.get("y")
+            if wx is not None and wy is not None and is_position_on_screen(wx, wy):
+                self.geometry(f"950x640+{wx}+{wy}")
+                return
+
+        sec = get_secondary_monitor_origin()
+        if sec and is_position_on_screen(sec[0], sec[1]):
+            self.geometry(f"950x640+{sec[0]}+{sec[1]}")
+            return
+
+        self.geometry("950x640")
 
     def minimize_window(self):
         self.bind("<Map>", self._on_restore_window)
@@ -578,6 +616,10 @@ class NGSTrackerApp(ctk.CTk):
     def on_close(self):
         self.is_running = False
         self.stop_event.set()
+        try:
+            self.save_settings()
+        except Exception:
+            pass
         if hasattr(self, "single_instance_guard") and self.single_instance_guard:
             try:
                 self.single_instance_guard.release()
@@ -713,9 +755,12 @@ class NGSTrackerApp(ctk.CTk):
                     self.log_folder = data.get("log_folder", "")
                     self.board_coord = data.get("board_coord", "0, 0, 1")
                     saved_lang = data.get("language", DEFAULT_LANGUAGE)
+                    self.window_pos = data.get("window_pos", None)
+                    self.overlay_pos = data.get("overlay_pos", None)
             except (OSError, json.JSONDecodeError):
                 pass
 
+        self.apply_initial_geometry()
         self.set_app_language(saved_lang, save=False)
 
         if hasattr(self, "war_service"):
@@ -724,10 +769,11 @@ class NGSTrackerApp(ctk.CTk):
             self.coord_var.set(self.board_coord)
 
         if not self.log_folder or not os.path.exists(self.log_folder):
-            default_ngs_path = self._find_default_pso2_log_folder()
-            if default_ngs_path:
-                self.log_folder = default_ngs_path
-                self.save_settings()
+            if not (os.getenv("NEKO_TEST_MODE") == "1" or "pytest" in sys.modules):
+                default_ngs_path = self._find_default_pso2_log_folder()
+                if default_ngs_path:
+                    self.log_folder = default_ngs_path
+                    self.save_settings()
             
         if self.log_folder and os.path.exists(self.log_folder): 
             self.find_latest_log_file()
@@ -737,12 +783,28 @@ class NGSTrackerApp(ctk.CTk):
                 self.war_view.lbl_file_status.configure(text=t("status_folder_unspecified"), text_color="red")
 
     def save_settings(self):
+        try:
+            if not getattr(self, "window_pos", None) and hasattr(self, "winfo_x") and callable(self.winfo_x):
+                wx = self.winfo_x()
+                wy = self.winfo_y()
+                if wx > -10000 and wy > -10000 and not getattr(self, "is_maximized", False):
+                    self.window_pos = {"x": wx, "y": wy}
+        except Exception:
+            pass
+
         data = {
             "watchlist": self.watchlist_items,
             "log_folder": self.log_folder,
             "board_coord": self.board_coord,
             "language": i18n.get_language(),
         }
+        w_pos = getattr(self, "window_pos", None)
+        if isinstance(w_pos, dict):
+            data["window_pos"] = w_pos
+        o_pos = getattr(self, "overlay_pos", None)
+        if isinstance(o_pos, dict):
+            data["overlay_pos"] = o_pos
+
         try:
             with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=4) 
@@ -755,10 +817,10 @@ class NGSTrackerApp(ctk.CTk):
             norm_folder = folder_path.replace("\\", "/").lower()
             if "sample_logs" in norm_folder or "/mock" in norm_folder or "/test" in norm_folder:
                 self._enable_test_mode_bypasses()
-            self.log_folder = folder_path
-            self.save_settings() 
-            self.log_path = ""
-            self.find_latest_log_file()
+            if folder_path != self.log_folder:
+                self.log_folder = folder_path
+                self.save_settings() 
+                self.find_latest_log_file()
 
     def find_latest_log_file(self):
         if not self.log_folder: return
@@ -1058,11 +1120,16 @@ class NGSTrackerApp(ctk.CTk):
 
     def force_taskbar_icon(self):
         try:
-            hwnd = ctypes.windll.user32.GetParent(self.winfo_id())
+            hwnd = ctypes.windll.user32.GetParent(self.winfo_id()) or self.winfo_id()
             style = ctypes.windll.user32.GetWindowLongW(hwnd, -20)
-            style = style & ~0x00000080
-            style = style | 0x00040000
+            style = style & ~0x00000088  # Clear WS_EX_TOOLWINDOW (0x80) and WS_EX_TOPMOST (0x08)
+            style = style | 0x00040000   # Add WS_EX_APPWINDOW (0x40000)
             ctypes.windll.user32.SetWindowLongW(hwnd, -20, style)
+            try:
+                # HWND_NOTOPMOST = -2
+                ctypes.windll.user32.SetWindowPos(hwnd, -2, 0, 0, 0, 0, 0x0013)
+            except Exception:
+                pass
             self.withdraw()
             self.deiconify()
         except Exception:

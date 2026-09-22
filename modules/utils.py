@@ -110,8 +110,9 @@ class WindowMover:
     to bypass Tk geometry formatting and Tcl overhead while avoiding
     modal message loop GIL corruption (PyEval_RestoreThread crash).
     """
-    def __init__(self, window: Any):
+    def __init__(self, window: Any, on_move_end: Optional[Any] = None):
         self.window = window
+        self.on_move_end = on_move_end
         self.start_x = 0
         self.start_y = 0
         self.win_x = 0
@@ -174,6 +175,59 @@ class WindowMover:
             self.window.geometry(f"+{new_x}+{new_y}")
         except Exception:
             pass
+
+    def end_move(self, event: Any = None) -> None:
+        """Invoked on mouse release to finalize window placement and trigger callbacks."""
+        if self.on_move_end and callable(self.on_move_end):
+            try:
+                wx = self.window.winfo_x()
+                wy = self.window.winfo_y()
+                self.on_move_end(wx, wy)
+            except Exception:
+                pass
+
+
+def is_position_on_screen(x: int, y: int, width: int = 100, height: int = 100) -> bool:
+    """Verifies that the window coordinates intersect with at least one active display monitor."""
+    try:
+        import sys
+        if sys.platform == "win32":
+            import ctypes
+            from ctypes import wintypes
+            # Sample point inside window title/client area
+            pt = wintypes.POINT(x + 50, y + 20)
+            # MONITOR_DEFAULTTONULL = 0
+            hmon = ctypes.windll.user32.MonitorFromPoint(pt, 0)
+            return bool(hmon)
+    except Exception:
+        pass
+    return True
+
+
+def get_secondary_monitor_origin() -> Optional[Tuple[int, int]]:
+    """Returns top-left (x, y) coordinates of a secondary monitor if present, or None."""
+    try:
+        import sys
+        if sys.platform == "win32":
+            import ctypes
+            from ctypes import wintypes
+            monitors: List[Tuple[int, int, int, int]] = []
+
+            def cb(hmon, hdc, rect, lparam):
+                r = rect.contents
+                monitors.append((r.left, r.top, r.right, r.bottom))
+                return True
+
+            CB_TYPE = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HMONITOR, wintypes.HDC, ctypes.POINTER(wintypes.RECT), wintypes.LPARAM)
+            ctypes.windll.user32.EnumDisplayMonitors(0, 0, CB_TYPE(cb), 0)
+            if len(monitors) > 1:
+                # Find the first monitor that is not the primary origin (0, 0)
+                for left, top, right, bottom in monitors:
+                    if left != 0 or top != 0:
+                        return (left + 60, top + 60)
+    except Exception:
+        pass
+    return None
 
 
 def start_native_drag(window: Any, event: Any = None) -> bool:

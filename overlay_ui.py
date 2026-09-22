@@ -11,6 +11,7 @@ from modules.utils import (
     WindowMover,
     start_native_drag,
     calculate_live_rate,
+    is_position_on_screen,
 )
 from modules.i18n import t
 from modules.event_bus import event_bus
@@ -34,7 +35,7 @@ class OverlayWindow(ctk.CTkToplevel):
 
         self.overrideredirect(True)
         self.attributes("-topmost", True)
-        self._window_mover = WindowMover(self)
+        self._window_mover = WindowMover(self, on_move_end=self._on_overlay_moved)
         self._opacity_high = True
         self.attributes("-alpha", self.OPACITY_HIGH)
         self.configure(fg_color=COLOR_BG_MAIN)
@@ -73,6 +74,13 @@ class OverlayWindow(ctk.CTkToplevel):
 
     # ---------- Layout ----------
 
+    def _on_overlay_moved(self, x: int, y: int) -> None:
+        if x > -10000 and y > -10000:
+            if hasattr(self.controller, "overlay_pos"):
+                self.controller.overlay_pos = {"x": x, "y": y}
+                if hasattr(self.controller, "save_settings"):
+                    self.controller.save_settings()
+
     def _position_window(self):
         screen_width = self.winfo_screenwidth()
         screen_height = self.winfo_screenheight()
@@ -85,6 +93,14 @@ class OverlayWindow(ctk.CTkToplevel):
         else:
             target_height = 250
             y_pos = int(screen_height * 0.15)
+
+        saved_pos = getattr(self.controller, "overlay_pos", None)
+        if saved_pos and isinstance(saved_pos, dict):
+            sx = saved_pos.get("x")
+            sy = saved_pos.get("y")
+            if sx is not None and sy is not None and is_position_on_screen(sx, sy):
+                self.geometry(f"{window_width}x{target_height}+{sx}+{sy}")
+                return
 
         self.geometry(f"{window_width}x{target_height}+{x_pos}+{y_pos}")
 
@@ -360,6 +376,16 @@ class OverlayWindow(ctk.CTkToplevel):
 
     def destroy(self):
         try:
+            ox = self.winfo_x()
+            oy = self.winfo_y()
+            if ox > -10000 and oy > -10000:
+                if hasattr(self.controller, "overlay_pos"):
+                    self.controller.overlay_pos = {"x": ox, "y": oy}
+                    if hasattr(self.controller, "save_settings"):
+                        self.controller.save_settings()
+        except Exception:
+            pass
+        try:
             event_bus.unsubscribe("language_changed", self._on_language_changed)
         except Exception:
             pass
@@ -395,9 +421,14 @@ class OverlayWindow(ctk.CTkToplevel):
         for w in widgets:
             w.bind("<ButtonPress-1>", self.start_move)
             w.bind("<B1-Motion>", self.do_move)
+            w.bind("<ButtonRelease-1>", self.end_move)
 
     def start_move(self, event):
         self._window_mover.start_move(event)
 
     def do_move(self, event):
         self._window_mover.do_move(event)
+
+    def end_move(self, event=None):
+        self._window_mover.end_move(event)
+        self._on_overlay_moved(self.winfo_x(), self.winfo_y())

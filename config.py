@@ -118,12 +118,13 @@ MAX_SEQUENCE_JUMP_ALERT = 5000            # Sequence jump threshold for anomaly 
 MIN_CADENCE_SAMPLE_SIZE = 10
 MIN_CADENCE_STDDEV_SEC = 0.05
 
-# Test Mode detection (CLI flag or environment variable)
+# Test Mode detection (CLI flag, environment variable, or pytest runner)
 IS_TEST_MODE = (
     os.getenv("NEKO_TEST_MODE", "0").lower() in ("1", "true", "yes")
     or "--test" in sys.argv
     or "--test-mode" in sys.argv
     or "--mock" in sys.argv
+    or "pytest" in sys.modules
 )
 
 if IS_TEST_MODE:

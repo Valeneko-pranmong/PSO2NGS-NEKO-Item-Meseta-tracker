@@ -8,6 +8,7 @@ def isolate_test_environment(tmp_path_factory):
     tmp_dir = tmp_path_factory.mktemp("test_env")
     orig_appdata = os.environ.get("APPDATA")
     os.environ["APPDATA"] = str(tmp_dir)
+    os.environ["NEKO_TEST_MODE"] = "1"
     
     # Intercept all real network calls to production Firebase RTDB during tests
     with patch("urllib.request.urlopen") as mock_urlopen:
@@ -27,9 +28,13 @@ def shared_app():
     """Shared GUI app instance for tests to prevent repeated Tk re-initialization crashes."""
     from meseta_tracker import NGSTrackerApp
     app = NGSTrackerApp()
+    app.log_folder = ""
+    app.log_path = ""
     app.update_idletasks()
     yield app
     try:
+        if hasattr(app, "stop_monitoring"):
+            app.stop_monitoring()
         app.destroy()
     except Exception:
         pass

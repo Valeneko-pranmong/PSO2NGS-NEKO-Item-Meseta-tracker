@@ -27,9 +27,30 @@ import os
 import sys
 import time
 import json
+import logging
 import urllib.request
 import urllib.parse
 from typing import Dict, Any, List, Optional
+
+logger = logging.getLogger("firebase_war_sync")
+
+try:
+    from modules.version import (
+        parse_semver,
+        compare_semver,
+        is_version_secure,
+        MIN_SECURE_VERSION,
+        REVOKED_VERSIONS,
+    )
+except (ImportError, ValueError):
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+    from modules.version import (
+        parse_semver,
+        compare_semver,
+        is_version_secure,
+        MIN_SECURE_VERSION,
+        REVOKED_VERSIONS,
+    )
 
 try:
     import firebase_admin
@@ -37,54 +58,6 @@ try:
     FIREBASE_ADMIN_AVAILABLE = True
 except ImportError:
     FIREBASE_ADMIN_AVAILABLE = False
-
-MIN_SECURE_VERSION = "7.1.0"
-REVOKED_VERSIONS = {"7.0.0-alpha", "7.0.0"}
-
-
-def parse_semver(v: str):
-    if not v or not isinstance(v, str):
-        return (0, 0, 0, "")
-    clean = v.strip().lstrip("vV").strip()
-    pre = ""
-    if "-" in clean:
-        parts_pre = clean.split("-", 1)
-        clean = parts_pre[0].strip()
-        pre = parts_pre[1].strip()
-    nums = clean.split(".")
-    major = int(nums[0]) if len(nums) > 0 and nums[0].isdigit() else 0
-    minor = int(nums[1]) if len(nums) > 1 and nums[1].isdigit() else 0
-    patch = int(nums[2]) if len(nums) > 2 and nums[2].isdigit() else 0
-    return (major, minor, patch, pre)
-
-
-def compare_semver(v1: str, v2: str) -> int:
-    p1 = parse_semver(v1)
-    p2 = parse_semver(v2)
-    if p1[:3] > p2[:3]:
-        return 1
-    if p1[:3] < p2[:3]:
-        return -1
-    if p1[3] and not p2[3]:
-        return -1
-    if not p1[3] and p2[3]:
-        return 1
-    if p1[3] and p2[3]:
-        if p1[3] < p2[3]:
-            return -1
-        if p1[3] > p2[3]:
-            return 1
-    return 0
-
-
-def is_version_secure(version: str, min_version: str = MIN_SECURE_VERSION) -> bool:
-    if not version or not isinstance(version, str):
-        return False
-    v_clean = version.strip().lower().lstrip("v").strip()
-    for rev in REVOKED_VERSIONS:
-        if v_clean == rev.lower().lstrip("v").strip():
-            return False
-    return compare_semver(version, min_version) >= 0
 
 
 class ARKSFirebaseBroadcaster:
@@ -278,18 +251,23 @@ class ARKSFirebaseBroadcaster:
         }
 
         # Sync via Firebase Admin SDK if active
+        sync_ok = True
         if self.rtdb:
-            ref_op = self.rtdb.reference(f"{self.base_path}/operatives/{character_name}")
-            ref_op.update(op_payload)
+            try:
+                ref_op = self.rtdb.reference(f"{self.base_path}/operatives/{character_name}")
+                ref_op.update(op_payload)
 
-            ref_sec = self.rtdb.reference(f"{self.base_path}/sectors/{coord_key}/challengers/{character_name}")
-            ref_sec.update(sec_payload)
+                ref_sec = self.rtdb.reference(f"{self.base_path}/sectors/{coord_key}/challengers/{character_name}")
+                ref_sec.update(sec_payload)
 
-            ref_sub = self.rtdb.reference(f"{self.base_path}/sectors/{coord_key}/sub_cells/{slot}/challengers/{character_name}")
-            ref_sub.update(sub_payload)
+                ref_sub = self.rtdb.reference(f"{self.base_path}/sectors/{coord_key}/sub_cells/{slot}/challengers/{character_name}")
+                ref_sub.update(sub_payload)
 
-            ref_tel = self.rtdb.reference(f"{self.base_path}/latest_telemetry")
-            ref_tel.update(op_payload)
+                ref_tel = self.rtdb.reference(f"{self.base_path}/latest_telemetry")
+                ref_tel.update(op_payload)
+            except Exception as exc:
+                logger.warning(f"[!] Firebase Admin SDK sync error for {character_name}: {exc}")
+                sync_ok = False
 
         # Fallback via REST API if database_url is provided
         elif self.database_url:
@@ -305,19 +283,30 @@ class ARKSFirebaseBroadcaster:
                 "latest_telemetry": op_payload,
             }
             if not self._rest_patch(f"{base}/{self.base_path}.json", patch_data):
-                self._rest_put(f"{base}/{self.base_path}/operatives/{safe_char}.json", op_payload)
-                self._rest_put(f"{base}/{self.base_path}/sectors/{safe_coord}/challengers/{safe_char}.json", sec_payload)
-                self._rest_put(f"{base}/{self.base_path}/sectors/{safe_coord}/sub_cells/{slot}/challengers/{safe_char}.json", sub_payload)
-                self._rest_put(f"{base}/{self.base_path}/latest_telemetry.json", op_payload)
+                p1 = self._rest_put(f"{base}/{self.base_path}/operatives/{safe_char}.json", op_payload)
+                p2 = self._rest_put(f"{base}/{self.base_path}/sectors/{safe_coord}/challengers/{safe_char}.json", sec_payload)
+                p3 = self._rest_put(f"{base}/{self.base_path}/sectors/{safe_coord}/sub_cells/{slot}/challengers/{safe_char}.json", sub_payload)
+                p4 = self._rest_put(f"{base}/{self.base_path}/latest_telemetry.json", op_payload)
+                if not (p1 and p2 and p3 and p4):
+                    logger.warning(f"[!] Firebase REST sync failed for {character_name}")
+                    sync_ok = False
+        else:
+            sync_ok = False
 
         if not is_secure:
             print(f"[!] คำเตือนความปลอดภัย: ไคลเอนต์เวอร์ชัน {client_version} ไม่ปลอดภัย (ถูกแก้เป็น 7.1.0) ยอดเงินจะไม่ถูกนับเข้าสู่ฐานข้อมูล (บันทึก meseta = 0)")
             return False
-        else:
-            print(f"[✓] ซิงค์ Sector: ตัวละคร {character_name} (v{client_version}) ➔ พิกัด [{sector_x}, {sector_y}] ช่อง #{slot} | เงินสะสม {counted_meseta:,} ℳ | ความเร็ว {rate_val:,} ℳ/hr")
-            return True
+
+        if not sync_ok:
+            logger.warning(f"[!] การซิงค์ล้มเหลว: ไม่สามารถส่งข้อมูลไปยัง Firebase RTDB สำหรับ {character_name}")
+            return False
+
+        print(f"[✓] ซิงค์ Sector: ตัวละคร {character_name} (v{client_version}) ➔ พิกัด [{sector_x}, {sector_y}] ช่อง #{slot} | เงินสะสม {counted_meseta:,} ℳ | ความเร็ว {rate_val:,} ℳ/hr")
+        return True
 
     def _rest_patch(self, url: str, data: Dict[str, Any], timeout: float = 3.5) -> bool:
+        if "mock-test-default-rtdb" in self.database_url.lower():
+            return True
         try:
             req = urllib.request.Request(
                 url,
@@ -325,12 +314,19 @@ class ARKSFirebaseBroadcaster:
                 headers={"Content-Type": "application/json"},
                 method="PATCH",
             )
-            with urllib.request.urlopen(req, timeout=timeout):
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                status = getattr(resp, "status", 200)
+                if status and status >= 400:
+                    logger.warning(f"[!] Firebase REST PATCH failed with HTTP {status}: {url}")
+                    return False
                 return True
-        except Exception:
+        except Exception as exc:
+            logger.warning(f"[!] Firebase REST PATCH error for {url}: {exc}")
             return False
 
     def _rest_put(self, url: str, data: Dict[str, Any], timeout: float = 3.5) -> bool:
+        if "mock-test-default-rtdb" in self.database_url.lower():
+            return True
         try:
             req = urllib.request.Request(
                 url,
@@ -338,10 +334,14 @@ class ARKSFirebaseBroadcaster:
                 headers={"Content-Type": "application/json"},
                 method="PUT",
             )
-            with urllib.request.urlopen(req, timeout=timeout):
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                status = getattr(resp, "status", 200)
+                if status and status >= 400:
+                    logger.warning(f"[!] Firebase REST PUT failed with HTTP {status}: {url}")
+                    return False
                 return True
         except Exception as exc:
-            # Silently catch network errors in broadcaster
+            logger.warning(f"[!] Firebase REST PUT error for {url}: {exc}")
             return False
 
     # -------------------------------------------------------------

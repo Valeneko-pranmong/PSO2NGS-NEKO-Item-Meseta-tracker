@@ -76,6 +76,7 @@ def build_python_tracker() -> None:
         "--hidden-import", "modules.i18n",
         "--hidden-import", "modules.guide_dialog",
         "--hidden-import", "modules.utils",
+        "--hidden-import", "modules.version",
         "--hidden-import", "modules.security",
         "--hidden-import", "modules.anti_tamper",
         "--hidden-import", "modules.war_mode.war_service",
@@ -144,6 +145,27 @@ def compute_checksums() -> str:
     
     log(f"SHA256: {digest}")
     log(f"Saved to: {SHA256_FILE}")
+
+    # Synchronize SHA-256 digest atomically across release documentation & QA checklists
+    import re
+    doc_sync_targets = [
+        (os.path.join(ARTIFACTS_DIR, "E2E_TEST_CHECKLIST.md"), r"`[0-9a-fA-F]{64}`"),
+        (os.path.join(ROOT_DIR, "Doc", "current", "E2E_TEST_GUIDE.md"), r"`[0-9a-fA-F]{64}`"),
+        (os.path.join(ARTIFACTS_DIR, "README.md"), r"[0-9a-fA-F]{64}(?=\s+NekoTracker-Setup-v7\.1\.0\.exe)"),
+    ]
+    for path, pattern in doc_sync_targets:
+        if os.path.isfile(path):
+            with open(path, "r", encoding="utf-8") as df:
+                content = df.read()
+            if "`" in pattern:
+                new_content = re.sub(pattern, f"`{digest}`", content)
+            else:
+                new_content = re.sub(pattern, digest, content)
+            if new_content != content:
+                with open(path, "w", encoding="utf-8", newline="\n") as df:
+                    df.write(new_content)
+                log(f"Synchronized SHA-256 hash in {os.path.relpath(path, ROOT_DIR)}")
+
     return digest
 
 def smoke_test_installer() -> None:
@@ -186,16 +208,31 @@ def smoke_test_installer() -> None:
     # 2. Main Python Tracker Process Smoke
     log("2. Verifying Main Python Tracker (V7.1.0) process smoke...")
     py_proc = subprocess.Popen([installed_main_exe])
-    time.sleep(3)
-    py_poll = py_proc.poll()
-    if py_poll is not None:
-        raise RuntimeError(f"Installed Main Tracker crashed immediately with code {py_poll}")
+    pid = py_proc.pid
+    log(f"Child process launched (PID: {pid}). Polling readiness across stabilization window...")
+
+    # Bounded readiness polling: verify process stays alive and healthy without blind sleep
+    readiness_deadline = time.time() + 6.0
+    stable_samples = 0
+    poll_interval = 0.25
+
+    while time.time() < readiness_deadline:
+        poll_code = py_proc.poll()
+        if poll_code is not None:
+            raise RuntimeError(f"Installed Main Tracker (PID {pid}) crashed immediately with code {poll_code}")
+        stable_samples += 1
+        time.sleep(poll_interval)
+
+    # Clean termination bound strictly to exact child handle / PID
+    log(f"Process stability verified over {stable_samples} samples ({time.time() - (readiness_deadline - 6.0):.2f}s). Terminating PID {pid}...")
     py_proc.terminate()
     try:
-        py_proc.wait(timeout=3)
+        py_proc.wait(timeout=5)
     except subprocess.TimeoutExpired:
+        log(f"Graceful terminate timed out for PID {pid}, sending kill signal...")
         py_proc.kill()
-    log("Main Python Tracker process smoke PASS (PID started and stayed alive cleanly).")
+        py_proc.wait(timeout=3)
+    log(f"Main Python Tracker process smoke PASS (exact child PID {pid} started, remained stable, and terminated cleanly).")
 
     # 3. Clean Uninstallation Check
     log("3. Running clean silent uninstallation...")
@@ -205,13 +242,21 @@ def smoke_test_installer() -> None:
         "/SUPPRESSMSGBOXES"
     ]
     unins_res = subprocess.run(unins_cmd)
-    time.sleep(2)
     if unins_res.returncode != 0:
         log(f"Warning: Uninstaller exited with code {unins_res.returncode}")
-    
-    # Check if core executable was removed
+
+    # Bounded poll for uninstallation purge completion
+    unins_deadline = time.time() + 10.0
+    while time.time() < unins_deadline:
+        if not os.path.exists(installed_main_exe) and not os.path.exists(uninstaller_exe):
+            break
+        time.sleep(0.5)
+
     if not os.path.exists(installed_main_exe):
         log("Uninstaller cleanly purged primary executable payload!")
+    else:
+        raise RuntimeError(f"Uninstaller failed to remove primary executable: {installed_main_exe}")
+
     if not os.path.exists(uninstaller_exe):
         log("Uninstaller cleanly purged uninstaller binary!")
     
