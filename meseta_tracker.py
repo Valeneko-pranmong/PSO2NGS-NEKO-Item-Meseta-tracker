@@ -578,6 +578,11 @@ class NGSTrackerApp(ctk.CTk):
     def on_close(self):
         self.is_running = False
         self.stop_event.set()
+        if hasattr(self, "single_instance_guard") and self.single_instance_guard:
+            try:
+                self.single_instance_guard.release()
+            except Exception:
+                pass
         if hasattr(self, "war_service") and hasattr(self.war_service, "stop"):
             try:
                 self.war_service.stop()
@@ -752,6 +757,7 @@ class NGSTrackerApp(ctk.CTk):
                 self._enable_test_mode_bypasses()
             self.log_folder = folder_path
             self.save_settings() 
+            self.log_path = ""
             self.find_latest_log_file()
 
     def find_latest_log_file(self):
@@ -774,11 +780,19 @@ class NGSTrackerApp(ctk.CTk):
         if "sample_logs" in norm_file or "/mock" in norm_file or "/test" in norm_file:
             self._enable_test_mode_bypasses()
         if latest_file != self.log_path:
+            is_initial = (not self.log_path)
             self.log_path = latest_file
             self.pending_status_text = t("status_reading_file", file=os.path.basename(latest_file))
             self.pending_status_color = COLOR_TEXT_VAL
             self.detect_encoding(self.log_path)
-            self.reset_data() 
+            if is_initial:
+                self.reset_data()
+            else:
+                # Log rollover during an active session (e.g. hourly change):
+                # Start reading from byte 0 of the new file without wiping session earnings
+                self.last_file_pos = 0
+                if hasattr(self, "anti_tamper"):
+                    self.anti_tamper.switch_log_stream(latest_file)
             self.detect_character_from_file(self.log_path)
         else:
             if not getattr(self, "pending_status_text", None):
@@ -931,6 +945,15 @@ class NGSTrackerApp(ctk.CTk):
             if self.log_path and os.path.exists(self.log_path):
                 try:
                     current_file_size = os.path.getsize(self.log_path)
+                    # Idle check: If file size has not changed since last read, no new bytes exist.
+                    # Avoid redundant stream validation and file opens while idle.
+                    if (
+                        current_file_size == self.last_file_pos
+                        and current_file_size == getattr(self.anti_tamper, "_last_file_size", current_file_size)
+                    ):
+                        time.sleep(1)
+                        continue
+
                     if hasattr(self, "anti_tamper"):
                         if not self.anti_tamper.validate_stream(
                             self.last_file_pos, current_file_size, file_path=self.log_path
@@ -1001,7 +1024,13 @@ class NGSTrackerApp(ctk.CTk):
                     if self.first_drop_time is None: self.first_drop_time = time.time()
                     self.session_meseta += income
                     self.last_income_time = time.time()
-                    self.event_bus.emit("meseta_earned", amount=income, wallet=self.current_wallet)
+                    seq = record.sequence_number if record else -1
+                    self.event_bus.emit(
+                        "meseta_earned",
+                        amount=income,
+                        wallet=self.current_wallet,
+                        sequence_number=seq,
+                    )
 
             if raw_valid_action and not meseta_match and "Num(" in line:
                 if hasattr(self, "anti_tamper") and record:
@@ -1140,5 +1169,16 @@ class NGSTrackerApp(ctk.CTk):
             pass
 
 if __name__ == "__main__":
+    from modules.utils import SingleInstanceGuard
+    guard = SingleInstanceGuard()
+    if guard.is_already_running():
+        guard.activate_existing_window("NEKO")
+        print("[INFO] Another instance of NekoTracker is already running. Focusing existing window.")
+        sys.exit(0)
     app = NGSTrackerApp()
+    app.single_instance_guard = guard
+    try:
+        app.protocol("WM_DELETE_WINDOW", app.on_close)
+    except Exception:
+        pass
     app.mainloop()

@@ -3,6 +3,8 @@ from __future__ import annotations
 import os
 import sys
 import time
+import queue
+import threading
 import webbrowser
 import tkinter as tk
 from typing import Any, Dict, List, Optional, Tuple
@@ -61,9 +63,15 @@ class WarDashboardFrame(ctk.CTkFrame):
         self.auth_service = auth_service
         self.lbl_war_status = None
         self.btn_sync = None
+        self._ui_sync_queue = queue.Queue()
+        self._sync_pending_after_id = None
+        self._sync_started_time = 0.0
+        self._is_sync_animating = False
+        self._last_display_contrib = 0
 
         self._build_ui()
         self._subscribe_events()
+        self._poll_ui_sync_queue()
 
     def _subscribe_events(self) -> None:
         try:
@@ -75,29 +83,89 @@ class WarDashboardFrame(ctk.CTkFrame):
         except Exception:
             pass
 
-    def _on_realtime_sync_started(self, **kwargs) -> None:
+    def _apply_sync_started(self) -> None:
+        if not hasattr(self, "lbl_sync_time") or not self.lbl_sync_time.winfo_exists():
+            return
+        if getattr(self, "_sync_pending_after_id", None):
+            try:
+                self.after_cancel(self._sync_pending_after_id)
+            except Exception:
+                pass
+            self._sync_pending_after_id = None
+        self._sync_started_time = time.time()
+        self._is_sync_animating = True
+        self.lbl_sync_time.configure(text=t("war_syncing"), text_color="#0284C7")
+
+    def _apply_sync_completed(self, success: bool = True, message: str = "", timestamp: float = 0, contribution: int = 0, **kwargs) -> None:
+        if not hasattr(self, "lbl_sync_time") or not self.lbl_sync_time.winfo_exists():
+            return
+        self._sync_pending_after_id = None
+        self._is_sync_animating = False
+        t_val = timestamp or time.time()
+        t_str = time.strftime("%H:%M:%S", time.localtime(t_val))
+        if success:
+            contrib = contribution if contribution > 0 else getattr(self.war_service, "session_contribution", 0)
+            self._last_display_contrib = contrib
+            new_text = t("war_synced", time=t_str, contrib=f"{contrib:,}")
+            new_color = "#10B981"
+        else:
+            new_text = t("war_sync_waiting")
+            new_color = "#F59E0B"
+
+        if self.lbl_sync_time.cget("text") != new_text or self.lbl_sync_time.cget("text_color") != new_color:
+            self.lbl_sync_time.configure(
+                text=new_text,
+                text_color=new_color,
+            )
+
+    def _process_ui_sync_queue(self) -> None:
+        if not hasattr(self, "_ui_sync_queue"):
+            return
+        while not self._ui_sync_queue.empty():
+            try:
+                item = self._ui_sync_queue.get_nowait()
+                action, data = item
+                if action == "started":
+                    self._apply_sync_started()
+                elif action == "completed":
+                    self._apply_sync_completed(**data)
+            except queue.Empty:
+                break
+            except Exception:
+                pass
+
+    def _poll_ui_sync_queue(self) -> None:
+        try:
+            self._process_ui_sync_queue()
+        except Exception:
+            pass
         try:
             if hasattr(self, "lbl_sync_time") and self.lbl_sync_time.winfo_exists():
-                self.lbl_sync_time.configure(text=t("war_syncing"), text_color="#0284C7")
+                self.after(100, self._poll_ui_sync_queue)
+        except Exception:
+            pass
+
+    def _on_realtime_sync_started(self, **kwargs) -> None:
+        try:
+            if threading.current_thread() is threading.main_thread():
+                self._apply_sync_started()
+            else:
+                self._ui_sync_queue.put(("started", kwargs))
         except Exception:
             pass
 
     def _on_realtime_sync_completed(self, success: bool = True, message: str = "", timestamp: float = 0, contribution: int = 0, **kwargs) -> None:
+        payload = {
+            "success": success,
+            "message": message,
+            "timestamp": timestamp,
+            "contribution": contribution,
+        }
         try:
-            if hasattr(self, "lbl_sync_time") and self.lbl_sync_time.winfo_exists():
-                t_val = timestamp or time.time()
-                t_str = time.strftime("%H:%M:%S", time.localtime(t_val))
-                if success:
-                    contrib = contribution if contribution > 0 else getattr(self.war_service, "session_contribution", 0)
-                    self.lbl_sync_time.configure(
-                        text=t("war_synced", time=t_str, contrib=f"{contrib:,}"),
-                        text_color="#10B981",
-                    )
-                else:
-                    self.lbl_sync_time.configure(
-                        text=t("war_sync_waiting"),
-                        text_color="#F59E0B",
-                    )
+            if threading.current_thread() is threading.main_thread():
+                self._apply_sync_completed(**payload)
+            else:
+                self._ui_sync_queue.put(("completed", payload))
         except Exception:
             pass
 
@@ -143,6 +211,8 @@ class WarDashboardFrame(ctk.CTkFrame):
             text=t("war_sync_ready"),
             font=(FONT_FAMILY, 10, "bold"),
             text_color=COLOR_TEXT_SUB,
+            width=280,
+            anchor="e",
         )
         self.lbl_sync_time.pack(side="right")
 
@@ -783,6 +853,11 @@ class WarDashboardFrame(ctk.CTkFrame):
 
     def update_view(self) -> None:
         """Called by controller or timer to refresh war view stats."""
+        try:
+            self._process_ui_sync_queue()
+        except Exception:
+            pass
+
         op_name = self.war_service.operative_name or getattr(self.controller, "character_name", "") or "Operative"
 
         if hasattr(self, "lbl_op_title"):
@@ -831,13 +906,22 @@ class WarDashboardFrame(ctk.CTkFrame):
             except Exception:
                 pass
 
-        if hasattr(self, "lbl_sync_time") and not getattr(self.war_service, "_is_syncing", False) and getattr(self.war_service, "_last_sync_time", 0) > 0:
+        is_syncing = getattr(self.war_service, "_is_syncing", False) or getattr(self, "_is_sync_animating", False)
+        last_sync_time = getattr(self.war_service, "_last_sync_time", 0)
+        last_sync_status = getattr(self.war_service, "_last_sync_status", (True, ""))
+        if hasattr(self, "lbl_sync_time") and not is_syncing and last_sync_time > 0 and last_sync_status[0]:
             try:
-                t_str = time.strftime("%H:%M:%S", time.localtime(self.war_service._last_sync_time))
-                self.lbl_sync_time.configure(
-                    text=t("war_synced", time=t_str, contrib=f"{self.war_service.session_contribution:,}"),
-                    text_color="#10B981",
-                )
+                t_str = time.strftime("%H:%M:%S", time.localtime(last_sync_time))
+                if getattr(self, "_last_display_contrib", None) is not None:
+                    display_contrib = self._last_display_contrib
+                else:
+                    display_contrib = getattr(self.war_service, "session_contribution", 0)
+                new_text = t("war_synced", time=t_str, contrib=f"{display_contrib:,}")
+                if self.lbl_sync_time.cget("text") != new_text or self.lbl_sync_time.cget("text_color") != "#10B981":
+                    self.lbl_sync_time.configure(
+                        text=new_text,
+                        text_color="#10B981",
+                    )
             except Exception:
                 pass
 

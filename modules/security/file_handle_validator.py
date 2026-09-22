@@ -34,6 +34,9 @@ class WindowsRestartManagerFileValidator(IFileHandleValidator):
         "pso2ngs",
         "pso2bin",
         "pso2_bin",
+        "phantasy star online 2",
+        "phantasystaronline2",
+        "phantasy star online",
     )
 
     def __init__(self, cache_ttl_seconds: float = 3.0):
@@ -74,7 +77,7 @@ class WindowsRestartManagerFileValidator(IFileHandleValidator):
         for _, app_name in procs:
             app_lower = app_name.lower().strip()
             for known in self.KNOWN_PSO2_PROCESS_NAMES:
-                if app_lower == known or app_lower.startswith(known + "."):
+                if known in app_lower or app_lower.startswith(known + "."):
                     return True
         return False
 
@@ -94,7 +97,7 @@ class WindowsRestartManagerFileValidator(IFileHandleValidator):
                 continue
             app_lower = app_name.lower().strip()
             is_game = any(
-                app_lower == known or app_lower.startswith(known + ".")
+                known in app_lower or app_lower.startswith(known + ".")
                 for known in self.KNOWN_PSO2_PROCESS_NAMES
             )
             if not is_game:

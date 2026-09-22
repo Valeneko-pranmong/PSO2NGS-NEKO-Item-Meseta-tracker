@@ -9,7 +9,7 @@
 ## 📋 เช็กลิสต์ทดสอบสำหรับผู้ทดสอบ (Tester Action Items)
 
 ### 1. การติดตั้งและการตรวจสอบไฟล์ (Installation Phase)
-- [ ] **TC-01 [Checksum]:** ตรวจสอบค่า SHA-256 ของ `NekoTracker-Setup-v7.1.0.exe` ตรงกับ `de3165db2c026ce1fff02b544a74430a11c830118c875a689ed05c65b4e1bd72`
+- [ ] **TC-01 [Checksum]:** ตรวจสอบค่า SHA-256 ของ `NekoTracker-Setup-v7.1.0.exe` ตรงกับ `9de510137417620bcfb341f0991ef2643fe658fd65d6036fad3012b0faa20e80`
 - [ ] **TC-02 [Zero-UAC]:** ดับเบิลคลิกตัวติดตั้ง รันได้ทันทีโดย **ไม่มี** หน้าต่างเตือน UAC เด้งถามสิทธิ์ Admin
 - [ ] **TC-03 [Per-User Path]:** ติดตั้งลงโฟลเดอร์ `%LOCALAPPDATA%\NEKO FAMILY\NekoTracker` ถูกต้อง
 - [ ] **TC-04 [Shortcuts]:** พบบน Desktop 1 ไอคอน และ Start Menu พบโฟลเดอร์ NEKO Tracker และทางลัด Uninstall

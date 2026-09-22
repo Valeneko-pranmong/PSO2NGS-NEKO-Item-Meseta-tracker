@@ -110,6 +110,17 @@ class AntiTamperGuard:
         self.is_compromised = False
         self.violations.clear()
 
+    def switch_log_stream(self, new_file_path: Optional[str] = None) -> None:
+        """
+        Switches active log file stream (e.g. during hourly PSO2 log rollover)
+        without resetting locked player identity or active session earnings.
+        """
+        self._last_file_size = 0
+        self._last_file_position = 0
+        self._last_sequence = -1
+        self._last_timestamp = None
+        self.cadence_analyzer.reset()
+
     def lock_identity(self, player_id: Optional[str], character_name: Optional[str]) -> None:
         """Locks operative identity to prevent session spoofing across characters."""
         if player_id:
@@ -129,6 +140,15 @@ class AntiTamperGuard:
         and missing game write handles.
         """
         if not self.enforce_stream_validation:
+            return True
+
+        # Idle stream guard: If position matches size and matches last recorded size,
+        # no new bytes were appended. Return True without handle validation churn.
+        if (
+            current_file_position == current_file_size
+            and current_file_size == self._last_file_size
+            and self._last_file_size > 0
+        ):
             return True
 
         if self._last_file_size > 0 and current_file_size < self._last_file_size:
@@ -162,7 +182,13 @@ class AntiTamperGuard:
 
             # 2. File Handle & Game Ownership Check
             if self.enforce_file_handle_validation:
-                if not self.file_handle_validator.is_file_held_by_game(file_path):
+                is_held = self.file_handle_validator.is_file_held_by_game(file_path)
+                game_running = (
+                    self.process_validator.is_game_process_running()
+                    if self.process_validator
+                    else False
+                )
+                if not is_held and not game_running:
                     violation = TamperViolation(
                         TamperViolationType.FILE_NOT_LOCKED_BY_GAME,
                         f"Log file '{os.path.basename(file_path)}' is not locked/opened by PSO2 game process. Suspected offline or fake log injection.",

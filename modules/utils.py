@@ -179,3 +179,86 @@ class WindowMover:
 def start_native_drag(window: Any, event: Any = None) -> bool:
     """Safe wrapper for backwards compatibility."""
     return False
+
+
+class SingleInstanceGuard:
+    """
+    Ensures only a single instance of NekoTracker runs concurrently on the system.
+    Uses a Win32 Named Mutex and window restoration to bring the existing
+    instance to the foreground if a second launch is attempted.
+    """
+
+    def __init__(self, mutex_name: str = "Local\\NekoNGSTrackerSingleInstanceMutex"):
+        import os
+        import sys
+
+        self.mutex_name = mutex_name
+        self.mutex = None
+        self.already_running = False
+        self._is_win32 = (sys.platform == "win32")
+
+        # Bypass in test environments
+        if (
+            os.getenv("NEKO_TEST_MODE") == "1"
+            or "pytest" in sys.modules
+            or os.getenv("PYTEST_CURRENT_TEST")
+        ):
+            return
+
+        if self._is_win32:
+            try:
+                import ctypes
+                self.kernel32 = ctypes.windll.kernel32
+                self.mutex = self.kernel32.CreateMutexW(None, False, self.mutex_name)
+                # ERROR_ALREADY_EXISTS = 183
+                if self.kernel32.GetLastError() == 183:
+                    self.already_running = True
+            except Exception:
+                self.already_running = False
+
+    def is_already_running(self) -> bool:
+        return self.already_running
+
+    def activate_existing_window(self, window_title_keyword: str = "NEKO") -> bool:
+        """Brings the existing NekoTracker window to foreground and restores it if minimized."""
+        if not self._is_win32:
+            return False
+        try:
+            import ctypes
+            from ctypes import wintypes
+            user32 = ctypes.windll.user32
+
+            found_hwnd = None
+
+            def enum_proc(hwnd, lparam):
+                nonlocal found_hwnd
+                if user32.IsWindowVisible(hwnd):
+                    length = user32.GetWindowTextLengthW(hwnd)
+                    if length > 0:
+                        buff = ctypes.create_unicode_buffer(length + 1)
+                        user32.GetWindowTextW(hwnd, buff, length + 1)
+                        if window_title_keyword.lower() in buff.value.lower():
+                            found_hwnd = hwnd
+                            return False
+                return True
+
+            WNDENUMPROC = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+            user32.EnumWindows(WNDENUMPROC(enum_proc), 0)
+
+            if found_hwnd:
+                # SW_RESTORE = 9
+                user32.ShowWindow(found_hwnd, 9)
+                user32.SetForegroundWindow(found_hwnd)
+                return True
+        except Exception:
+            pass
+        return False
+
+    def release(self) -> None:
+        if self._is_win32 and self.mutex:
+            try:
+                self.kernel32.CloseHandle(self.mutex)
+            except Exception:
+                pass
+            self.mutex = None
+

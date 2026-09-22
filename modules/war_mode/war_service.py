@@ -253,6 +253,7 @@ class WarService:
         # Security & Anti-Tamper State
         self.is_tamper_compromised: bool = False
         self.tamper_violations_count: int = 0
+        self._last_processed_sequence: int = -1
 
         # Realtime Sync Architecture
         self.realtime_sync_enabled: bool = realtime_sync
@@ -266,6 +267,7 @@ class WarService:
         self._sync_lock = threading.Lock()
         self._sync_event = threading.Event()
         self._stop_event = threading.Event()
+        self.event_bus = kwargs.get("event_bus") or event_bus
 
         app_data = os.getenv("APPDATA") or os.path.expanduser("~")
         self.stats_file = kwargs.get("stats_file") or os.path.join(app_data, "NekoTrackerOffline", "war_stats.json")
@@ -274,17 +276,18 @@ class WarService:
         self._subscribe_events()
 
         # Start Realtime Background Worker
-        self._sync_worker_thread = threading.Thread(
-            target=self._realtime_sync_worker, daemon=True, name="WarService-RealtimeSync"
-        )
-        self._sync_worker_thread.start()
+        if self.realtime_sync_enabled:
+            self._sync_worker_thread = threading.Thread(
+                target=self._realtime_sync_worker, daemon=True, name="WarService-RealtimeSync"
+            )
+            self._sync_worker_thread.start()
 
     def _subscribe_events(self) -> None:
-        event_bus.subscribe("meseta_earned", self.on_meseta_earned)
-        event_bus.subscribe("tracker_reset", self.on_tracker_reset)
-        event_bus.subscribe("character_detected", self.on_character_detected)
-        event_bus.subscribe("board_coord_changed", self.on_board_coord_changed)
-        event_bus.subscribe("tamper_violation", self.on_tamper_violation)
+        self.event_bus.subscribe("meseta_earned", self.on_meseta_earned)
+        self.event_bus.subscribe("tracker_reset", self.on_tracker_reset)
+        self.event_bus.subscribe("character_detected", self.on_character_detected)
+        self.event_bus.subscribe("board_coord_changed", self.on_board_coord_changed)
+        self.event_bus.subscribe("tamper_violation", self.on_tamper_violation)
 
     def on_tamper_violation(self, violation: Any = None, **kwargs) -> None:
         """Handles anti-tamper violation events from tracker engine."""
@@ -433,8 +436,16 @@ class WarService:
             self.set_operative(name)
             self.trigger_realtime_sync()
 
-    def on_meseta_earned(self, amount: int, wallet: int = 0) -> None:
+    def on_meseta_earned(self, amount: int, wallet: int = 0, sequence_number: int = -1, **kwargs) -> None:
         if amount > 0:
+            if self.is_tamper_compromised:
+                return
+            # Sequence deduplication guard: ignore replayed or duplicated sequence numbers
+            if sequence_number >= 0:
+                if self._last_processed_sequence >= 0 and sequence_number <= self._last_processed_sequence:
+                    return
+                self._last_processed_sequence = sequence_number
+
             if self.first_farming_time is None:
                 self.first_farming_time = time.time()
             self.session_contribution += amount
@@ -451,10 +462,11 @@ class WarService:
         self.session_contribution = 0
         self.session_start_time = time.time()
         self.first_farming_time = None
-        self._last_logged_contribution = 0
+        self._last_logged_contribution = max(self.total_farmed, 0)
+        self._last_processed_sequence = -1
         self.is_tamper_compromised = False
         self.tamper_violations_count = 0
-        self.add_log("รีเซ็ตสถิติรอบการฟาร์มสงคราม", "reset")
+        self.add_log("รีเซ็ตสถิติรอบการฟาร์ม (คงสถานะความคืบหน้ากระดานสงคราม)", "reset")
         self._save_stats()
         self.trigger_realtime_sync()
 
@@ -602,8 +614,10 @@ class WarService:
         now_ms = int(time.time() * 1000)
         is_secure = self.is_version_secure() and not self.is_tamper_compromised
 
-        # Security gate: Insecure/revoked versions or compromised tamper do NOT count meseta
-        counted_meseta = self.session_contribution if is_secure else 0
+        # Security gate: Insecure/revoked versions or compromised tamper do NOT count meseta.
+        # Preserve board meseta across session resets using cumulative total_farmed.
+        effective_meseta = max(self.total_farmed, self.session_contribution)
+        counted_meseta = effective_meseta if is_secure else 0
         if self.is_tamper_compromised:
             sec_status = "TAMPER_COMPROMISED"
         elif is_secure:
@@ -616,7 +630,9 @@ class WarService:
         return {
             "character_name": self.operative_name,
             "meseta": counted_meseta,
-            "raw_meseta": self.session_contribution,
+            "raw_meseta": effective_meseta,
+            "session_meseta": self.session_contribution,
+            "total_farmed": self.total_farmed,
             "client_version": self.client_version,
             "version": self.client_version,
             "app_version": self.client_version,
@@ -636,13 +652,14 @@ class WarService:
 
     def trigger_realtime_sync(self, force: bool = False) -> None:
         """Queue or immediately signal a realtime sync event."""
+        self._is_dirty = True
         if not self.realtime_sync_enabled and not force:
             return
-        self._is_dirty = True
         self._sync_event.set()
 
     def _realtime_sync_worker(self) -> None:
         """Background thread that executes non-blocking realtime syncs with debouncing."""
+        min_cooldown = 1.2  # Cooldown between consecutive cloud sync cycles to prevent rapid thrashing
         while not self._stop_event.is_set():
             woken_by_event = self._sync_event.wait(timeout=self.sync_heartbeat_interval)
             if self._stop_event.is_set():
@@ -650,8 +667,21 @@ class WarService:
 
             if woken_by_event:
                 self._sync_event.clear()
-                time.sleep(self.sync_debounce_seconds)
-                self._sync_event.clear()
+                # Trailing-edge debounce: wait for rapid consecutive events to settle
+                debounce_start = time.time()
+                while not self._stop_event.is_set():
+                    new_event = self._sync_event.wait(timeout=self.sync_debounce_seconds)
+                    if not new_event or (time.time() - debounce_start >= 1.5):
+                        self._sync_event.clear()
+                        break
+                    self._sync_event.clear()
+
+            # Enforce cooldown since last sync completion to avoid rapid back-to-back network churn
+            elapsed_since_last = time.time() - self._last_sync_time
+            if elapsed_since_last < min_cooldown:
+                wait_needed = min_cooldown - elapsed_since_last
+                if self._stop_event.wait(timeout=wait_needed):
+                    break
 
             now = time.time()
             time_since_sync = now - self._last_sync_time
@@ -659,45 +689,59 @@ class WarService:
             needs_heartbeat = has_activity and (time_since_sync >= self.sync_heartbeat_interval)
 
             if self.realtime_sync_enabled and (self._is_dirty or needs_heartbeat):
-                self._execute_realtime_cycle()
+                is_heartbeat = (not self._is_dirty and needs_heartbeat)
+                self._execute_realtime_cycle(is_heartbeat=is_heartbeat)
 
-    def _execute_realtime_cycle(self) -> Tuple[bool, str]:
+    def _execute_realtime_cycle(self, is_heartbeat: bool = False) -> Tuple[bool, str]:
         """Execute one complete telemetry sync cycle under lock."""
         with self._sync_lock:
             self._is_dirty = False
             self._is_syncing = True
-            event_bus.emit("realtime_sync_started")
+            if not is_heartbeat:
+                self.event_bus.emit("realtime_sync_started")
             try:
                 ok, msg = self.sync_to_war_room()
                 self._last_sync_time = time.time()
                 self._last_sync_status = (ok, msg)
-                event_bus.emit(
-                    "realtime_sync_completed",
-                    success=ok,
-                    message=msg,
-                    timestamp=self._last_sync_time,
-                    contribution=self.session_contribution,
-                )
+                active_contrib = max(self.total_farmed, self.session_contribution)
+                if not is_heartbeat:
+                    self.event_bus.emit(
+                        "realtime_sync_completed",
+                        success=ok,
+                        message=msg,
+                        timestamp=self._last_sync_time,
+                        contribution=active_contrib,
+                    )
                 return ok, msg
             except Exception as exc:
                 self._last_sync_status = (False, str(exc))
-                event_bus.emit(
-                    "realtime_sync_completed",
-                    success=False,
-                    message=str(exc),
-                    timestamp=time.time(),
-                    contribution=self.session_contribution,
-                )
+                active_contrib = max(self.total_farmed, self.session_contribution)
+                if not is_heartbeat:
+                    self.event_bus.emit(
+                        "realtime_sync_completed",
+                        success=False,
+                        message=str(exc),
+                        timestamp=time.time(),
+                        contribution=active_contrib,
+                    )
                 return False, str(exc)
             finally:
                 self._is_syncing = False
 
     def stop(self) -> None:
-        """Cleanly stop background realtime sync worker."""
+        """Cleanly stop background realtime sync worker and unsubscribe."""
         self._stop_event.set()
         self._sync_event.set()
         if hasattr(self, "_sync_worker_thread") and self._sync_worker_thread.is_alive():
             self._sync_worker_thread.join(timeout=1.0)
+        try:
+            self.event_bus.unsubscribe("meseta_earned", self.on_meseta_earned)
+            self.event_bus.unsubscribe("tracker_reset", self.on_tracker_reset)
+            self.event_bus.unsubscribe("character_detected", self.on_character_detected)
+            self.event_bus.unsubscribe("board_coord_changed", self.on_board_coord_changed)
+            self.event_bus.unsubscribe("tamper_violation", self.on_tamper_violation)
+        except Exception:
+            pass
 
     def sync_to_cloud_database(self, timeout: float = 3.5) -> Tuple[bool, str]:
         """
@@ -891,22 +935,23 @@ class WarService:
                 return False, f"ไคลเอนต์เวอร์ชัน {client_ver} มีช่องโหว่ความปลอดภัย ยอดเงินจะไม่ถูกนับเข้าสู่ฐานข้อมูล (กรุณาอัปเดตเป็น 7.1.0)"
 
             # 5. Add to live war logs when contribution increases
-            if self.session_contribution > self._last_logged_contribution:
-                gain = self.session_contribution - self._last_logged_contribution
-                self._last_logged_contribution = self.session_contribution
+            current_contrib = max(self.total_farmed, self.session_contribution)
+            if current_contrib > self._last_logged_contribution:
+                gain = current_contrib - self._last_logged_contribution
+                self._last_logged_contribution = current_contrib
                 gx, gy, cslot = self.target_coord.x, self.target_coord.y, self.target_coord.slot
                 log_entry = {
                     "time": time.strftime("%H:%M:%S"),
                     "day": 1,
                     "type": "MESETA",
                     "character_name": char_name,
-                    "meseta": self.session_contribution,
+                    "meseta": current_contrib,
                     "gain": gain,
                     "client_version": client_ver,
                     "security_status": "SECURE",
                     "coord": f"{gx}, {gy}, {cslot}",
                     "slot": cslot,
-                    "message": f"{char_name} เก็บเกี่ยว +{gain:,} ℳ พิกัด [{gx}, {gy}] ช่อง #{cslot} (ยอดสะสม: {self.session_contribution:,} ℳ | v{client_ver})",
+                    "message": f"{char_name} เก็บเกี่ยว +{gain:,} ℳ พิกัด [{gx}, {gy}] ช่อง #{cslot} (ยอดสะสม: {current_contrib:,} ℳ | v{client_ver})",
                     "timestamp": now_ms,
                     "lastUpdated": now_ms,
                 }
@@ -1012,13 +1057,14 @@ class WarService:
                 print(f"[WarService] Cloud database sync exception: {exc}")
 
         self._last_sync_time = now
+        active_contrib = payload.get("meseta", max(self.total_farmed, self.session_contribution))
         if saved_paths or cloud_ok:
             gx, gy, slot = self.target_coord.x, self.target_coord.y, self.target_coord.slot
-            self.add_log(f"ซิงค์ข้อมูลสำเร็จ: ส่งยอด {self.session_contribution:,} ℳ พิกัด [{gx}, {gy}] ช่อง #{slot} ({self.operative_name})", "sync")
-            event_bus.emit("war_telemetry_synced", payload=payload)
+            self.add_log(f"ซิงค์ข้อมูลสำเร็จ: ส่งยอด {active_contrib:,} ℳ พิกัด [{gx}, {gy}] ช่อง #{slot} ({self.operative_name})", "sync")
+            self.event_bus.emit("war_telemetry_synced", payload=payload)
             if cloud_ok:
-                return True, f"ซิงค์ข้อมูลเรียลไทม์สำเร็จ (+{self.session_contribution:,} ℳ)"
-            return True, f"บันทึกข้อมูลเรียลไทม์เรียบร้อย (+{self.session_contribution:,} ℳ)"
+                return True, f"ซิงค์ข้อมูลเรียลไทม์สำเร็จ (+{active_contrib:,} ℳ)"
+            return True, f"บันทึกข้อมูลเรียลไทม์เรียบร้อย (+{active_contrib:,} ℳ)"
         return False, "ไม่สามารถบันทึกข้อมูล Telemetry ได้"
 
     def _save_stats(self) -> None:

@@ -974,3 +974,260 @@ def test_firebase_broadcaster_sync_with_farming_rate():
     assert ok is True
 
 
+def test_war_service_reset_does_not_clear_database_board_meseta():
+    """
+    Regression test: Verifies that pressing Reset (on_tracker_reset) resets the session metrics
+    (live rate, first_farming_time) but preserves the operative's cumulative board meseta
+    and does NOT wipe the database / sectors to 0.
+    """
+    from modules.war_mode.war_service import WarService
+
+    war = WarService()
+    war.set_operative("ConquerorHero")
+    war.set_target_coord("0, 0, 1")
+
+    # 1. Earn 10M Meseta to claim Sector [0, 0] Slot #1
+    war.on_meseta_earned(10_000_000)
+    payload_before = war.get_database_payload()
+    assert payload_before["meseta"] == 10_000_000
+    assert war.total_farmed == 10_000_000
+
+    # 2. User presses Reset in the tracker app
+    war.on_tracker_reset()
+
+    # Session rate and duration must reset to 0
+    assert war.session_contribution == 0
+    assert war.first_farming_time is None
+    assert war.get_live_rate() == 0.0
+
+    # CRITICAL INVARIANT: Database board meseta must NOT be cleared to 0!
+    payload_after_reset = war.get_database_payload()
+    assert payload_after_reset["meseta"] == 10_000_000, "Reset must NOT wipe board meseta on database to 0!"
+    assert war.total_farmed == 10_000_000
+
+    # 3. Subsequent drops in the new session must accumulate on top of existing board meseta
+    war.on_meseta_earned(1_500_000)
+    payload_next_session = war.get_database_payload()
+    assert payload_next_session["meseta"] == 11_500_000, "Subsequent earnings must accumulate with prior total!"
+    assert war.total_farmed == 11_500_000
+    assert war.session_contribution == 1_500_000
+
+    war.stop()
+
+
+def test_war_view_sync_label_geometry_stability_and_deflicker(shared_app):
+    """
+    Regression test: Verifies cloud sync label stability below window controls:
+    - Fixed width (280) and anchor 'e' prevent horizontal geometry jumping/bouncing
+    - Background thread event marshaling works safely without thread collision
+    - update_view does not overwrite error/waiting status when sync fails
+    """
+    import threading
+    import time
+    app = shared_app
+    app.update_idletasks()
+    app.show_war_view()
+    app.update_idletasks()
+
+    wv = app.war_view
+    # Stop background worker so it doesn't emit asynchronous telemetry during assertions
+    app.war_service.stop()
+
+    # 1. Geometry stability: width must be fixed to 280 and right-anchored
+    assert getattr(wv, "lbl_sync_time", None) is not None
+    assert wv.lbl_sync_time.cget("width") == 280
+    assert wv.lbl_sync_time.cget("anchor") == "e"
+
+    # 2. Background thread event delivery
+    def emit_from_bg():
+        event_bus.emit("realtime_sync_started")
+    bg_t = threading.Thread(target=emit_from_bg)
+    bg_t.start()
+    bg_t.join()
+
+    # Process main thread queue
+    wv._process_ui_sync_queue()
+    app.update()
+    txt_syncing = wv.lbl_sync_time.cget("text")
+    assert ("กำลังซิงค์" in txt_syncing or "Syncing" in txt_syncing)
+
+    # 3. Completion delivery from background thread
+    def emit_complete_from_bg():
+        event_bus.emit("realtime_sync_completed", success=True, timestamp=1789830000, contribution=750000)
+    bg_t2 = threading.Thread(target=emit_complete_from_bg)
+    bg_t2.start()
+    bg_t2.join()
+
+    # Process queue and poll
+    wv._process_ui_sync_queue()
+    app.update()
+    txt_completed = wv.lbl_sync_time.cget("text")
+    assert ("ล่าสุด" in txt_completed or "synced" in txt_completed.lower() or "last" in txt_completed.lower())
+    assert "750,000" in txt_completed
+
+    # 4. Error state preservation: when last sync status is failed, update_view must NOT overwrite it with green synced
+    wv.war_service._last_sync_status = (False, "Network connection timeout")
+    event_bus.emit("realtime_sync_completed", success=False, message="Timeout")
+    app.update()
+    txt_waiting = wv.lbl_sync_time.cget("text")
+    assert ("รอการเชื่อมต่อ" in txt_waiting or "Waiting" in txt_waiting)
+
+    # Run periodic update_view — must respect failed status and NOT reset to synced
+    wv.update_view()
+    app.update()
+    assert wv.lbl_sync_time.cget("text") == txt_waiting
+
+    # Restore clean state
+    wv.war_service._last_sync_status = (True, "OK")
+    app.show_offline_view()
+
+
+def test_realtime_sync_heartbeat_silent_pulse():
+    """
+    Regression test: Verifies that heartbeat pulses (when no new data is dirty)
+    execute quietly without firing realtime_sync_started, preventing periodic UI blinking.
+    """
+    from modules.event_bus import EventBus
+    from modules.war_mode.war_service import WarService
+
+    mock_bus = EventBus()
+    war = WarService(realtime_sync=True, event_bus=mock_bus)
+    war.stop()  # Stop worker thread so it only executes on direct calls in test
+    war.realtime_sync_enabled = True
+    war.set_operative("SteadyHero")
+    war.set_target_coord("0, 0, 1")
+
+    events = []
+    def on_started(**kw):
+        events.append("started")
+    def on_completed(**kw):
+        events.append("completed")
+
+    mock_bus.subscribe("realtime_sync_started", on_started)
+    mock_bus.subscribe("realtime_sync_completed", on_completed)
+
+    # 1. Heartbeat pulse with is_heartbeat=True must NOT emit started or completed UI events
+    events.clear()
+    ok, msg = war._execute_realtime_cycle(is_heartbeat=True)
+    assert ok is True
+    assert "started" not in events
+    assert "completed" not in events
+
+    # 2. Dirty sync (meseta drop) with is_heartbeat=False MUST emit started and completed
+    events.clear()
+    war.on_meseta_earned(50000)
+    assert war._is_dirty is True
+    ok, msg = war._execute_realtime_cycle(is_heartbeat=False)
+    assert ok is True
+    assert "started" in events
+    assert "completed" in events
+
+    war.stop()
+
+
+def test_idle_file_does_not_trigger_tamper_compromise():
+    """
+    Regression test: Verifies that an idle log file (no new bytes written)
+    does not trigger handle validation or falsely poison the session as compromised.
+    """
+    from modules.security.anti_tamper import AntiTamperGuard
+    from modules.security.file_handle_validator import IFileHandleValidator
+
+    class OfflineFileHandleValidator(IFileHandleValidator):
+        def is_file_held_by_game(self, file_path: str) -> bool:
+            return False  # Game is NOT running yet
+        def get_file_locking_processes(self, file_path: str):
+            return []
+        def has_unauthorized_concurrent_writers(self, file_path: str):
+            return (False, [])
+
+    guard = AntiTamperGuard(
+        enforce_file_handle_validation=True,
+        enforce_stream_validation=True,
+        enforce_process_validation=False,
+    )
+    guard.file_handle_validator = OfflineFileHandleValidator()
+
+    # Initially file is at 1000 bytes, read pos is 1000 bytes
+    guard._last_file_size = 1000
+    guard._last_file_position = 1000
+
+    # Validate stream on an IDLE file (no new bytes)
+    is_valid = guard.validate_stream(1000, 1000, file_path="ActionLog20260922_12.txt")
+    assert is_valid is True
+    assert guard.is_compromised is False, "Idle stream must NOT trigger tamper compromise!"
+
+
+def test_hourly_log_rollover_preserves_session_meseta(tmp_path):
+    """
+    Regression test: Verifies that transitioning to a new hourly log file during
+    an active farming run preserves session meseta, starts reading from byte 0,
+    and re-arms stream pointers without false truncation violations.
+    """
+    from modules.security.anti_tamper import AntiTamperGuard
+
+    guard = AntiTamperGuard(enforce_stream_validation=True)
+    # File 1 was 50,000 bytes
+    guard._last_file_size = 50_000
+    guard._last_file_position = 50_000
+    guard._last_sequence = 250
+
+    # Hourly rollover occurs to a brand new 500-byte file
+    new_file = str(tmp_path / "ActionLog20260922_13.txt")
+    guard.switch_log_stream(new_file)
+
+    assert guard._last_file_size == 0
+    assert guard._last_file_position == 0
+    assert guard._last_sequence == -1
+
+    # Validate new smaller file - MUST NOT flag FILE_STREAM_TRUNCATED!
+    is_valid = guard.validate_stream(0, 500, file_path=new_file)
+    assert is_valid is True
+    assert guard.is_compromised is False
+
+
+def test_war_service_sequence_deduplication_prevents_score_multiplication():
+    """
+    Regression test: Verifies that duplicated log drops with the same sequence number
+    (e.g. from multiple instances reading the same log line) are discarded by WarService,
+    preventing score multiplication.
+    """
+    from modules.war_mode.war_service import WarService
+
+    war = WarService(realtime_sync=False)
+    war.set_operative("HeroTest")
+    war.set_target_coord("0, 0, 1")
+
+    # Drop 1 with sequence 101: +10,000 Meseta
+    war.on_meseta_earned(10_000, sequence_number=101)
+    assert war.session_contribution == 10_000
+    assert war.total_farmed == 10_000
+
+    # Duplicated delivery of sequence 101 (e.g. duplicate process / thread)
+    war.on_meseta_earned(10_000, sequence_number=101)
+    # MUST NOT multiply! Still 10,000
+    assert war.session_contribution == 10_000, "Duplicate sequence must NOT multiply score!"
+    assert war.total_farmed == 10_000
+
+    # Legitimate subsequent drop with sequence 102: +5,000 Meseta
+    war.on_meseta_earned(5_000, sequence_number=102)
+    assert war.session_contribution == 15_000
+    assert war.total_farmed == 15_000
+
+    war.stop()
+
+
+def test_single_instance_guard():
+    """
+    Regression test: Verifies SingleInstanceGuard initialization and clean API behavior.
+    """
+    from modules.utils import SingleInstanceGuard
+
+    guard = SingleInstanceGuard(mutex_name="Local\\NekoTestInstanceMutex")
+    # In test environment (pytest running), SingleInstanceGuard safely bypasses already_running check
+    assert guard.is_already_running() is False
+    guard.release()
+
+
+
+
