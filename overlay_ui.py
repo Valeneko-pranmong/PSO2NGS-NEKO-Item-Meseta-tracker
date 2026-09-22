@@ -10,6 +10,7 @@ from modules.utils import (
     filter_and_sort_items,
     WindowMover,
     start_native_drag,
+    calculate_live_rate,
 )
 from modules.i18n import t
 from modules.event_bus import event_bus
@@ -277,7 +278,7 @@ class OverlayWindow(ctk.CTkToplevel):
 
             self.lbl_time_overlay.configure(text=_format_duration(duration))
 
-            rate = (session / duration) * 3600 if (duration >= 1 and session > 0) else 0
+            rate = calculate_live_rate(session, duration, min_smoothing_seconds=30.0) if (duration >= 1 and session > 0) else 0
             self.lbl_mhr_overlay.configure(text=_format_rate(rate))
 
             if self.mode == "full":

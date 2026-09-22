@@ -30,6 +30,22 @@ def format_rate(meseta_per_hour: float) -> str:
     return f"{int(meseta_per_hour)} /hr"
 
 
+def calculate_live_rate(
+    session_meseta: Union[int, float],
+    duration_seconds: float,
+    min_smoothing_seconds: float = 30.0,
+) -> float:
+    """
+    Calculate live Meseta/hr with cold-start smoothing.
+    Prevents erratic spikes (e.g. 90M/hr) during the first few seconds of farming
+    by using a minimum duration floor (default 30.0 seconds).
+    """
+    if session_meseta <= 0:
+        return 0.0
+    effective_duration = max(min_smoothing_seconds, max(0.0, float(duration_seconds)))
+    return (float(session_meseta) / effective_duration) * 3600.0
+
+
 def format_duration(seconds: float) -> str:
     """
     Format elapsed seconds into HH:MM:SS string.

@@ -207,6 +207,8 @@ class ARKSFirebaseBroadcaster:
         sector_y: int,
         slot: int = 1,
         client_version: str = "7.1.0",
+        farming_rate_mhr: int = 0,
+        **kwargs: Any,
     ) -> bool:
         """
         ซิงค์พิกัดและยอดเงินของตัวละครเข้าสู่ระบบ Sector + 4 ช่องย่อย (NW: 1, NE: 2, SW: 3, SE: 4)
@@ -216,6 +218,7 @@ class ARKSFirebaseBroadcaster:
         :param sector_y: พิกัด Y ของ Sector ที่ต้องการฟาร์ม (-11 ถึง +9)
         :param slot: ช่องย่อย (1: NW บนซ้าย, 2: NE บนขวา, 3: SW ล่างซ้าย, 4: SE ล่างขวา)
         :param client_version: เลขเวอร์ชันไคลเอนต์ที่ส่งเพื่อตรวจความปลอดภัย (ค่าเริ่มต้น: 7.1.0)
+        :param farming_rate_mhr: ความเร็วการฟาร์ม Meseta ต่อชั่วโมง (Meseta/hr)
         """
         now_ms = int(time.time() * 1000)
         # Clamping
@@ -227,6 +230,7 @@ class ARKSFirebaseBroadcaster:
         is_secure = is_version_secure(client_version)
         counted_meseta = meseta if is_secure else 0
         sec_status = "SECURE" if is_secure else "REVOKED_VERSION_INSECURE"
+        rate_val = int(farming_rate_mhr) if is_secure else 0
 
         # 1. ข้อมูล Operative
         op_payload = {
@@ -240,6 +244,9 @@ class ARKSFirebaseBroadcaster:
             "sector_coord": {"x": sector_x, "y": sector_y, "slot": slot},
             "coord_key": coord_key,
             "slot": slot,
+            "farming_rate_mhr": rate_val,
+            "farmingRateMhr": rate_val,
+            "meseta_per_hour": rate_val,
             "lastUpdated": now_ms,
         }
 
@@ -251,6 +258,9 @@ class ARKSFirebaseBroadcaster:
             "security_status": sec_status,
             "status": "claimed" if (is_secure and counted_meseta >= 10_000_000) else ("BLOCKED_INSECURE_VERSION" if not is_secure else "contributing"),
             "slot": slot,
+            "farming_rate_mhr": rate_val,
+            "farmingRateMhr": rate_val,
+            "meseta_per_hour": rate_val,
             "lastUpdated": now_ms,
         }
 
@@ -260,6 +270,10 @@ class ARKSFirebaseBroadcaster:
             "meseta": counted_meseta,
             "client_version": client_version,
             "security_status": sec_status,
+            "slot": slot,
+            "farming_rate_mhr": rate_val,
+            "farmingRateMhr": rate_val,
+            "meseta_per_hour": rate_val,
             "lastUpdated": now_ms,
         }
 
@@ -274,22 +288,47 @@ class ARKSFirebaseBroadcaster:
             ref_sub = self.rtdb.reference(f"{self.base_path}/sectors/{coord_key}/sub_cells/{slot}/challengers/{character_name}")
             ref_sub.update(sub_payload)
 
+            ref_tel = self.rtdb.reference(f"{self.base_path}/latest_telemetry")
+            ref_tel.update(op_payload)
+
         # Fallback via REST API if database_url is provided
         elif self.database_url:
             safe_char = urllib.parse.quote(str(character_name))
             safe_coord = urllib.parse.quote(coord_key)
             base = self.database_url
 
-            self._rest_put(f"{base}/{self.base_path}/operatives/{safe_char}.json", op_payload)
-            self._rest_put(f"{base}/{self.base_path}/sectors/{safe_coord}/challengers/{safe_char}.json", sec_payload)
-            self._rest_put(f"{base}/{self.base_path}/sectors/{safe_coord}/sub_cells/{slot}/challengers/{safe_char}.json", sub_payload)
+            # Multi-path atomic PATCH optimization (1 request instead of 4)
+            patch_data = {
+                f"operatives/{character_name}": op_payload,
+                f"sectors/{coord_key}/challengers/{character_name}": sec_payload,
+                f"sectors/{coord_key}/sub_cells/{slot}/challengers/{character_name}": sub_payload,
+                "latest_telemetry": op_payload,
+            }
+            if not self._rest_patch(f"{base}/{self.base_path}.json", patch_data):
+                self._rest_put(f"{base}/{self.base_path}/operatives/{safe_char}.json", op_payload)
+                self._rest_put(f"{base}/{self.base_path}/sectors/{safe_coord}/challengers/{safe_char}.json", sec_payload)
+                self._rest_put(f"{base}/{self.base_path}/sectors/{safe_coord}/sub_cells/{slot}/challengers/{safe_char}.json", sub_payload)
+                self._rest_put(f"{base}/{self.base_path}/latest_telemetry.json", op_payload)
 
         if not is_secure:
             print(f"[!] คำเตือนความปลอดภัย: ไคลเอนต์เวอร์ชัน {client_version} ไม่ปลอดภัย (ถูกแก้เป็น 7.1.0) ยอดเงินจะไม่ถูกนับเข้าสู่ฐานข้อมูล (บันทึก meseta = 0)")
             return False
         else:
-            print(f"[✓] ซิงค์ Sector: ตัวละคร {character_name} (v{client_version}) ➔ พิกัด [{sector_x}, {sector_y}] ช่อง #{slot} | เงินสะสม {counted_meseta:,} ℳ")
+            print(f"[✓] ซิงค์ Sector: ตัวละคร {character_name} (v{client_version}) ➔ พิกัด [{sector_x}, {sector_y}] ช่อง #{slot} | เงินสะสม {counted_meseta:,} ℳ | ความเร็ว {rate_val:,} ℳ/hr")
             return True
+
+    def _rest_patch(self, url: str, data: Dict[str, Any], timeout: float = 3.5) -> bool:
+        try:
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(data).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="PATCH",
+            )
+            with urllib.request.urlopen(req, timeout=timeout):
+                return True
+        except Exception:
+            return False
 
     def _rest_put(self, url: str, data: Dict[str, Any], timeout: float = 3.5) -> bool:
         try:

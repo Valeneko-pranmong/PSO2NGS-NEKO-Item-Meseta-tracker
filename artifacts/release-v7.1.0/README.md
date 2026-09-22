@@ -25,10 +25,10 @@
 ตรวจสอบความถูกต้องของไฟล์ก่อนการใช้งานด้วยค่า SHA-256:
 
 ```text
-567c32d661e5a19396a67dbd7f992a1e3bce6cbf1a2c83c35aa16a3f4402ca4a  NekoTracker-Setup-v7.1.0.exe
+de3165db2c026ce1fff02b544a74430a11c830118c875a689ed05c65b4e1bd72  NekoTracker-Setup-v7.1.0.exe
 ```
 
-* **ขนาดไฟล์:** ~22.18 MB
+* **ขนาดไฟล์:** ~22.19 MB
 * **กลไกการบีบอัด:** LZMA2/Ultra64 Solid Compression (Inno Setup 6)
 * **สถาปัตยกรรม:** 64-bit Windows (`ArchitecturesAllowed=x64compatible`)
 * **การติดตั้ง:** Per-User Local AppData (`%LOCALAPPDATA%\NEKO FAMILY\NekoTracker`, `PrivilegesRequired=lowest`) ไม่ต้องใช้สิทธิ์ Administrator ไม่เด้งเตือน UAC
@@ -45,18 +45,15 @@
 - **In-App User Guide:** หน้าต่างคู่มือการใช้งานและคำแนะนำระบบสงครามในตัว รองรับ 3 ภาษา พร้อมปุ่มคัดลอกลิงก์ Discord คอมมูนิตี้
 - **ARKS War Room (Coordinate War Engine V9):** รองรับพิกัด 798 Sectors และ 4 Quadrant Slots พร้อมระบบ Standby Presence และซิงค์สด Realtime ขึ้น Cloud
 - **AntiTamperGuard V7.1.0:** 10 เกราะป้องกันความสมบูรณ์ของข้อมูลและเพิกถอนเวอร์ชันที่มีช่องโหว่
-
-### 2. ชุดเครื่องมือทดสอบสำหรับเครื่องเทสอื่นๆ (Testing Tools Included)
-- **`NekoLogSimulator.exe` (Standalone Binary):** โปรแกรมจำลองการดรอปเงินและไอเทมแบบคอมไพล์สำเร็จรูป เครื่องเทสอื่น **ไม่จำเป็นต้องติดตั้ง Python** ก็สามารถรันตัวจำลองเหตุการณ์ได้ทันที
-- **Native Test Mode Support (`--test` / `NEKO_TEST_MODE=1`):** ข้ามการตรวจจับ Process ของเกม (`pso2.exe`), File Handle, Timestamp Skew, และ Velocity Limit สำหรับเครื่องที่ไม่มีตัวเกม PSO2 NGS ทำให้ทดสอบยอด Meseta และส่งข้อมูลขึ้นคลาวด์ได้ 100%
-- **Smart Sample Log Ingestion:** เมื่อเปิดโฟลเดอร์ `sample_logs` หรือไฟล์ทดสอบ ระบบจะอ่านและประมวลผลข้อมูลตั้งแต่บรรทัดแรกทันที ไม่ข้ามไปยังท้ายไฟล์
 - **แก้ไขปุ่มพับจอ (Window Minimize Fix):** ปรับปรุง Event Loop ดักจับสถานะ `<Map>` ขณะ Minimize ให้หน้าต่างย่อลง Taskbar ได้อย่างสมบูรณ์ ไม่เด้งกลับขึ้นมาเอง
-- **1-Click Test Runners:**
-  - `NEKO Tracker (Test Mode)` — ทางลัดบน Desktop/Start Menu เปิดโปรแกรมในโหมดทดสอบทันที
-  - `Quick_Test_All_In_One.bat` — รัน Mock Simulator สตรีมข้อมูลสด + เปิด NekoTracker
-  - `Run_Test_Mode.bat` — รัน NekoTracker ในโหมด Bypass ตรวจจับตัวเกม
-  - `Start_Mock_Stream.bat` — เปิดหน้าต่าง Live Streamer จำลองการดรอปไอเทมและ Meseta ต่อเนื่อง
-- **`sample_logs/`:** โฟลเดอร์ Log ตัวอย่างที่แนบไปพร้อมติดตั้ง สามารถคลิก "เลือกโฟลเดอร์ Log" แล้วเลือกโฟลเดอร์นี้เพื่อทดสอบได้ทันที
+
+### 2. ชุดเครื่องมือและแพ็กเกจสำหรับเครื่องทดสอบอื่นๆ (Testing on Other Machines)
+- **Native Test Mode Support (`--test` / `NEKO_TEST_MODE=1`):** ข้ามการตรวจจับ Process ของเกม (`pso2.exe`), File Handle, Timestamp Skew, และ Velocity Limit สำหรับเครื่องที่ไม่มีตัวเกม PSO2 NGS ทำให้ทดสอบยอด Meseta และส่งข้อมูลขึ้นคลาวด์ได้ 100%
+- **Smart Sample Log Ingestion:** เมื่อเปิดโฟลเดอร์ชื่อ `sample_logs` หรือโฟลเดอร์ที่มีไฟล์ทดสอบ ระบบจะเข้าสู่ Test Mode อัตโนมัติ ป้ายเหลือง `[TEST MODE]` ปรากฏ และอ่านข้อมูลได้ทันที
+- **Portable Test Package (`NekoTracker-v7.1.0-Portable-Test.zip`):** สำหรับเครื่องทดสอบที่ไม่มีเกม PSO2 หรือไม่มี Python มีชุดไฟล์ Standalone พร้อมตัวจำลอง `NekoLogSimulator.exe`, โฟลเดอร์ `sample_logs/`, และสคริปต์ 1-Click Launchers:
+  - `3_Quick_Test_All_In_One.bat` — รันตัวสตรีมข้อมูลจำลองสด + เปิด NekoTracker พร้อมกันทันที
+  - `1_Run_NekoTracker_Test.bat` — รันตัวโปรแกรม NekoTracker ในโหมด Standalone Test
+  - `2_Start_Mock_Log_Feed.bat` — รันสตรีมเมอร์จำลอง ActionLog สด
 
 ---
 
@@ -64,33 +61,41 @@
 
 ### 🇹🇭 ภาษาไทย (TH)
 
-#### ก. การติดตั้งปกติ (สำหรับเล่นเกมจริง)
-1. ดาวน์โหลดไฟล์ `NekoTracker-Setup-v7.1.0.exe`
+#### ก. การติดตั้งปกติ (สำหรับเครื่องที่มีเกม PSO2:NGS)
+1. นำไฟล์ `NekoTracker-Setup-v7.1.0.exe` ไปยังเครื่องเป้าหมาย
 2. ดับเบิลคลิกเพื่อเริ่มการติดตั้ง (ไม่ต้องกด Run as administrator)
 3. กด Next เพื่อติดตั้งลงใน `%LOCALAPPDATA%\NEKO FAMILY\NekoTracker`
-4. เมื่อติดตั้งเสร็จ สามารถเปิด **NEKO Item & Meseta Tracker** เพื่อใช้งานคู่กับการเล่นเกมจริงได้ทันที
+4. เมื่อติดตั้งเสร็จ สามารถเปิด **NEKO Item & Meseta Tracker** โปรแกรมจะค้นหาโฟลเดอร์ Log ของเกมโดยอัตโนมัติ
 
-#### ข. การทดสอบบนเครื่องเทส (ไม่มีเกมหรือไม่มี Python)
-1. ติดตั้งตัวติดตั้ง `NekoTracker-Setup-v7.1.0.exe` ตามปกติ
-2. สามารถเปิดทดสอบได้ 2 วิธี:
-   - **วิธีที่ 1 (แนะนำ):** ดับเบิลคลิกทางลัด Desktop หรือ Start Menu: **`NEKO Tracker (Test Mode)`** แล้วคลิกเลือกโฟลเดอร์ `sample_logs`
-   - **วิธีที่ 2:** คลิก **Quick Test All-in-One** บน Desktop/Start Menu เพื่อรัน Live Streamer ร่วมกับตัวโปรแกรม
-3. สังเกตชื่อตัวละคร `Vale3neko`, ยอดเงิน Meseta วิ่งขึ้นสด, ไอเท็มดรอป, และทดสอบหน้าต่าง Overlay และ ARKS War Room ได้ทันที
+#### ข. การทดสอบบนเครื่องทดสอบอื่น (ไม่มีเกมหรือไม่มี Python)
+สามารถเลือกทดสอบได้ 2 รูปแบบตามความสะดวก:
+* **รูปแบบที่ 1 (ทดสอบตัวติดตั้ง Release Candidate):**
+  1. ดับเบิลคลิก `NekoTracker-Setup-v7.1.0.exe` เพื่อติดตั้ง
+  2. เปิดโปรแกรมจาก Desktop หรือ Start Menu
+  3. คลิกปุ่ม **"เลือกโฟลเดอร์ Log"** แล้วเลือกโฟลเดอร์ `sample_logs` (คัดลอกจากชุดทดสอบ)
+  4. ป้ายสถานะ `[TEST MODE]` สีเหลืองจะปรากฏ และประมวลผลข้อมูลจำลองทันที
+* **รูปแบบที่ 2 (ทดสอบทันทีแบบไม่ต้องติดตั้ง Portable Test):**
+  1. แตกไฟล์ `NekoTracker-v7.1.0-Portable-Test.zip`
+  2. ดับเบิลคลิก `3_Quick_Test_All_In_One.bat`
+  3. ระบบจะเปิด Live Mock Streamer (`NekoLogSimulator.exe`) และเปิดตัวแอปให้พร้อมทดสอบทันทีโดยไม่ต้องติดตั้งและไม่ต้องมี Python
 
 ---
 
 ### 🇬🇧 English (EN)
 
-#### A. Standard Installation (For Live Gameplay)
-1. Download `NekoTracker-Setup-v7.1.0.exe`.
+#### A. Standard Installation (For Machines with PSO2:NGS Installed)
+1. Transfer `NekoTracker-Setup-v7.1.0.exe` to target machine.
 2. Double-click the installer (no admin elevation required).
 3. Proceed with the setup wizard to install into `%LOCALAPPDATA%\NEKO FAMILY\NekoTracker`.
-4. Launch **NEKO Item & Meseta Tracker** to track your live NGS farming session.
+4. Launch **NEKO Item & Meseta Tracker**; log folder will be auto-detected.
 
 #### B. Testing on Clean / Non-Game Machines
-1. Run `NekoTracker-Setup-v7.1.0.exe` and complete installation.
-2. In the Windows Start Menu, open the **NEKO Item & Meseta Tracker** folder.
-3. Click **Quick Test All-in-One** (or run `Quick_Test_All_In_One.bat` in the app directory).
-4. The background mock streamer will generate simulated drops automatically.
-5. In NekoTracker, click **"Select Log Folder"** and pick the bundled `sample_logs` folder.
-6. Verify live Meseta counters, M/hr rate, item drops, and test the Gadget Overlay mode.
+* **Option 1 (Test Official Release Candidate Installer):**
+  1. Run `NekoTracker-Setup-v7.1.0.exe` and complete installation.
+  2. Launch from Desktop or Start Menu.
+  3. Click **"Select Log Folder"** and choose a `sample_logs` directory.
+  4. The `[TEST MODE]` yellow badge will activate and simulate telemetry cleanly.
+* **Option 2 (Instant Zero-Install Portable Test Bundle):**
+  1. Extract `NekoTracker-v7.1.0-Portable-Test.zip`.
+  2. Run `3_Quick_Test_All_In_One.bat`.
+  3. Built-in `NekoLogSimulator.exe` streams live mock drops, launching the tracker instantly without Python or NGS installed.

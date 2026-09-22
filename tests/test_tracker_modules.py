@@ -880,3 +880,97 @@ def test_sidebar_and_war_view_status_frame_not_clipped(shared_app):
     assert hasattr(wv, "btn_discord")
     assert wv.btn_discord.winfo_ismapped()
 
+
+def test_calculate_live_rate_and_cold_start_smoothing():
+    """Verify live Meseta/hr calculation with cold-start smoothing."""
+    from modules.utils import calculate_live_rate
+
+    # Zero or negative income
+    assert calculate_live_rate(0, 100) == 0.0
+    assert calculate_live_rate(-500, 100) == 0.0
+
+    # Cold start (duration < 30s): smoothed with 30s floor even at duration=0s
+    # 50,000 meseta in 2 seconds would naively be 90,000,000/hr (spike)
+    # With smoothing: (50000 / 30) * 3600 = 6,000,000/hr
+    rate_0s = calculate_live_rate(50000, 0.0, min_smoothing_seconds=30.0)
+    assert rate_0s == 6_000_000.0
+    rate_2s = calculate_live_rate(50000, 2.0, min_smoothing_seconds=30.0)
+    assert rate_2s == 6_000_000.0
+
+    # Normal duration (duration >= 30s): exact calculation
+    # 1,000,000 meseta in 1800 seconds (30 mins) = 2,000,000/hr
+    rate_30m = calculate_live_rate(1_000_000, 1800.0)
+    assert rate_30m == 2_000_000.0
+
+
+def test_war_service_live_rate_lifecycle_and_reset():
+    """Verify WarService manages first_farming_time, cold start, and reset properly."""
+    from modules.war_mode.war_service import WarService
+
+    war = WarService()
+    assert war.first_farming_time is None
+    assert war.get_live_rate() == 0.0
+
+    # Earn meseta: sets first_farming_time
+    war.on_meseta_earned(100000)
+    assert war.first_farming_time is not None
+    assert war.session_contribution == 100000
+    assert war.get_live_rate() > 0.0
+
+    # Reset: clears first_farming_time and resets rate to 0
+    war.on_tracker_reset()
+    assert war.first_farming_time is None
+    assert war.session_contribution == 0
+    assert war.get_live_rate() == 0.0
+
+    # Tamper compromised: rate must be 0
+    war.on_meseta_earned(50000)
+    war.is_tamper_compromised = True
+    assert war.get_live_rate() == 0.0
+
+    war.stop()
+
+
+def test_war_service_database_payload_includes_rate_fields():
+    """Verify database payload and telemetry contain farming_rate_mhr and aliases."""
+    from modules.war_mode.war_service import WarService
+
+    war = WarService()
+    war.set_operative("SpeedyHero")
+    war.on_meseta_earned(300000)
+
+    payload = war.get_database_payload()
+    assert "farming_rate_mhr" in payload
+    assert "farmingRateMhr" in payload
+    assert "meseta_per_hour" in payload
+    assert payload["farming_rate_mhr"] > 0
+    assert payload["farming_rate_mhr"] == payload["farmingRateMhr"] == payload["meseta_per_hour"]
+
+    # Cloud sync executes and sends rate
+    ok, msg = war.sync_to_cloud_database()
+    assert ok is True
+
+    war.stop()
+
+
+def test_firebase_broadcaster_sync_with_farming_rate():
+    """Verify ARKSFirebaseBroadcaster includes farming_rate_mhr in payloads."""
+    from tools.firebase_war_sync import ARKSFirebaseBroadcaster
+
+    broadcaster = ARKSFirebaseBroadcaster(
+        database_url="https://mock-test-default-rtdb.firebaseio.com"
+    )
+
+    # Sync with farming_rate_mhr
+    ok = broadcaster.sync_operative_sector(
+        character_name="TestHero",
+        meseta=5_000_000,
+        sector_x=1,
+        sector_y=2,
+        slot=1,
+        client_version="7.1.0",
+        farming_rate_mhr=2_500_000,
+    )
+    assert ok is True
+
+

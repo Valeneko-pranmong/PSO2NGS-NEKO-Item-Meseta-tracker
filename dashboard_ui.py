@@ -2,7 +2,7 @@ import customtkinter as ctk
 import tkinter as tk
 import time
 from config import *
-from modules.utils import format_duration, format_rate, filter_and_sort_items
+from modules.utils import format_duration, format_rate, filter_and_sort_items, calculate_live_rate
 from modules.i18n import t
 from modules.event_bus import event_bus
 
@@ -121,7 +121,7 @@ class DashboardFrame(ctk.CTkFrame):
         self.lbl_time.configure(text=format_duration(duration_secs))
 
         if duration_secs >= 1 and self.controller.session_meseta > 0:
-            m_hr = (self.controller.session_meseta / duration_secs) * 3600
+            m_hr = calculate_live_rate(self.controller.session_meseta, duration_secs, min_smoothing_seconds=30.0)
             m_hr_str = format_rate(m_hr)
         else:
             m_hr_str = "0 /hr"

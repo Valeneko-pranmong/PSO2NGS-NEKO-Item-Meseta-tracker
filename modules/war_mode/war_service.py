@@ -18,6 +18,7 @@ except (ImportError, ValueError):
     from modules.event_bus import event_bus
 
 from modules.i18n import t
+from modules.utils import calculate_live_rate
 
 TEAMS_DATA: Dict[str, Dict[str, Any]] = {}
 
@@ -238,6 +239,7 @@ class WarService:
         self.session_contribution = 0
         self.total_farmed = 0
         self.session_start_time = time.time()
+        self.first_farming_time: Optional[float] = None
         self.war_logs: List[Dict[str, Any]] = []
         self._logs_lock = threading.Lock()
 
@@ -433,6 +435,8 @@ class WarService:
 
     def on_meseta_earned(self, amount: int, wallet: int = 0) -> None:
         if amount > 0:
+            if self.first_farming_time is None:
+                self.first_farming_time = time.time()
             self.session_contribution += amount
             self.total_farmed += amount
             gx, gy, slot = self.target_coord.x, self.target_coord.y, self.target_coord.slot
@@ -446,6 +450,7 @@ class WarService:
     def on_tracker_reset(self) -> None:
         self.session_contribution = 0
         self.session_start_time = time.time()
+        self.first_farming_time = None
         self._last_logged_contribution = 0
         self.is_tamper_compromised = False
         self.tamper_violations_count = 0
@@ -470,11 +475,19 @@ class WarService:
             return list(self.war_logs[:limit])
 
     def get_live_rate(self) -> float:
-        """Calculate live M/hr for the current war session."""
-        duration = time.time() - self.session_start_time
-        if duration >= 1 and self.session_contribution > 0:
-            return (self.session_contribution / duration) * 3600
-        return 0.0
+        """
+        Calculate live Meseta/hr for the current war session with cold-start smoothing.
+        Applies a minimum duration floor (30s) to prevent erratic spikes.
+        Returns 0.0 if session is compromised or client version is insecure.
+        """
+        if self.is_tamper_compromised or not self.is_version_secure():
+            return 0.0
+        if self.session_contribution <= 0:
+            return 0.0
+
+        ref_time = self.first_farming_time or self.session_start_time
+        duration = time.time() - ref_time
+        return calculate_live_rate(self.session_contribution, duration, min_smoothing_seconds=30.0)
 
     def fetch_remote_version_policy(self, timeout: float = 3.0) -> Dict[str, Any]:
         """
@@ -598,6 +611,8 @@ class WarService:
         else:
             sec_status = "REVOKED_VERSION_INSECURE"
 
+        rate_mhr = round(self.get_live_rate()) if is_secure else 0
+
         return {
             "character_name": self.operative_name,
             "meseta": counted_meseta,
@@ -612,7 +627,9 @@ class WarService:
             "coord_key": f"{gx},{gy}",
             "slot": slot,
             "lastUpdated": now_ms,
-            "farming_rate_mhr": round(self.get_live_rate()) if is_secure else 0,
+            "farming_rate_mhr": rate_mhr,
+            "farmingRateMhr": rate_mhr,
+            "meseta_per_hour": rate_mhr,
             "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
             "timestamp": now_ms,
         }
@@ -718,6 +735,7 @@ class WarService:
 
         coord_key = db_payload["coord_key"]
         slot = db_payload["slot"]
+        rate_mhr = db_payload.get("farming_rate_mhr", 0)
 
         # Path 1: Operative record
         op_payload = {
@@ -733,7 +751,9 @@ class WarService:
             "slot": slot,
             "lastUpdated": now_ms,
             "target_coord": db_payload["target_coord"],
-            "farming_rate_mhr": db_payload["farming_rate_mhr"],
+            "farming_rate_mhr": rate_mhr,
+            "farmingRateMhr": rate_mhr,
+            "meseta_per_hour": rate_mhr,
             "updated_at": db_payload["updated_at"],
             "timestamp": db_payload["timestamp"],
         }
@@ -746,6 +766,9 @@ class WarService:
             "security_status": db_payload["security_status"],
             "status": "claimed" if (is_secure and db_payload["meseta"] >= SLOT_TARGET_MESETA) else ("BLOCKED_INSECURE_VERSION" if not is_secure else "contributing"),
             "slot": slot,
+            "farming_rate_mhr": rate_mhr,
+            "farmingRateMhr": rate_mhr,
+            "meseta_per_hour": rate_mhr,
             "lastUpdated": now_ms,
         }
 
@@ -755,62 +778,86 @@ class WarService:
             "meseta": db_payload["meseta"],
             "client_version": client_ver,
             "security_status": db_payload["security_status"],
+            "farming_rate_mhr": rate_mhr,
+            "farmingRateMhr": rate_mhr,
+            "meseta_per_hour": rate_mhr,
             "lastUpdated": now_ms,
         }
 
         try:
-            # 1. Update individual operative record
-            url_op = f"{base_url}/arks_war_room/operatives/{urllib.parse.quote(safe_key)}.json"
-            req_op = urllib.request.Request(
-                url_op,
-                data=json.dumps(op_payload).encode("utf-8"),
-                headers={"Content-Type": "application/json"},
-                method="PUT",
+            # Multi-Path Atomic Update Optimization for Firebase RTDB
+            # Combines operative, sector, sub-cell, and latest_telemetry into 1 atomic PATCH request,
+            # reducing network roundtrips from 4 to 1 for high concurrency (100+ operatives).
+            patch_payload = {
+                f"operatives/{safe_key}": op_payload,
+                f"sectors/{coord_key}/challengers/{safe_key}": sec_payload,
+                f"sectors/{coord_key}/sub_cells/{slot}/challengers/{safe_key}": sub_payload,
+                "latest_telemetry": op_payload,
+            }
+            url_patch = f"{base_url}/arks_war_room.json"
+            req_patch = urllib.request.Request(
+                url_patch,
+                data=json.dumps(patch_payload).encode("utf-8"),
+                headers={"Content-Type": "application/json", "User-Agent": f"NEKOTracker/{client_ver}"},
+                method="PATCH",
             )
-            with urllib.request.urlopen(req_op, timeout=timeout) as resp:
-                pass
-
-            # 2. Update sector challenger record
-            url_sec = f"{base_url}/arks_war_room/sectors/{urllib.parse.quote(coord_key)}/challengers/{urllib.parse.quote(safe_key)}.json"
-            req_sec = urllib.request.Request(
-                url_sec,
-                data=json.dumps(sec_payload).encode("utf-8"),
-                headers={"Content-Type": "application/json"},
-                method="PUT",
-            )
+            patch_ok = False
             try:
-                with urllib.request.urlopen(req_sec, timeout=timeout) as resp:
-                    pass
+                with urllib.request.urlopen(req_patch, timeout=timeout) as resp:
+                    patch_ok = True
             except Exception:
-                pass
+                patch_ok = False
 
-            # 3. Update sub-cell challenger record
-            url_sub = f"{base_url}/arks_war_room/sectors/{urllib.parse.quote(coord_key)}/sub_cells/{slot}/challengers/{urllib.parse.quote(safe_key)}.json"
-            req_sub = urllib.request.Request(
-                url_sub,
-                data=json.dumps(sub_payload).encode("utf-8"),
-                headers={"Content-Type": "application/json"},
-                method="PUT",
-            )
-            try:
-                with urllib.request.urlopen(req_sub, timeout=timeout) as resp:
+            if not patch_ok:
+                # Fallback to individual PUT calls if root PATCH is restricted
+                url_op = f"{base_url}/arks_war_room/operatives/{urllib.parse.quote(safe_key)}.json"
+                req_op = urllib.request.Request(
+                    url_op,
+                    data=json.dumps(op_payload).encode("utf-8"),
+                    headers={"Content-Type": "application/json", "User-Agent": f"NEKOTracker/{client_ver}"},
+                    method="PUT",
+                )
+                with urllib.request.urlopen(req_op, timeout=timeout) as resp:
                     pass
-            except Exception:
-                pass
 
-            # 4. Update global latest telemetry
-            url_tel = f"{base_url}/arks_war_room/latest_telemetry.json"
-            req_tel = urllib.request.Request(
-                url_tel,
-                data=json.dumps(op_payload).encode("utf-8"),
-                headers={"Content-Type": "application/json"},
-                method="PUT",
-            )
-            try:
-                with urllib.request.urlopen(req_tel, timeout=timeout) as resp:
+                url_sec = f"{base_url}/arks_war_room/sectors/{urllib.parse.quote(coord_key)}/challengers/{urllib.parse.quote(safe_key)}.json"
+                req_sec = urllib.request.Request(
+                    url_sec,
+                    data=json.dumps(sec_payload).encode("utf-8"),
+                    headers={"Content-Type": "application/json", "User-Agent": f"NEKOTracker/{client_ver}"},
+                    method="PUT",
+                )
+                try:
+                    with urllib.request.urlopen(req_sec, timeout=timeout) as resp:
+                        pass
+                except Exception:
                     pass
-            except Exception:
-                pass
+
+                url_sub = f"{base_url}/arks_war_room/sectors/{urllib.parse.quote(coord_key)}/sub_cells/{slot}/challengers/{urllib.parse.quote(safe_key)}.json"
+                req_sub = urllib.request.Request(
+                    url_sub,
+                    data=json.dumps(sub_payload).encode("utf-8"),
+                    headers={"Content-Type": "application/json", "User-Agent": f"NEKOTracker/{client_ver}"},
+                    method="PUT",
+                )
+                try:
+                    with urllib.request.urlopen(req_sub, timeout=timeout) as resp:
+                        pass
+                except Exception:
+                    pass
+
+                url_tel = f"{base_url}/arks_war_room/latest_telemetry.json"
+                req_tel = urllib.request.Request(
+                    url_tel,
+                    data=json.dumps(op_payload).encode("utf-8"),
+                    headers={"Content-Type": "application/json", "User-Agent": f"NEKOTracker/{client_ver}"},
+                    method="PUT",
+                )
+                try:
+                    with urllib.request.urlopen(req_tel, timeout=timeout) as resp:
+                        pass
+                except Exception:
+                    pass
 
             # If client version is insecure, log security warning and reject counting meseta
             if not is_secure:
@@ -904,7 +951,9 @@ class WarService:
             "target_coord": db_payload["target_coord"],
             "coord_key": db_payload["coord_key"],
             "slot": db_payload["slot"],
-            "farmingRateMhr": round(self.get_live_rate()) if db_payload["version_security_valid"] else 0,
+            "farmingRateMhr": db_payload.get("farming_rate_mhr", 0),
+            "farming_rate_mhr": db_payload.get("farming_rate_mhr", 0),
+            "meseta_per_hour": db_payload.get("farming_rate_mhr", 0),
             "operative": {
                 "name": self.operative_name,
                 "character_name": self.operative_name,
@@ -916,7 +965,9 @@ class WarService:
                 "sessionContribution": db_payload["meseta"],
                 "rawContribution": self.session_contribution,
                 "totalFarmed": self.total_farmed,
-                "farmingRateMhr": round(self.get_live_rate()) if db_payload["version_security_valid"] else 0,
+                "farmingRateMhr": db_payload.get("farming_rate_mhr", 0),
+                "farming_rate_mhr": db_payload.get("farming_rate_mhr", 0),
+                "meseta_per_hour": db_payload.get("farming_rate_mhr", 0),
             },
             "recentLogs": self.get_recent_logs(10),
         }

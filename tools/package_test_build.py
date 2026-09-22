@@ -72,6 +72,9 @@ def build_portable_package() -> None:
     tools_dir = os.path.join(PORTABLE_DIR, "tools")
     os.makedirs(tools_dir, exist_ok=True)
     shutil.copy2(os.path.join(ROOT_DIR, "tools", "mock_log_simulator.py"), os.path.join(tools_dir, "mock_log_simulator.py"))
+    sim_exe = os.path.join(DIST_DIR, "NekoLogSimulator.exe")
+    if os.path.exists(sim_exe):
+        shutil.copy2(sim_exe, os.path.join(tools_dir, "NekoLogSimulator.exe"))
     
     # 4. Generate Sample Logs
     sample_logs_dir = os.path.join(PORTABLE_DIR, "sample_logs")
@@ -126,12 +129,16 @@ def build_portable_package() -> None:
         f.write("echo [INFO] In NekoTracker, click \"เลือกโฟลเดอร์ Log\" and select:\r\n")
         f.write("echo        %~dp0sample_logs\r\n")
         f.write("echo ======================================================================\r\n")
-        f.write("python \"%~dp0tools\\mock_log_simulator.py\" --dir \"%~dp0sample_logs\" --stream --interval 2.5\r\n")
-        f.write("if %ERRORLEVEL% NEQ 0 (\r\n")
-        f.write("    py \"%~dp0tools\\mock_log_simulator.py\" --dir \"%~dp0sample_logs\" --stream --interval 2.5\r\n")
+        f.write("if exist \"%~dp0tools\\NekoLogSimulator.exe\" (\r\n")
+        f.write("    \"%~dp0tools\\NekoLogSimulator.exe\" --dir \"%~dp0sample_logs\" --stream --interval 2.5\r\n")
+        f.write(") else (\r\n")
+        f.write("    python \"%~dp0tools\\mock_log_simulator.py\" --dir \"%~dp0sample_logs\" --stream --interval 2.5\r\n")
+        f.write("    if %ERRORLEVEL% NEQ 0 (\r\n")
+        f.write("        py \"%~dp0tools\\mock_log_simulator.py\" --dir \"%~dp0sample_logs\" --stream --interval 2.5\r\n")
+        f.write("    )\r\n")
         f.write(")\r\n")
         f.write("pause\r\n")
-
+    
     # 3_Quick_Test_All_In_One.bat
     with open(os.path.join(PORTABLE_DIR, "3_Quick_Test_All_In_One.bat"), "w", encoding="utf-8") as f:
         f.write("@echo off\r\n")
@@ -142,9 +149,15 @@ def build_portable_package() -> None:
         f.write("echo  🌸 NEKO Tracker - Automated Live Test (App + Live Mock Stream)\r\n")
         f.write("echo ======================================================================\r\n")
         f.write("echo 1. Generating fresh sample log...\r\n")
-        f.write("python \"%~dp0tools\\mock_log_simulator.py\" --dir \"%~dp0sample_logs\" --static --events 5 > nul 2>&1\r\n")
-        f.write("echo 2. Launching background live log streamer...\r\n")
-        f.write("start \"PSO2 Live Log Streamer\" cmd /k \"title PSO2 NGS Log Streamer && python \"%~dp0tools\\mock_log_simulator.py\" --dir \"%~dp0sample_logs\" --stream --interval 2.5\"\r\n")
+        f.write("if exist \"%~dp0tools\\NekoLogSimulator.exe\" (\r\n")
+        f.write("    \"%~dp0tools\\NekoLogSimulator.exe\" --dir \"%~dp0sample_logs\" --static --events 5 > nul 2>&1\r\n")
+        f.write("    echo 2. Launching background live log streamer...\r\n")
+        f.write("    start \"PSO2 Live Log Streamer\" cmd /k \"title PSO2 NGS Log Streamer && \"%~dp0tools\\NekoLogSimulator.exe\" --dir \"%~dp0sample_logs\" --stream --interval 2.5\"\r\n")
+        f.write(") else (\r\n")
+        f.write("    python \"%~dp0tools\\mock_log_simulator.py\" --dir \"%~dp0sample_logs\" --static --events 5 > nul 2>&1\r\n")
+        f.write("    echo 2. Launching background live log streamer...\r\n")
+        f.write("    start \"PSO2 Live Log Streamer\" cmd /k \"title PSO2 NGS Log Streamer && python \"%~dp0tools\\mock_log_simulator.py\" --dir \"%~dp0sample_logs\" --stream --interval 2.5\"\r\n")
+        f.write(")\r\n")
         f.write("echo 3. Launching NEKO Tracker...\r\n")
         f.write("echo.\r\n")
         f.write("echo >> คำแนะนำ: ในหน้าต่าง NEKO Tracker ให้คลิกปุ่ม \"เลือกโฟลเดอร์ Log\"\r\n")
