@@ -185,6 +185,7 @@ class WarService:
         self.session_start_time = time.time()
         self.first_farming_time: Optional[float] = None
         self.war_logs: List[Dict[str, Any]] = []
+        self._has_fetched_cloud_stats: bool = False
         self._logs_lock = threading.Lock()
         self._state_lock = threading.RLock()
 
@@ -254,6 +255,7 @@ class WarService:
         if character_name and character_name != self.operative_name:
             with self._state_lock:
                 self.operative_name = character_name
+                self._has_fetched_cloud_stats = False
             self.add_log(f"ตรวจพบชื่อในเกมจาก Log (Primary Key): {character_name}", "info")
             self._load_saved_stats()
             self._save_stats()
@@ -736,6 +738,40 @@ class WarService:
             self.fetch_remote_version_policy(timeout=min(2.0, timeout))
 
         base_url = self.firebase_url.rstrip("/")
+        char_name = self.operative_name or "Operative"
+        safe_key = "".join(
+            c for c in char_name
+            if c not in '.$#[]/\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f\x7f'
+        ).strip() or "Operative"
+
+        # Fetch authoritative database state to support "clean close / fetch fresh" 
+        # when the user deletes the database manually.
+        if not self._has_fetched_cloud_stats and safe_key != "Operative":
+            try:
+                url_get = f"{base_url}/arks_war_room/operatives/{urllib.parse.quote(safe_key)}.json"
+                req = urllib.request.Request(url_get, method="GET", headers={"User-Agent": f"NEKOTracker/{self.client_version}"})
+                with urllib.request.urlopen(req, timeout=timeout) as resp:
+                    data = resp.read().decode("utf-8").strip()
+                if data == "null":
+                    # Database record is missing (deleted). Clean local stats to match.
+                    with self._state_lock:
+                        self.total_farmed = self.session_contribution
+                        self._has_fetched_cloud_stats = True
+                    self.add_log("ไม่พบข้อมูลเดิมบนฐานข้อมูล (เริ่มนับยอดรวมใหม่ตาม Session)", "info")
+                    self._save_stats()
+                else:
+                    parsed = json.loads(data)
+                    db_meseta = int(parsed.get("meseta", 0))
+                    with self._state_lock:
+                        # Adopt DB state unconditionally as source of truth (respecting current session)
+                        self.total_farmed = max(db_meseta, self.session_contribution)
+                        self._has_fetched_cloud_stats = True
+                    self.add_log(f"ดึงข้อมูลจากฐานข้อมูล: เริ่มนับที่ {self.total_farmed:,} ℳ", "info")
+            except Exception as exc:
+                print(f"[WarService] Failed fetching initial cloud stats for {safe_key}: {exc}")
+                # Don't fail the sync, just mark as fetched to prevent blocking loops
+                self._has_fetched_cloud_stats = True
+
         db_payload = self.get_database_payload()
         now_ms = db_payload["lastUpdated"]
         is_secure = db_payload["version_security_valid"]
@@ -746,12 +782,6 @@ class WarService:
 
         if not is_secure:
             return False, t("msg_security_revoked", version=client_ver)
-
-        char_name = self.operative_name or "Operative"
-        safe_key = "".join(
-            c for c in char_name
-            if c not in '.$#[]/\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f\x7f'
-        ).strip() or "Operative"
 
         coord_key = db_payload["coord_key"]
         slot = db_payload["slot"]
