@@ -36,7 +36,7 @@ try:
 except ImportError:
     DEFAULT_FIREBASE_RTDB_URL = os.getenv(
         "FIREBASE_RTDB_URL",
-        os.getenv("ARKS_FIREBASE_RTDB_URL", "")
+        os.getenv("ARKS_FIREBASE_RTDB_URL", "https://arks-war-room-default-rtdb.asia-southeast1.firebasedatabase.app")
     )
     CLIENT_VERSION = "7.1.0"
     MIN_SECURE_VERSION = "7.1.0"
@@ -155,9 +155,12 @@ def safe_factory_reset_cloud(firebase_url: str = DEFAULT_FIREBASE_RTDB_URL) -> b
 
     # 2. เคลียร์ Operatives (ล้างชื่อและยอดเงินสะสมของนักรบทุกคน)
     operatives = data.get("operatives", {})
-    if isinstance(operatives, dict) and operatives:
-        log_ok(f"พบทะเบียน Operatives {len(operatives)} รายการ กำลังล้างข้อมูลนักรบ...")
-        for char_name in operatives:
+    all_op_keys = set(operatives.keys()) if isinstance(operatives, dict) else set()
+    all_op_keys.update(["None", "none"])
+
+    if all_op_keys:
+        log_ok(f"พบทะเบียน Operatives {len(all_op_keys)} รายการ กำลังล้างข้อมูลนักรบ...")
+        for char_name in all_op_keys:
             safe_char = urllib.parse.quote(str(char_name))
             op_url = f"{base_url}/{BASE_PATH}/operatives/{safe_char}.json"
             clean_op_payload = {
@@ -313,6 +316,7 @@ def setup_version_control(firebase_url: str = DEFAULT_FIREBASE_RTDB_URL) -> bool
 def setup_latest_telemetry(firebase_url: str = DEFAULT_FIREBASE_RTDB_URL) -> bool:
     """
     ติดตั้งโหนด latest_telemetry ในสถานะพร้อมรบ (Standby 0 ℳ)
+    ไม่ใส่ character_name ปลอม เพื่อไม่ให้หน้าเว็บเข้าใจผิดว่ามีตัวละครชื่อ None
     """
     base_url = firebase_url.rstrip("/")
     url = f"{base_url}/{BASE_PATH}/latest_telemetry.json"
@@ -320,7 +324,6 @@ def setup_latest_telemetry(firebase_url: str = DEFAULT_FIREBASE_RTDB_URL) -> boo
     now_str = time.strftime("%Y-%m-%d %H:%M:%S")
 
     payload = {
-        "character_name": "None",
         "client_version": CLIENT_VERSION,
         "version": CLIENT_VERSION,
         "meseta": 0,
@@ -397,7 +400,7 @@ def setup_local_workspace_data() -> bool:
         "lastSync": now_str,
         "timestamp": now_ms,
         "lastUpdated": now_ms,
-        "character_name": "None",
+        "character_name": "",
         "meseta": 0,
         "raw_meseta": 0,
         "sector_coord": {"x": 0, "y": 0, "slot": 1},
@@ -407,21 +410,6 @@ def setup_local_workspace_data() -> bool:
         "farmingRateMhr": 0,
         "farming_rate_mhr": 0,
         "meseta_per_hour": 0,
-        "operative": {
-            "name": "None",
-            "character_name": "None",
-            "client_version": CLIENT_VERSION,
-            "security_status": "SECURE",
-            "targetSector": {"x": 0, "y": 0, "slot": 1},
-            "sectorCoord": {"x": 0, "y": 0, "slot": 1},
-            "slot": 1,
-            "sessionContribution": 0,
-            "rawContribution": 0,
-            "totalFarmed": 0,
-            "farmingRateMhr": 0,
-            "farming_rate_mhr": 0,
-            "meseta_per_hour": 0,
-        },
         "recentLogs": [
             {
                 "time": now_time,
@@ -433,7 +421,7 @@ def setup_local_workspace_data() -> bool:
     }
 
     clean_record = {
-        "character_name": "None",
+        "character_name": "",
         "meseta": 0,
         "raw_meseta": 0,
         "slot_meseta": 0,
@@ -560,8 +548,12 @@ def verify_database(firebase_url: str = DEFAULT_FIREBASE_RTDB_URL) -> bool:
         print(f"   - latest_version:     {vc.get('latest_version')}")
     print(f" latest_telemetry: {'[PASS] พร้อมรบ (0 ℳ Standby)' if is_tel_valid else '[WARN] ตรวจสอบยอด'}")
     if isinstance(latest_tel, dict):
-        print(f"   - character_name:     {latest_tel.get('character_name')}")
-        print(f"   - meseta:             {latest_tel.get('meseta'):,} ℳ")
+        char = latest_tel.get('character_name')
+        if char and char.strip() and char.strip().lower() != "none":
+            print(f"   - character_name:     {char}")
+        else:
+            print(f"   - character_name:     (ไม่มีตัวละครค้าง / รอสัญญาณสด)")
+        print(f"   - meseta:             {latest_tel.get('meseta', 0):,} ℳ")
         print(f"   - sector_coord:       {latest_tel.get('coord_key', '0,0')} #{latest_tel.get('slot', 1)}")
     print(f" Operatives:       {len(operatives) if isinstance(operatives, dict) else 0} รายการ (มียอดเงินค้าง: {active_ops_with_money})")
     print(f" Sectors:          {len(sectors) if isinstance(sectors, dict) else 0} พิกัด (มีผู้ยึดครองค้าง: {active_sectors_with_money})")
