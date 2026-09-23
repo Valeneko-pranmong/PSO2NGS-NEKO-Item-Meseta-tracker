@@ -9,6 +9,7 @@ ARKS War Room — All-in-One Database Admin & Factory Reset Utility
 4. ตรวจสอบสถานะความพร้อมสดบน Google Firebase Realtime Database (Verify)
 """
 
+import logging
 import os
 import sys
 import json
@@ -18,6 +19,8 @@ import urllib.parse
 import urllib.error
 import argparse
 from typing import Dict, Any, Optional
+
+logger = logging.getLogger("NekoTracker.setup_database")
 
 WORKSPACE_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if WORKSPACE_ROOT not in sys.path:
@@ -47,18 +50,18 @@ if sys.platform == "win32":
         import ctypes
         ctypes.windll.kernel32.SetConsoleOutputCP(65001)
         ctypes.windll.kernel32.SetConsoleCP(65001)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("Failed to set Windows console codepage: %s", exc)
     if hasattr(sys.stdout, "reconfigure"):
         try:
             sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Failed to reconfigure stdout encoding: %s", exc)
     if hasattr(sys.stderr, "reconfigure"):
         try:
             sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Failed to reconfigure stderr encoding: %s", exc)
 
 
 def log_header(msg: str) -> None:
@@ -224,10 +227,10 @@ def safe_factory_reset_local() -> bool:
                     try:
                         os.remove(os.path.join(offline_dir, item))
                         log_ok(f"ลบไฟล์ตกค้าง: {item}")
-                    except Exception:
-                        pass
-        except Exception:
-            pass
+                    except Exception as exc:
+                        logger.debug("safe_factory_reset_local: failed to remove residual file %s: %s", item, exc)
+        except Exception as exc:
+            logger.debug("safe_factory_reset_local: failed to list offline_dir for cleanup: %s", exc)
 
         # รีเซ็ต config
         cfg_file = os.path.join(offline_dir, "ngs_tracker_config.json")
@@ -255,8 +258,8 @@ def safe_factory_reset_local() -> bool:
                 try:
                     os.remove(fp)
                     log_ok(f"ลบ {f} ใน LocalAppData")
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("safe_factory_reset_local: failed to remove %s from LocalAppData: %s", f, exc)
 
     return True
 
@@ -291,8 +294,8 @@ def setup_version_control(firebase_url: str = DEFAULT_FIREBASE_RTDB_URL) -> bool
             existing = None
             try:
                 existing = make_request(url, method="GET")
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("setup_version_control: failed to read existing version_control: %s", exc)
             if isinstance(existing, dict) and existing.get("min_secure_version"):
                 log_ok(f"version_control พร้อมใช้งานอยู่แล้ว (min_secure: {existing.get('min_secure_version')})")
                 return True

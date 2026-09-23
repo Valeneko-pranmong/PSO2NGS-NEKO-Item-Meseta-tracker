@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import sys
 import time
@@ -9,6 +10,8 @@ import webbrowser
 import tkinter as tk
 from typing import Any, Dict, List, Optional, Tuple
 import customtkinter as ctk
+
+logger = logging.getLogger("NekoTracker.war_view")
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
@@ -80,8 +83,8 @@ class WarDashboardFrame(ctk.CTkFrame):
             event_bus.subscribe("realtime_sync_completed", self._on_realtime_sync_completed)
             event_bus.subscribe("board_coord_changed", self._on_board_coord_changed)
             event_bus.subscribe("language_changed", self._on_language_changed)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("_subscribe_events: failed to subscribe events: %s", exc)
 
     def _apply_sync_started(self) -> None:
         if not hasattr(self, "lbl_sync_time") or not self.lbl_sync_time.winfo_exists():
@@ -89,8 +92,8 @@ class WarDashboardFrame(ctk.CTkFrame):
         if getattr(self, "_sync_pending_after_id", None):
             try:
                 self.after_cancel(self._sync_pending_after_id)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("_apply_sync_started: failed to cancel pending after: %s", exc)
             self._sync_pending_after_id = None
         self._sync_started_time = time.time()
         self._is_sync_animating = True
@@ -132,19 +135,19 @@ class WarDashboardFrame(ctk.CTkFrame):
                     self._apply_sync_completed(**data)
             except queue.Empty:
                 break
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("_process_ui_sync_queue: failed to process queue item: %s", exc)
 
     def _poll_ui_sync_queue(self) -> None:
         try:
             self._process_ui_sync_queue()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("_poll_ui_sync_queue: failed to process queue: %s", exc)
         try:
             if hasattr(self, "lbl_sync_time") and self.lbl_sync_time.winfo_exists():
                 self.after(100, self._poll_ui_sync_queue)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("_poll_ui_sync_queue: failed to schedule next poll: %s", exc)
 
     def _on_realtime_sync_started(self, **kwargs) -> None:
         try:
@@ -152,8 +155,8 @@ class WarDashboardFrame(ctk.CTkFrame):
                 self._apply_sync_started()
             else:
                 self._ui_sync_queue.put(("started", kwargs))
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("_on_realtime_sync_started: failed to enqueue sync start: %s", exc)
 
     def _on_realtime_sync_completed(self, success: bool = True, message: str = "", timestamp: float = 0, contribution: int = 0, **kwargs) -> None:
         payload = {
@@ -167,15 +170,15 @@ class WarDashboardFrame(ctk.CTkFrame):
                 self._apply_sync_completed(**payload)
             else:
                 self._ui_sync_queue.put(("completed", payload))
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("_on_realtime_sync_completed: failed to enqueue sync completion: %s", exc)
 
     def _on_board_coord_changed(self, coord: str = "", **kwargs) -> None:
         try:
             if coord and hasattr(self, "coord_var"):
                 self.coord_var.set(coord)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("_on_board_coord_changed: failed to update coord_var: %s", exc)
 
     def _build_ui(self) -> None:
         self.grid_rowconfigure(1, weight=1)
@@ -396,8 +399,8 @@ class WarDashboardFrame(ctk.CTkFrame):
                     btn.configure(fg_color=fg, hover_color=hov, text_color="white")
                 else:
                     btn.configure(fg_color="#E2E8F0", hover_color="#CBD5E1", text_color="#475569")
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("set_active_slot_ui: failed to update slot button: %s", exc)
 
     def _on_slot_button_clicked(self, slot: int) -> None:
         val = self.coord_var.get().strip()
@@ -467,8 +470,8 @@ class WarDashboardFrame(ctk.CTkFrame):
             if hasattr(self, "btn_paste_coord"):
                 self.btn_paste_coord.configure(text=t("war_pasted_btn"), fg_color="#059669")
                 self.after(1200, lambda: self.btn_paste_coord.configure(text=t("war_paste_btn"), fg_color="#2563EB"))
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("_on_paste_coord_clicked: failed to update paste button feedback: %s", exc)
 
     def _handle_coord_paste(self, event=None) -> str:
         """Handle paste event on coordinate entry, auto-parsing coordinates and updating entry."""
@@ -487,8 +490,8 @@ class WarDashboardFrame(ctk.CTkFrame):
                 inner = getattr(self.entry_coord, "_entry", self.entry_coord)
                 inner.select_range(0, tk.END)
                 inner.icursor(tk.END)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("_handle_coord_paste: failed to set cursor position: %s", exc)
             if hasattr(self.war_service, "parse_coordinate"):
                 parsed = self.war_service.parse_coordinate(norm)
                 self.set_active_slot_ui(parsed.slot)
@@ -563,8 +566,8 @@ class WarDashboardFrame(ctk.CTkFrame):
                 )
                 lbl_logo = ctk.CTkLabel(parent, image=self.logo_image, text="")
                 lbl_logo.pack(pady=(4, 0))
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("_build_menu_panel: failed to load logo: %s", exc)
 
         # 2. Brand text
         brand_frame = ctk.CTkFrame(parent, fg_color="transparent")
@@ -615,8 +618,8 @@ class WarDashboardFrame(ctk.CTkFrame):
             try:
                 initial_status = self.controller.lbl_file_status.cget("text")
                 status_color = self.controller.lbl_file_status.cget("text_color")
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("_build_menu_panel: failed to read controller file status: %s", exc)
 
         self.lbl_file_status = ctk.CTkLabel(
             self.status_frame,
@@ -788,8 +791,8 @@ class WarDashboardFrame(ctk.CTkFrame):
     def _on_language_changed(self, language: str = "", **kwargs) -> None:
         try:
             self.retranslate_ui()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("_on_language_changed: retranslate failed: %s", exc)
 
     def retranslate_ui(self) -> None:
         """Update all text in War Dashboard according to current language."""
@@ -844,8 +847,8 @@ class WarDashboardFrame(ctk.CTkFrame):
             if hasattr(self, "dashboard_area") and hasattr(self.dashboard_area, "retranslate_ui"):
                 self.dashboard_area.retranslate_ui()
             self.update_view()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("retranslate_ui: failed to retranslate war dashboard: %s", exc)
 
     def _on_toggle_filter(self) -> None:
         if hasattr(self, "switch_filter") and hasattr(self.controller, "toggle_filter"):
@@ -856,8 +859,8 @@ class WarDashboardFrame(ctk.CTkFrame):
         """Called by controller or timer to refresh war view stats."""
         try:
             self._process_ui_sync_queue()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("update_view: failed to process UI sync queue: %s", exc)
 
         op_name = self.war_service.operative_name or getattr(self.controller, "character_name", "") or "Operative"
 
@@ -885,8 +888,8 @@ class WarDashboardFrame(ctk.CTkFrame):
             try:
                 self.dashboard_area.update_display()
                 self.dashboard_area.update_live_stats()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("update_view: failed to update dashboard area: %s", exc)
 
         # Sync menu controls with controller state
         if hasattr(self, "switch_filter") and hasattr(self.controller, "is_filter_active"):
@@ -895,8 +898,8 @@ class WarDashboardFrame(ctk.CTkFrame):
                     self.switch_filter.select()
                 else:
                     self.switch_filter.deselect()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("update_view: failed to sync filter switch: %s", exc)
 
         if hasattr(self, "lbl_file_status") and hasattr(self.controller, "lbl_file_status"):
             try:
@@ -904,8 +907,8 @@ class WarDashboardFrame(ctk.CTkFrame):
                     text=self.controller.lbl_file_status.cget("text"),
                     text_color=self.controller.lbl_file_status.cget("text_color"),
                 )
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("update_view: failed to sync file status label: %s", exc)
 
         is_syncing = getattr(self.war_service, "_is_syncing", False) or getattr(self, "_is_sync_animating", False)
         last_sync_time = getattr(self.war_service, "_last_sync_time", 0)
@@ -924,8 +927,8 @@ class WarDashboardFrame(ctk.CTkFrame):
                         text=new_text,
                         text_color=new_color,
                     )
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("update_view: failed to update sync time label: %s", exc)
 
     def _open_web_war_room(self) -> None:
         try:

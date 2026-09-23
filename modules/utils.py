@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any, Dict, List, Optional, Tuple, Union
+
+logger = logging.getLogger("NekoTracker.utils")
 
 
 def format_compact(value: Union[int, float]) -> str:
@@ -125,8 +128,8 @@ class WindowMover:
             import sys
             if sys.platform == "win32":
                 self._is_win32 = True
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("WindowMover.__init__: failed to detect platform: %s", exc)
 
     def _get_hwnd(self) -> Optional[int]:
         if not self._is_win32:
@@ -168,13 +171,13 @@ class WindowMover:
                 # SWP_NOSIZE (1) | SWP_NOZORDER (4) | SWP_NOACTIVATE (16) = 0x0015
                 if ctypes.windll.user32.SetWindowPos(hwnd, 0, new_x, new_y, 0, 0, 0x0015):
                     return
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("WindowMover.do_move: SetWindowPos failed: %s", exc)
 
         try:
             self.window.geometry(f"+{new_x}+{new_y}")
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("WindowMover.do_move: geometry fallback failed: %s", exc)
 
     def end_move(self, event: Any = None) -> None:
         """Invoked on mouse release to finalize window placement and trigger callbacks."""
@@ -183,8 +186,8 @@ class WindowMover:
                 wx = self.window.winfo_x()
                 wy = self.window.winfo_y()
                 self.on_move_end(wx, wy)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("WindowMover.end_move: on_move_end callback failed: %s", exc)
 
 
 def is_position_on_screen(x: int, y: int, width: int = 100, height: int = 100) -> bool:
@@ -199,8 +202,8 @@ def is_position_on_screen(x: int, y: int, width: int = 100, height: int = 100) -
             # MONITOR_DEFAULTTONULL = 0
             hmon = ctypes.windll.user32.MonitorFromPoint(pt, 0)
             return bool(hmon)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("is_position_on_screen: monitor check failed: %s", exc)
     return True
 
 
@@ -225,8 +228,8 @@ def get_secondary_monitor_origin() -> Optional[Tuple[int, int]]:
                 for left, top, right, bottom in monitors:
                     if left != 0 or top != 0:
                         return (left + 60, top + 60)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("get_secondary_monitor_origin: monitor enumeration failed: %s", exc)
     return None
 
 
@@ -304,16 +307,16 @@ class SingleInstanceGuard:
                 user32.ShowWindow(found_hwnd, 9)
                 user32.SetForegroundWindow(found_hwnd)
                 return True
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("SingleInstanceGuard.activate_existing_window: failed to activate: %s", exc)
         return False
 
     def release(self) -> None:
         if self._is_win32 and self.mutex:
             try:
                 self.kernel32.CloseHandle(self.mutex)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("SingleInstanceGuard.release: CloseHandle failed: %s", exc)
             self.mutex = None
 
 
@@ -329,7 +332,7 @@ def cleanup_legacy_auth_session() -> bool:
         if os.path.exists(legacy_file):
             os.remove(legacy_file)
             return True
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("cleanup_legacy_auth_session: failed to remove legacy file: %s", exc)
     return False
 

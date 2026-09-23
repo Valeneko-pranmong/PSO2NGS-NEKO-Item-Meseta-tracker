@@ -1,6 +1,9 @@
+import logging
 import os
 import sys
 from typing import Tuple
+
+logger = logging.getLogger("NekoTracker.security.path")
 
 
 def is_reparse_point_or_symlink(path: str) -> bool:
@@ -35,8 +38,8 @@ def is_reparse_point_or_symlink(path: str) -> bool:
                 if parent == curr:
                     break
                 curr = parent
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("is_reparse_point_or_symlink: reparse point check failed: %s", exc)
 
     return False
 

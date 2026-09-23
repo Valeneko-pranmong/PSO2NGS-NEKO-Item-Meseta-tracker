@@ -7,12 +7,15 @@ tabbed category navigation, Discord community integration, and official credit:
 
 from __future__ import annotations
 
+import logging
 import os
 import webbrowser
 from typing import Any, Dict, List, Optional
 import tkinter as tk
 import customtkinter as ctk
 from PIL import Image
+
+logger = logging.getLogger("NekoTracker.guide")
 
 from modules.utils import WindowMover, start_native_drag
 from config import (
@@ -745,8 +748,8 @@ class GuideWindow(ctk.CTkToplevel):
                 self.icon_ctk = ctk.CTkImage(img, size=(22, 22))
                 self.lbl_icon = ctk.CTkLabel(self.header_bar, text="", image=self.icon_ctk)
                 self.lbl_icon.pack(side="left", padx=(12, 6))
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("GuideWindow.build_ui: failed to load icon: %s", exc)
 
         self.lbl_title = ctk.CTkLabel(
             self.header_bar,
@@ -931,14 +934,14 @@ class GuideWindow(ctk.CTkToplevel):
     def _on_language_changed_event(self, language: str = "", **kwargs: Any) -> None:
         try:
             self.retranslate_ui()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("GuideWindow._on_language_changed_event: retranslate failed: %s", exc)
 
     def _on_close(self) -> None:
         try:
             event_bus.unsubscribe("language_changed", self._on_lang_sub)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("GuideWindow._on_close: failed to unsubscribe: %s", exc)
         self.destroy()
 
     def retranslate_ui(self) -> None:
@@ -972,8 +975,8 @@ class GuideWindow(ctk.CTkToplevel):
 
             # Re-render active tab content
             self.render_tab_content(self.current_tab)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("GuideWindow.retranslate_ui: failed to retranslate: %s", exc)
 
     def _confirm_and_uninstall(self) -> None:
         """Confirm with user and launch the uninstaller cleanly."""
@@ -1248,8 +1251,8 @@ class GuideWindow(ctk.CTkToplevel):
         """Open official Discord invite URL."""
         try:
             webbrowser.open(DEFAULT_DISCORD_URL)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("GuideWindow.open_discord: failed to open URL: %s", exc)
 
     def copy_discord_link(self) -> None:
         """Copy Discord invite link to system clipboard and show toast."""
@@ -1261,8 +1264,8 @@ class GuideWindow(ctk.CTkToplevel):
             self.clipboard_append(text_to_copy)
             self.update()
             self.show_toast(feedback_msg)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("GuideWindow._copy_text: clipboard operation failed: %s", exc)
 
     def show_toast(self, message: str) -> None:
         self.lbl_toast.configure(text=message)

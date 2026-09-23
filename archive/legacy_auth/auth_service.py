@@ -6,9 +6,12 @@ Status: RETIRED / ARCHIVED. Authentication credentials are no longer required.
 from __future__ import annotations
 
 import json
+import logging
 import os
 from typing import Any, Dict, Optional, Tuple
 from urllib.parse import urlparse
+
+logger = logging.getLogger("NekoTracker.legacy_auth")
 
 try:
     from ..event_bus import event_bus
@@ -228,8 +231,8 @@ class AuthService:
             db_file = os.path.join(self.session_dir, "database_meseta_records.json")
             with open(db_file, "w", encoding="utf-8") as f:
                 json.dump(record, f, ensure_ascii=False, indent=2)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("save_meseta_to_database: failed to write local database cache: %s", exc)
 
         return True, "บันทึกลงฐานข้อมูลเรียบร้อย"
 
@@ -276,8 +279,8 @@ class AuthService:
         if self._client and self._current_user and self._current_user.get("mode") == "supabase":
             try:
                 self._client.auth.sign_out()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("sign_out: failed to sign out from Supabase: %s", exc)
 
         self._current_user = None
         self._clear_session_file()

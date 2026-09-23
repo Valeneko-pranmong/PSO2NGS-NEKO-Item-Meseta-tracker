@@ -5,12 +5,15 @@ Status: RETIRED / ARCHIVED. Login UI is no longer displayed.
 """
 from __future__ import annotations
 
+import logging
 import os
 import sys
 import tkinter as tk
 from typing import Any, Callable, Optional
 import customtkinter as ctk
 from PIL import Image
+
+logger = logging.getLogger("NekoTracker.legacy_auth_view")
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
@@ -134,8 +137,8 @@ class AuthFrame(ctk.CTkFrame):
         if hasattr(self, "opt_team"):
             try:
                 delattr(self, "opt_team")
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("_render: failed to delete opt_team attribute: %s", exc)
         for widget in self.content_frame.winfo_children():
             widget.destroy()
         for widget in self.bottom_frame.winfo_children():

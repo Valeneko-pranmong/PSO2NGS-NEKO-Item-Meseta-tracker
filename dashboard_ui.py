@@ -6,6 +6,9 @@ from modules.utils import format_duration, format_rate, filter_and_sort_items, c
 from modules.i18n import t
 from modules.event_bus import event_bus
 
+import logging
+logger = logging.getLogger('NekoTracker.dashboard')
+
 class DashboardFrame(ctk.CTkFrame):
     def __init__(self, parent, controller):
         super().__init__(parent, fg_color=COLOR_BG_MAIN, corner_radius=0) 
@@ -81,14 +84,14 @@ class DashboardFrame(ctk.CTkFrame):
 
         try:
             event_bus.subscribe("language_changed", self._on_language_changed)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(f'[__init__] subscribing to language change events: {exc}')
 
     def _on_language_changed(self, language: str = "", **kwargs) -> None:
         try:
             self.retranslate_ui()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(f'[_on_language_changed] handling language change: {exc}')
 
     def retranslate_ui(self) -> None:
         """Update all displayed text to current active language."""
@@ -106,8 +109,8 @@ class DashboardFrame(ctk.CTkFrame):
             if hasattr(self, "lbl_drops_title") and self.lbl_drops_title.winfo_exists():
                 self.lbl_drops_title.configure(text=t("header_drops"))
             self.update_display()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(f'[retranslate_ui] retranslating dashboard text: {exc}')
 
     def on_search_change(self, *args):
         self.controller.search_keyword = self.search_var.get().strip().lower()

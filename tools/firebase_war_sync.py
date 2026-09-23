@@ -32,7 +32,7 @@ import urllib.request
 import urllib.parse
 from typing import Dict, Any, List, Optional
 
-logger = logging.getLogger("firebase_war_sync")
+logger = logging.getLogger("NekoTracker.firebase_sync")
 
 try:
     from modules.version import (
@@ -456,8 +456,8 @@ class ARKSFirebaseBroadcaster:
                 )
                 with urllib.request.urlopen(req, timeout=3.5):
                     pass
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("push_war_log: failed to POST war log via REST: %s", exc)
         print(f"[✓] บันทึกสงคราม: {message}")
 
 

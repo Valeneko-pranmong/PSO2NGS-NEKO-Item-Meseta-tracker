@@ -42,8 +42,8 @@ from modules.security import (
 try:
     myappid = f'neko.family.shop.tracker v{CLIENT_VERSION}' 
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
-except Exception:
-    pass
+except Exception as exc:
+    logger.debug(f'[<module>] setting app user model ID: {exc}')
 
 app_data_dir = os.getenv('APPDATA') or os.path.expanduser('~')
 config_dir = os.path.join(app_data_dir, "NekoTrackerOffline") 
@@ -270,8 +270,8 @@ class NGSTrackerApp(ctk.CTk):
                     self.lbl_file_status.configure(text=self.pending_status_text, text_color=getattr(self, 'pending_status_color', "black"))
                     if hasattr(self, "war_view") and hasattr(self.war_view, "lbl_file_status"):
                         self.war_view.lbl_file_status.configure(text=self.pending_status_text, text_color=getattr(self, 'pending_status_color', "black"))
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug(f'[update_live_clock] updating status label: {exc}')
             self.pending_status_text = None
 
         if getattr(self, 'needs_ui_update', False):
@@ -282,8 +282,8 @@ class NGSTrackerApp(ctk.CTk):
                         self.war_view.dashboard_area.update_display()
                 if has_overlay:
                     self.overlay_window.update_data()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug(f'[update_live_clock] updating dashboard display: {exc}')
             self.needs_ui_update = False 
 
         if self.first_drop_time is not None:
@@ -294,14 +294,14 @@ class NGSTrackerApp(ctk.CTk):
                         self.war_view.dashboard_area.update_live_stats()
                 if has_overlay:
                     self.overlay_window.update_data()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug(f'[update_live_clock] updating live stats: {exc}')
 
         if not is_iconic and getattr(self, "current_view", "offline") == "war" and hasattr(self, "war_view") and self.war_view.winfo_ismapped():
             try:
                 self.war_view.update_view()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug(f'[update_live_clock] updating war view: {exc}')
             
         self.after(1000, self.update_live_clock)
 
@@ -309,8 +309,8 @@ class NGSTrackerApp(ctk.CTk):
         try:
             if os.path.exists(ICON_FILENAME):
                 self.iconbitmap(default=ICON_FILENAME)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(f'[setup_icon] setting window icon: {exc}')
 
     def build_title_bar(self):
         self.title_bar = ctk.CTkFrame(self.main_container, height=40, corner_radius=0, fg_color="transparent")
@@ -325,8 +325,8 @@ class NGSTrackerApp(ctk.CTk):
                 icon_lbl.bind("<B1-Motion>", self.do_move)
                 icon_lbl.bind("<ButtonRelease-1>", self.end_move)
                 icon_lbl.bind("<Double-Button-1>", self.toggle_maximize)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug(f'[build_title_bar] loading title bar icon: {exc}')
 
         title_text = t("app_title_offline")
         self.title_label = ctk.CTkLabel(
@@ -440,8 +440,8 @@ class NGSTrackerApp(ctk.CTk):
                     self.war_service.set_operative(character_name)
                 if getattr(self, "current_view", "") == "war" and hasattr(self, "war_view") and self.war_view.winfo_ismapped():
                     self.war_view.update_view()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(f'[_on_character_detected] handling character detection: {exc}')
 
     def enter_war_mode(self):
         self.show_war_view()
@@ -450,8 +450,8 @@ class NGSTrackerApp(ctk.CTk):
         self.current_view = "offline"
         try:
             self.title_label.configure(text=t("app_title_offline"))
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(f'[show_offline_view] setting offline title: {exc}')
         if hasattr(self, "war_view"):
             self.war_view.grid_remove()
         if hasattr(self, "war_service"):
@@ -464,8 +464,8 @@ class NGSTrackerApp(ctk.CTk):
         self.current_view = "war"
         try:
             self.title_label.configure(text=t("app_title_war"))
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(f'[show_war_view] setting war title: {exc}')
         self.offline_container.grid_remove()
 
         if not hasattr(self, "war_view"):
@@ -542,8 +542,8 @@ class NGSTrackerApp(ctk.CTk):
         self.overrideredirect(True)
         try:
             self.unbind("<Map>")
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(f'[_on_restore_window] unbinding Map event: {exc}')
         self.after(50, self.force_taskbar_icon)
 
     def _enable_test_mode_bypasses(self):
@@ -564,8 +564,8 @@ class NGSTrackerApp(ctk.CTk):
         if hasattr(self, "test_mode_badge") and self.test_mode_badge.winfo_exists():
             try:
                 self.test_mode_badge.pack(side="left", padx=6, pady=5)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug(f'[_enable_test_mode_bypasses] showing test mode badge: {exc}')
             
     def confirm_reset(self):
         if self.confirm_dialog is not None and self.confirm_dialog.winfo_exists():
@@ -612,8 +612,8 @@ class NGSTrackerApp(ctk.CTk):
 
         try:
             dlg.grab_set()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(f'[do_confirm] setting dialog grab: {exc}')
 
     def reset_data(self):
         with self.data_lock:
@@ -645,22 +645,22 @@ class NGSTrackerApp(ctk.CTk):
         self.stop_event.set()
         try:
             self.save_settings()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(f'[on_close] saving settings on close: {exc}')
         if hasattr(self, "single_instance_guard") and self.single_instance_guard:
             try:
                 self.single_instance_guard.release()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug(f'[on_close] releasing single instance guard: {exc}')
         if hasattr(self, "war_service") and hasattr(self.war_service, "stop"):
             try:
                 self.war_service.stop()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug(f'[on_close] stopping war service: {exc}')
         try:
             self.destroy()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(f'[on_close] destroying main window: {exc}')
         sys.exit(0)
 
     def open_how_to_use(self, tab: str = "setup"):
@@ -683,8 +683,8 @@ class NGSTrackerApp(ctk.CTk):
                     self.switch_filter.select()
                 else:
                     self.switch_filter.deselect()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug(f'[toggle_filter] toggling filter switch: {exc}')
 
         if hasattr(self, "war_view") and hasattr(self.war_view, "switch_filter"):
             try:
@@ -692,8 +692,8 @@ class NGSTrackerApp(ctk.CTk):
                     self.war_view.switch_filter.select()
                 else:
                     self.war_view.switch_filter.deselect()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug(f'[toggle_filter] toggling war view filter switch: {exc}')
 
         self.trigger_update_ui()
 
@@ -741,8 +741,8 @@ class NGSTrackerApp(ctk.CTk):
                 try:
                     corrupt_cfg = CONFIG_FILE + f".corrupt.{int(time.time())}"
                     shutil.copy2(CONFIG_FILE, corrupt_cfg)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug(f'[load_settings] backing up corrupt config: {exc}')
 
         self.apply_initial_geometry()
         self.set_app_language(saved_lang, save=False)
@@ -773,8 +773,8 @@ class NGSTrackerApp(ctk.CTk):
                 wy = self.winfo_y()
                 if wx > -10000 and wy > -10000 and not getattr(self, "is_maximized", False):
                     self.window_pos = {"x": wx, "y": wy}
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(f'[save_settings] reading window position: {exc}')
 
         data = {
             "watchlist": self.watchlist_items,
@@ -868,8 +868,8 @@ class NGSTrackerApp(ctk.CTk):
                         self.player_id = pid
                         self.event_bus.emit("character_detected", character_name=cname, player_id=self.player_id)
                         return cname
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(f'[detect_character_from_file] reading character from log file: {exc}')
         return self.character_name or ""
 
     def ensure_character_from_log(self) -> str:
@@ -907,8 +907,8 @@ class NGSTrackerApp(ctk.CTk):
                     icon_ctk = ctk.CTkImage(img, size=(20, 20))
                     icon_lbl = ctk.CTkLabel(title_bar, text="", image=icon_ctk)
                     icon_lbl.pack(side="left", padx=(15, 5), pady=5)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug(f'[open_watchlist_editor] loading watchlist editor icon: {exc}')
 
             title_label = ctk.CTkLabel(title_bar, text=t("dialog_watchlist_title"), font=(FONT_FAMILY, 14, "bold"), text_color="#333333")
             title_label.pack(side="left", padx=5, pady=5)
@@ -955,8 +955,8 @@ class NGSTrackerApp(ctk.CTk):
                 target_h = int(h * (target_w / w))
                 self.logo_img_obj = ctk.CTkImage(img, size=(target_w, target_h))
                 ctk.CTkLabel(self.sidebar, text="", image=self.logo_img_obj).pack(pady=(20, 5))
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug(f'[load_logo] loading logo image: {exc}')
 
     def design_brand_text(self):
         brand_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
@@ -993,8 +993,8 @@ class NGSTrackerApp(ctk.CTk):
                 check_counter = 0
                 try:
                     self.find_latest_log_file()
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug(f'[monitor_log_file] finding latest log file: {exc}')
             
             if self.log_path and os.path.exists(self.log_path):
                 try:
@@ -1120,12 +1120,12 @@ class NGSTrackerApp(ctk.CTk):
             try:
                 # HWND_NOTOPMOST = -2
                 ctypes.windll.user32.SetWindowPos(hwnd, -2, 0, 0, 0, 0, 0x0013)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug(f'[force_taskbar_icon] setting window position flags: {exc}')
             self.withdraw()
             self.deiconify()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(f'[force_taskbar_icon] forcing taskbar icon visibility: {exc}')
 
     def summon_main_window(self):
         self.deiconify()
@@ -1224,8 +1224,8 @@ class NGSTrackerApp(ctk.CTk):
 
             if getattr(self, 'guide_window', None) and self.guide_window.winfo_exists():
                 self.guide_window.retranslate_ui()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(f'[retranslate_ui] retranslating overlay text: {exc}')
 
 if __name__ == "__main__":
     from modules.utils import SingleInstanceGuard
@@ -1238,6 +1238,6 @@ if __name__ == "__main__":
     app.single_instance_guard = guard
     try:
         app.protocol("WM_DELETE_WINDOW", app.on_close)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug(f'[retranslate_ui] setting close protocol: {exc}')
     app.mainloop()

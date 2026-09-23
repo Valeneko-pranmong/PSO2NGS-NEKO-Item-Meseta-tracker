@@ -16,6 +16,9 @@ from modules.utils import (
 from modules.i18n import t
 from modules.event_bus import event_bus
 
+import logging
+logger = logging.getLogger('NekoTracker.overlay')
+
 # Backward-compatible aliases
 _format_compact = format_compact
 _format_rate = format_rate
@@ -45,8 +48,8 @@ class OverlayWindow(ctk.CTkToplevel):
 
         try:
             event_bus.subscribe("language_changed", self._on_language_changed)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(f'[__init__] subscribing to language change events: {exc}')
 
         if os.path.exists(ICON_FILENAME):
             try:
@@ -350,8 +353,8 @@ class OverlayWindow(ctk.CTkToplevel):
     def _on_language_changed(self, language: str = "", **kwargs) -> None:
         try:
             self.retranslate_ui()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(f'[_on_language_changed] handling language change: {exc}')
 
     def retranslate_ui(self) -> None:
         """Update all text in Overlay window according to current language."""
@@ -369,8 +372,8 @@ class OverlayWindow(ctk.CTkToplevel):
             if hasattr(self, "lbl_drops") and self.lbl_drops.winfo_exists():
                 self.lbl_drops.configure(text=t("overlay_drops_cap"))
             self.update_data()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(f'[retranslate_ui] retranslating overlay text: {exc}')
 
     def destroy(self):
         try:
@@ -381,12 +384,12 @@ class OverlayWindow(ctk.CTkToplevel):
                     self.controller.overlay_pos = {"x": ox, "y": oy}
                     if hasattr(self.controller, "save_settings"):
                         self.controller.save_settings()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(f'[destroy] saving overlay position on destroy: {exc}')
         try:
             event_bus.unsubscribe("language_changed", self._on_language_changed)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(f'[destroy] unsubscribing from language events: {exc}')
         super().destroy()
 
     def _make_row(self):

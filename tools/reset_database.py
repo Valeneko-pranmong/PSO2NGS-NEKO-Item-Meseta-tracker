@@ -6,6 +6,7 @@ NEKO Item & Meseta Tracker - Authoritative Database Reset Utility
 เพื่อให้พร้อมสำหรับการทดสอบของผู้ใช้แบบ Clean Slate 100%
 """
 
+import logging
 import os
 import sys
 import json
@@ -13,6 +14,8 @@ import time
 import urllib.request
 import urllib.parse
 from typing import Dict, Any, List
+
+logger = logging.getLogger("NekoTracker.reset_database")
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if ROOT_DIR not in sys.path:
@@ -210,10 +213,10 @@ def reset_local_database() -> bool:
                     try:
                         os.remove(item_path)
                         log(f"  [✓] ลบไฟล์สำรอง {item} สำเร็จ")
-                    except Exception:
-                        pass
-        except Exception:
-            pass
+                    except Exception as exc:
+                        logger.debug("reset_local_database: failed to remove residual file %s: %s", item, exc)
+        except Exception as exc:
+            logger.debug("reset_local_database: failed to list offline_dir for cleanup: %s", exc)
 
         # 4. รีเซ็ตพิกัดใน ngs_tracker_config.json กลับสู่ค่าเริ่มต้น
         cfg_file = os.path.join(offline_dir, "ngs_tracker_config.json")
@@ -242,8 +245,8 @@ def reset_local_database() -> bool:
                 try:
                     os.remove(fp)
                     log(f"  [✓] ลบ {f} ใน LocalAppData สำเร็จ")
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("reset_local_database: failed to remove %s from LocalAppData: %s", f, exc)
 
     log("ล้างฐานข้อมูลในเครื่องสำเร็จเรียบร้อย!")
     return True

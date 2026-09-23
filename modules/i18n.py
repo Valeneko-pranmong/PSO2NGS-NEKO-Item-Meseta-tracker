@@ -8,7 +8,10 @@ for both Offline Tracking and Online ARKS War Room features.
 from __future__ import annotations
 
 import locale
+import logging
 from typing import Any, Callable, Dict, List, Optional
+
+logger = logging.getLogger("NekoTracker.i18n")
 
 SUPPORTED_LANGUAGES = ["en", "th", "ja"]
 DEFAULT_LANGUAGE = "en"
@@ -440,14 +443,14 @@ class I18n:
             try:
                 from modules.event_bus import event_bus
                 event_bus.emit("language_changed", language=self._current_lang)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("I18n.set_language: event_bus emit failed: %s", exc)
 
             for callback in list(self._listeners):
                 try:
                     callback(self._current_lang)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("I18n.set_language: listener callback failed: %s", exc)
 
         return changed
 

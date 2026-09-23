@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import shutil
@@ -10,6 +11,8 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import urllib.request
 import urllib.parse
 import urllib.error
+
+logger = logging.getLogger("NekoTracker.war_service")
 
 try:
     from ..event_bus import event_bus
@@ -345,8 +348,8 @@ class WarService:
                 try:
                     data = json.loads(s)
                     return cls.parse_coordinate(data, default_slot=default_slot)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("parse_coordinate: failed to parse JSON coord string: %s", exc)
 
             slot_val = None
             slot_match = re.search(r'(?:slot|ช่อง|\#)\s*[:=]?\s*([1-4])\b', s, re.IGNORECASE)
@@ -589,8 +592,8 @@ class WarService:
                     # Database is empty (null): Auto-bootstrap version_control baseline
                     if self.bootstrap_version_control_policy(timeout=timeout):
                         return self.remote_policy
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("fetch_remote_version_policy: failed to fetch policy: %s", exc)
         return {}
 
     def is_version_secure(self, version: Optional[str] = None) -> bool:
@@ -828,8 +831,8 @@ class WarService:
             self.event_bus.unsubscribe("character_detected", self.on_character_detected)
             self.event_bus.unsubscribe("board_coord_changed", self.on_board_coord_changed)
             self.event_bus.unsubscribe("tamper_violation", self.on_tamper_violation)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("stop: failed to unsubscribe events: %s", exc)
 
     def sync_to_cloud_database(self, timeout: float = 3.5) -> Tuple[bool, str]:
         """
@@ -929,8 +932,8 @@ class WarService:
                     if isinstance(sub_parsed, dict) and "meseta" in sub_parsed:
                         with self._state_lock:
                             self.slot_farmed[slot_key] = max(0, int(sub_parsed.get("meseta", 0)))
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("sync_to_cloud_database: failed to fetch existing slot contribution: %s", exc)
 
         slot_meseta = self.slot_farmed.get(slot_key, 0)
         counted_slot_meseta = slot_meseta if is_secure else 0
@@ -1042,8 +1045,8 @@ class WarService:
                 try:
                     with urllib.request.urlopen(req_sec, timeout=timeout) as resp:
                         pass
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("sync_to_cloud_database: sector PUT fallback failed: %s", exc)
 
                 url_sub = f"{base_url}/arks_war_room/sectors/{urllib.parse.quote(coord_key)}/sub_cells/{slot}/challengers/{urllib.parse.quote(safe_key)}.json"
                 req_sub = urllib.request.Request(
@@ -1055,8 +1058,8 @@ class WarService:
                 try:
                     with urllib.request.urlopen(req_sub, timeout=timeout) as resp:
                         pass
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("sync_to_cloud_database: sub-cell PUT fallback failed: %s", exc)
 
                 url_tel = f"{base_url}/arks_war_room/latest_telemetry.json"
                 req_tel = urllib.request.Request(
@@ -1068,8 +1071,8 @@ class WarService:
                 try:
                     with urllib.request.urlopen(req_tel, timeout=timeout) as resp:
                         pass
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("sync_to_cloud_database: telemetry PUT fallback failed: %s", exc)
 
             # If client version is insecure, log security warning and reject counting meseta
             if not is_secure:
@@ -1098,8 +1101,8 @@ class WarService:
                 try:
                     with urllib.request.urlopen(req_log, timeout=timeout) as resp:
                         pass
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("sync_to_cloud_database: security warning log POST failed: %s", exc)
                 return False, f"ไคลเอนต์เวอร์ชัน {client_ver} มีช่องโหว่ความปลอดภัย ยอดเงินจะไม่ถูกนับเข้าสู่ฐานข้อมูล (กรุณาอัปเดตเป็น 7.1.0)"
 
             # 5. Add to live war logs when contribution increases
@@ -1137,8 +1140,8 @@ class WarService:
                 try:
                     with urllib.request.urlopen(req_log, timeout=timeout) as resp:
                         pass
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("sync_to_cloud_database: war log POST failed: %s", exc)
 
             self._last_synced_coord_key = coord_key
             self._last_synced_slot = slot
@@ -1309,8 +1312,8 @@ class WarService:
                             existing_op = str(existing.get("operative_name", "")).strip()
                             if existing_op and existing_op != "Operative":
                                 return
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("_save_stats: failed to read existing stats for guard check: %s", exc)
 
             with self._state_lock:
                 data = {
@@ -1398,8 +1401,8 @@ class WarService:
                 corrupt_backup = self.stats_file + f".corrupt.{int(time.time())}"
                 if os.path.exists(self.stats_file):
                     shutil.copy2(self.stats_file, corrupt_backup)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("_load_saved_stats: failed to backup corrupted stats file: %s", exc)
             self.add_log(f"ตรวจพบไฟล์ฐานข้อมูลในเครื่องเสียหาย ({corrupt_reason}) — สำรองไฟล์เดิมและกู้คืนอัตโนมัติ", "warning")
             self._save_stats()
 

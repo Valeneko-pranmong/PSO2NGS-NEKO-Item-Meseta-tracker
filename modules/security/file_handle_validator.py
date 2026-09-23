@@ -1,7 +1,10 @@
+import logging
 import os
 import sys
 import time
 from typing import List, Optional, Tuple
+
+logger = logging.getLogger("NekoTracker.security.file_handle")
 
 
 class IFileHandleValidator:
@@ -173,8 +176,8 @@ class WindowsRestartManagerFileValidator(IFileHandleValidator):
                         results.append(
                             (arr[i].Process.dwProcessId, arr[i].strAppName)
                         )
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("_query_restart_manager: failed to query file handles: %s", exc)
         finally:
             rstrtmgr.RmEndSession(session_handle)
 

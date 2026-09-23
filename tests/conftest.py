@@ -1,6 +1,9 @@
+import logging
 import os
 import pytest
 from unittest.mock import MagicMock, patch
+
+logger = logging.getLogger("NekoTracker.tests")
 
 @pytest.fixture(autouse=True, scope="session")
 def isolate_test_environment(tmp_path_factory):
@@ -37,5 +40,5 @@ def shared_app():
         if hasattr(app, "stop_monitoring"):
             app.stop_monitoring()
         app.destroy()
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("shared_app teardown suppressed: %s", exc)
