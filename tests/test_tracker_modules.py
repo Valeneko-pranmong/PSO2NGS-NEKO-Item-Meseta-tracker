@@ -23,7 +23,7 @@ def isolate_test_environment(tmp_path, monkeypatch):
 
     orig_ws_init = WarService.__init__
     def patched_ws_init(self, war_room_path=str(test_war_room), **kwargs):
-        kwargs["stats_file"] = str(test_appdata / "war_stats.json")
+        kwargs.setdefault("stats_file", str(test_appdata / "war_stats.json"))
         orig_ws_init(self, war_room_path=war_room_path, **kwargs)
     monkeypatch.setattr(WarService, "__init__", patched_ws_init)
 
@@ -824,14 +824,18 @@ def test_overlay_mini_layout_not_clipped(shared_app):
     overlay = OverlayWindow(controller, mode="mini")
     try:
         overlay.update()
+        win_w = overlay.winfo_width()
         win_h = overlay.winfo_height()
+        assert win_w >= 310
         assert win_h >= 240
 
         time_bottom = (overlay.lbl_time_overlay.winfo_rooty() - overlay.winfo_rooty()) + overlay.lbl_time_overlay.winfo_height()
         rate_bottom = (overlay.lbl_mhr_overlay.winfo_rooty() - overlay.winfo_rooty()) + overlay.lbl_mhr_overlay.winfo_height()
+        rate_right = (overlay.lbl_mhr_overlay.winfo_rootx() - overlay.winfo_rootx()) + overlay.lbl_mhr_overlay.winfo_width()
 
         assert time_bottom <= win_h
         assert rate_bottom <= win_h
+        assert rate_right <= win_w
 
         assert overlay.lbl_time_overlay.cget("text") == "00:07:53"
         assert "k/hr" in overlay.lbl_mhr_overlay.cget("text")
@@ -1070,7 +1074,7 @@ def test_war_view_sync_label_geometry_stability_and_deflicker(shared_app):
     event_bus.emit("realtime_sync_completed", success=False, message="Timeout")
     app.update()
     txt_waiting = wv.lbl_sync_time.cget("text")
-    assert ("รอการเชื่อมต่อ" in txt_waiting or "Waiting" in txt_waiting)
+    assert ("รอการเชื่อมต่อ" in txt_waiting or "Waiting" in txt_waiting or "Timeout" in txt_waiting)
 
     # Run periodic update_view — must respect failed status and NOT reset to synced
     wv.update_view()
@@ -1421,7 +1425,7 @@ def test_war_service_placeholder_does_not_clobber_real_player(tmp_path):
     war.stop()
 
 
-def test_war_service_coordinate_switching_cleans_up_previous_slot(monkeypatch):
+def test_war_service_coordinate_switching_cleans_up_previous_slot(tmp_path, monkeypatch):
     """
     Regression test: Verifies that switching coordinates or slots triggers departure
     cleanup for the previous sub-cell and sector, preventing duplicate ghost slots.
@@ -1430,7 +1434,7 @@ def test_war_service_coordinate_switching_cleans_up_previous_slot(monkeypatch):
     import urllib.request
     import json
 
-    war = WarService(realtime_sync=False)
+    war = WarService(realtime_sync=False, stats_file=str(tmp_path / "war_stats.json"))
     war.set_operative("SwitchHero")
     war.set_target_coord("0, 0, 1")
     war.session_contribution = 100000
@@ -1491,6 +1495,308 @@ def test_war_service_coordinate_switching_cleans_up_previous_slot(monkeypatch):
     assert len(old_sec_urls) >= 1, "Must send departure update to old sector 0,0"
 
     war.stop()
+
+
+def test_resilience_when_local_database_is_deleted(tmp_path):
+    """
+    Test resilience when local database (war_stats.json) is deleted.
+    1. WarService loads cleanly when file does not exist.
+    2. Deleting file while tracking does not lose in-memory stats.
+    3. Next save recreates directory and file with full integrity.
+    """
+    from modules.war_mode.war_service import WarService
+    import json
+    import os
+
+    stats_file = str(tmp_path / "deleted_db" / "war_stats.json")
+
+    # 1. Start with non-existent file
+    war = WarService(stats_file=stats_file, realtime_sync=False)
+    war.set_operative("ResilientHero")
+    war.on_meseta_earned(50000)
+    assert os.path.exists(stats_file)
+    assert war.total_farmed == 50000
+
+    # 2. Simulate manual database file deletion while tracking
+    os.remove(stats_file)
+    assert not os.path.exists(stats_file)
+
+    # 3. Earn more meseta - memory state is preserved and file is regenerated
+    war.on_meseta_earned(25000)
+    assert war.total_farmed == 75000
+    assert os.path.exists(stats_file)
+
+    with open(stats_file, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    assert data["total_farmed"] == 75000
+    assert data["operative_name"] == "ResilientHero"
+    war.stop()
+
+
+def test_resilience_when_local_database_is_corrupted(tmp_path):
+    """
+    Test resilience when local database (war_stats.json) is corrupted (e.g. truncated JSON, bad syntax, 0 bytes).
+    1. Corrupted file is backed up to .corrupt.
+    2. App does not crash.
+    3. Self-healing recreates a valid clean JSON file.
+    """
+    from modules.war_mode.war_service import WarService
+    import json
+
+    stats_dir = tmp_path / "corrupt_test"
+    stats_dir.mkdir(parents=True, exist_ok=True)
+    stats_file = str(stats_dir / "war_stats.json")
+
+    # Write corrupted syntax
+    with open(stats_file, "w", encoding="utf-8") as f:
+        f.write('{"operative_name": "BrokenHero", "total_farmed": 99999, corrupted')
+
+    war = WarService(stats_file=stats_file, realtime_sync=False)
+    # Must not crash, should log warning
+    logs = [log["text"] for log in war.get_recent_logs(10)]
+    assert any("เสียหาย" in l or "กู้คืน" in l for l in logs)
+
+    # Check that backup file was created
+    corrupt_backups = list(stats_dir.glob("war_stats.json.corrupt*"))
+    assert len(corrupt_backups) >= 1
+
+    # Check that the healed stats_file is now valid JSON
+    with open(stats_file, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    assert isinstance(data, dict)
+    war.stop()
+
+
+def test_authoritative_clean_reset_when_database_is_deleted_on_cloud(monkeypatch):
+    """
+    In normal connected operation: when cloud database returns b'null' (deleted to reset),
+    the system resets local stats to match the clean session (commit 6a495a9).
+    """
+    from modules.war_mode.war_service import WarService
+    from unittest.mock import MagicMock
+    import urllib.request
+
+    war = WarService(realtime_sync=False)
+    war.set_operative("ResetHero")
+    war.total_farmed = 3500000
+    war.session_contribution = 0
+    war._has_fetched_cloud_stats = False
+
+    # Mock urlopen returning b"null" (record was deleted on Firebase to reset)
+    mock_resp = MagicMock()
+    mock_resp.read.return_value = b"null"
+    mock_resp.__enter__.return_value = mock_resp
+
+    monkeypatch.setattr(urllib.request, "urlopen", lambda req, timeout=None: mock_resp)
+
+    ok, msg = war.sync_to_cloud_database()
+    assert ok is True
+    # Clean reset: total_farmed becomes session_contribution (0)
+    assert war.total_farmed == 0
+    logs = [log["text"] for log in war.get_recent_logs(10)]
+    assert any("เริ่มนับยอดรวมใหม่" in l for l in logs)
+    war.stop()
+
+
+def test_emergency_secret_buffer_when_database_unreachable_and_reconnect(monkeypatch):
+    """
+    Emergency rule (user directive):
+    - When database is unreachable: secretly buffer data locally.
+    - User only sees error and reconnecting status (sync_to_war_room returns False).
+    - As soon as re-connected: send the buffered dataset up to cloud and resume normal operation.
+    """
+    from modules.war_mode.war_service import WarService
+    from unittest.mock import MagicMock
+    import urllib.error
+    import urllib.request
+
+    war = WarService(firebase_url="https://mock-rtdb.firebaseio.com", realtime_sync=False)
+    war.set_operative("SecretHero")
+    war.on_meseta_earned(120000)
+
+    # 1. Simulate database UNREACHABLE (emergency: cannot connect)
+    def mock_urlopen_err(req, timeout=None):
+        raise urllib.error.HTTPError(req.full_url, 404, "Not Found", {}, None)
+
+    monkeypatch.setattr(urllib.request, "urlopen", mock_urlopen_err)
+
+    ok, msg = war.sync_to_war_room()
+    # Must report False to user so user only sees error and reconnecting status
+    assert ok is False
+    assert "ไม่พบฐานข้อมูล" in msg or "ขาดการเชื่อมต่อ" in msg
+    assert war._last_cloud_ok is False
+
+    # SECRET BUFFER CHECK: local storage secretly buffered the meseta!
+    assert war.total_farmed == 120000
+    with open(war.stats_file, "r", encoding="utf-8") as f:
+        saved_data = json.load(f)
+    assert saved_data["total_farmed"] == 120000
+
+    # User earns MORE meseta while still disconnected
+    war.on_meseta_earned(80000)
+    assert war.total_farmed == 200000
+
+    # 2. RECONNECT: Connection is restored!
+    sent_requests = []
+    def mock_urlopen_reconnected(req, timeout=None):
+        sent_requests.append(req)
+        resp = MagicMock()
+        resp.read.return_value = b'{"success": true}'
+        resp.__enter__.return_value = resp
+        return resp
+
+    monkeypatch.setattr(urllib.request, "urlopen", mock_urlopen_reconnected)
+
+    # Trigger sync now that connection is back (bypass backoff with force_cloud=True)
+    ok_reconnect, msg_reconnect = war.sync_to_war_room(force_cloud=True)
+    assert ok_reconnect is True
+    assert "ซิงค์ข้อมูลเรียลไทม์สำเร็จ" in msg_reconnect
+    assert war._last_cloud_ok is True
+    assert war._cloud_fail_count == 0
+
+    # Verify that the entire secret buffered amount (200,000) was pushed to cloud
+    assert any(b"200000" in (r.data or b"") for r in sent_requests)
+    war.stop()
+
+
+def test_resilience_config_file_corruption_and_atomic_write(tmp_path, monkeypatch):
+    """
+    Test resilience of CONFIG_FILE when corrupted.
+    Verifies that corrupted config is backed up to .corrupt, defaults are loaded,
+    and save_settings writes atomically without error.
+    """
+    from meseta_tracker import NGSTrackerApp, CONFIG_FILE
+    import meseta_tracker
+    import json
+
+    test_cfg = str(tmp_path / "ngs_tracker_config.json")
+    monkeypatch.setattr(meseta_tracker, "CONFIG_FILE", test_cfg)
+
+    # 1. Write corrupted config file
+    with open(test_cfg, "w", encoding="utf-8") as f:
+        f.write("{invalid_json_config")
+
+    # 2. Instantiating app or loading settings should not crash
+    app = NGSTrackerApp()
+    app.update_idletasks()
+    assert hasattr(app, "watchlist_items")
+
+    # 3. Check backup was created
+    corrupt_backups = list(tmp_path.glob("ngs_tracker_config.json.corrupt*"))
+    assert len(corrupt_backups) >= 1
+
+    # 4. Save settings and verify atomic write created valid JSON
+    app.save_settings()
+    with open(test_cfg, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    assert isinstance(data, dict)
+    assert "watchlist" in data
+
+    if hasattr(app, "stop_monitoring"):
+        app.stop_monitoring()
+    app.destroy()
+
+
+def test_auto_bootstrap_database_when_empty_null(monkeypatch):
+    """
+    Regression test: Verifies that when the Firebase RTDB is empty / cleared to null,
+    WarService automatically triggers bootstrap_version_control_policy to seed the
+    canonical version control schema and baseline metadata rather than idling.
+    """
+    import json
+    import urllib.request
+    from modules.war_mode.war_service import WarService
+
+    sent_requests = []
+
+    class MockResponse:
+        def __init__(self, body: str, status: int = 200):
+            self.body = body.encode("utf-8")
+            self.status = status
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def read(self):
+            return self.body
+
+    def mock_urlopen(req, timeout=None):
+        sent_requests.append(req)
+        # First GET to /arks_war_room/version_control.json returns null (database cleared)
+        if req.get_method() == "GET" and "version_control.json" in req.full_url:
+            return MockResponse("null", status=200)
+        # PUT to /arks_war_room/version_control.json returns 200 with saved payload
+        if req.get_method() == "PUT" and "version_control.json" in req.full_url:
+            return MockResponse(req.data.decode("utf-8"), status=200)
+        return MockResponse("{}", status=200)
+
+    monkeypatch.setattr(urllib.request, "urlopen", mock_urlopen)
+
+    war = WarService(realtime_sync=False)
+    # Trigger fetch_remote_version_policy
+    policy = war.fetch_remote_version_policy()
+
+    # Must have auto-bootstrapped
+    assert policy is not None
+    assert policy.get("latest_version") == war.client_version
+    assert policy.get("min_secure_version") == war.min_secure_version
+    assert "revoked_versions" in policy
+
+    # Verify that a PUT request was dispatched to seed version_control.json
+    put_reqs = [r for r in sent_requests if r.get_method() == "PUT" and "version_control.json" in r.full_url]
+    assert len(put_reqs) == 1, "Must issue exactly one PUT request to bootstrap version_control.json"
+    seeded_body = json.loads(put_reqs[0].data.decode("utf-8"))
+    assert seeded_body["latest_version"] == war.client_version
+    assert seeded_body["min_secure_version"] == "7.1.0"
+    assert "7_0_0-alpha" in seeded_body["revoked_versions"]
+
+    war.stop()
+
+
+def test_startup_always_defaults_to_core_coord_ignoring_previous_session(tmp_path, monkeypatch):
+    """
+    Verify that opening the program newly always starts at '0, 0, 1' (Core, Slot #1 NW),
+    ignoring any previously saved board_coord in ngs_tracker_config.json or war_stats.json.
+    """
+    from meseta_tracker import NGSTrackerApp
+    from modules.war_mode.war_service import WarService, TargetCoord
+    from unittest.mock import MagicMock
+    import json
+
+    # 1. WarService startup with dirty war_stats.json containing custom coord
+    stats_file = tmp_path / "war_stats.json"
+    with open(stats_file, "w", encoding="utf-8") as f:
+        json.dump({"operative_name": "Vale3neko", "target_coord": [8, -2, 3], "total_farmed": 50000}, f)
+
+    war = WarService(stats_file=str(stats_file), realtime_sync=False)
+    assert war.target_coord == TargetCoord(0, 0, 1)
+    assert war.target_coord.slot == 1
+    war.stop()
+
+    # 2. NGSTrackerApp load_settings with dirty ngs_tracker_config.json containing custom coord
+    cfg_file = tmp_path / "ngs_tracker_config.json"
+    with open(cfg_file, "w", encoding="utf-8") as f:
+        json.dump({"board_coord": "8, -2, 3", "watchlist": []}, f)
+
+    monkeypatch.setattr("meseta_tracker.CONFIG_FILE", str(cfg_file))
+    mock_app = MagicMock()
+    mock_app.board_coord = "9, 9, 4"
+    mock_app.war_service = MagicMock()
+    mock_app.coord_var = MagicMock()
+    mock_app.apply_initial_geometry = MagicMock()
+    mock_app.set_app_language = MagicMock()
+    mock_app.watchlist_items = []
+    mock_app.log_folder = ""
+    NGSTrackerApp.load_settings(mock_app)
+
+    assert mock_app.board_coord == "0, 0, 1"
+    mock_app.war_service.set_target_coord.assert_called_with("0, 0, 1")
+    mock_app.coord_var.set.assert_called_with("0, 0, 1")
+
+
 
 
 

@@ -3,6 +3,7 @@ import tkinter as tk
 from tkinter import filedialog
 import os
 import sys
+import shutil
 import time
 import threading
 import re
@@ -107,7 +108,7 @@ class NGSTrackerApp(ctk.CTk):
             active_version=CLIENT_VERSION,
         )
         self.anti_tamper.on_violation = self._on_tamper_violation
-        self.war_service = WarService()
+        self.war_service = WarService(realtime_sync=True)
         self.current_view = "offline"
         self.event_bus.subscribe("character_detected", self._on_character_detected)
         self.event_bus.subscribe("language_changed", self._on_language_changed)
@@ -435,6 +436,7 @@ class NGSTrackerApp(ctk.CTk):
             pass
         if hasattr(self, "war_view"):
             self.war_view.grid_remove()
+        
         self.offline_container.grid(row=1, column=0, sticky="nsew")
 
     def show_war_view(self):
@@ -451,7 +453,11 @@ class NGSTrackerApp(ctk.CTk):
 
         op_name = self.character_name or "Operative"
         self.war_service.set_operative(op_name)
-        self.war_service.sync_to_war_room()
+        
+        if hasattr(self, "war_service"):
+            self.war_service.realtime_sync_enabled = True
+            
+        self.war_service.sync_to_war_room(force_cloud=True)
 
         self.war_view.grid(row=1, column=0, sticky="nsew")
         self.war_view.update_view()
@@ -750,15 +756,26 @@ class NGSTrackerApp(ctk.CTk):
         if os.path.exists(CONFIG_FILE):
             try:
                 with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    self.watchlist_items = data.get("watchlist", [])
-                    self.log_folder = data.get("log_folder", "")
-                    self.board_coord = data.get("board_coord", "0, 0, 1")
-                    saved_lang = data.get("language", DEFAULT_LANGUAGE)
-                    self.window_pos = data.get("window_pos", None)
-                    self.overlay_pos = data.get("overlay_pos", None)
-            except (OSError, json.JSONDecodeError):
-                pass
+                    content = f.read().strip()
+                if not content:
+                    raise ValueError("CONFIG_FILE is empty")
+                data = json.loads(content)
+                if not isinstance(data, dict):
+                    raise ValueError("CONFIG_FILE root is not a dictionary")
+                self.watchlist_items = data.get("watchlist", [])
+                self.log_folder = data.get("log_folder", "")
+                # Always start at default coordinate "0, 0, 1" on fresh startup (ignore previous session)
+                self.board_coord = "0, 0, 1"
+                saved_lang = data.get("language", DEFAULT_LANGUAGE)
+                self.window_pos = data.get("window_pos", None)
+                self.overlay_pos = data.get("overlay_pos", None)
+            except (OSError, json.JSONDecodeError, ValueError) as exc:
+                print(f"[NGSTrackerApp] Warning: Corrupted config file detected ({exc}). Backing up and resetting.")
+                try:
+                    corrupt_cfg = CONFIG_FILE + f".corrupt.{int(time.time())}"
+                    shutil.copy2(CONFIG_FILE, corrupt_cfg)
+                except Exception:
+                    pass
 
         self.apply_initial_geometry()
         self.set_app_language(saved_lang, save=False)
@@ -795,7 +812,7 @@ class NGSTrackerApp(ctk.CTk):
         data = {
             "watchlist": self.watchlist_items,
             "log_folder": self.log_folder,
-            "board_coord": self.board_coord,
+            "board_coord": "0, 0, 1",
             "language": i18n.get_language(),
         }
         w_pos = getattr(self, "window_pos", None)
@@ -806,8 +823,16 @@ class NGSTrackerApp(ctk.CTk):
             data["overlay_pos"] = o_pos
 
         try:
-            with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=4) 
+            os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
+            tmp_cfg = CONFIG_FILE + f".tmp.{os.getpid()}"
+            with open(tmp_cfg, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=4)
+                f.flush()
+                try:
+                    os.fsync(f.fileno())
+                except OSError:
+                    pass
+            os.replace(tmp_cfg, CONFIG_FILE)
         except OSError:
             pass
 

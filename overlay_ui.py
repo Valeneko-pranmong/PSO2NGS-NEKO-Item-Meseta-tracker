@@ -25,7 +25,9 @@ _format_duration = format_duration
 class OverlayWindow(ctk.CTkToplevel):
     OPACITY_HIGH = 0.95
     OPACITY_LOW = 0.55
-    MAX_NAME_CHARS = 22
+    DEFAULT_WIDTH = 320
+    MIN_HEIGHT_MINI = 250
+    MAX_NAME_CHARS = 24
     MAX_ITEMS = 30
 
     def __init__(self, controller, mode="full"):
@@ -52,8 +54,6 @@ class OverlayWindow(ctk.CTkToplevel):
             except tk.TclError:
                 pass
 
-        self._position_window()
-
         self.item_rows = []
         self._drag_offset_x = 0
         self._drag_offset_y = 0
@@ -64,12 +64,8 @@ class OverlayWindow(ctk.CTkToplevel):
         self._build_stats_section()
         if self.mode == "full":
             self._build_item_list()
-        else:
-            self.update_idletasks()
-            needed_h = max(250, self.inner_frame.winfo_reqheight() + 4)
-            if self.winfo_height() < needed_h:
-                self.geometry(f"{self.winfo_width()}x{needed_h}")
 
+        self._position_window()
         self.update_data()
 
     # ---------- Layout ----------
@@ -84,14 +80,16 @@ class OverlayWindow(ctk.CTkToplevel):
     def _position_window(self):
         screen_width = self.winfo_screenwidth()
         screen_height = self.winfo_screenheight()
-        window_width = 290
+        window_width = self.DEFAULT_WIDTH
         x_pos = screen_width - window_width - 12
 
         if self.mode == "full":
             target_height = int(screen_height * 0.78)
             y_pos = int(screen_height * 0.10)
         else:
-            target_height = 250
+            self.update_idletasks()
+            needed_h = max(self.MIN_HEIGHT_MINI, self.inner_frame.winfo_reqheight() + 4)
+            target_height = needed_h
             y_pos = int(screen_height * 0.15)
 
         saved_pos = getattr(self.controller, "overlay_pos", None)

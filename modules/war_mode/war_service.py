@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import time
 import threading
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -209,6 +210,10 @@ class WarService:
         self._is_dirty: bool = False
         self._last_sync_time: float = 0.0
         self._last_sync_status: Tuple[bool, str] = (True, "พร้อมทำงาน")
+        self._last_cloud_ok: bool = True
+        self._last_cloud_msg: str = ""
+        self._cloud_fail_count: int = 0
+        self._cloud_backoff_until: float = 0.0
         self._last_logged_contribution: int = 0
         self._last_synced_coord_key: Optional[str] = None
         self._last_synced_slot: Optional[int] = None
@@ -226,10 +231,18 @@ class WarService:
 
         # Start Realtime Background Worker
         if self.realtime_sync_enabled:
-            self._sync_worker_thread = threading.Thread(
-                target=self._realtime_sync_worker, daemon=True, name="WarService-RealtimeSync"
-            )
-            self._sync_worker_thread.start()
+            self.ensure_sync_worker()
+
+    def ensure_sync_worker(self) -> None:
+        """Ensure background realtime sync worker thread is running."""
+        with self._state_lock:
+            if not self.realtime_sync_enabled or self._stop_event.is_set():
+                return
+            if not hasattr(self, "_sync_worker_thread") or not self._sync_worker_thread.is_alive():
+                self._sync_worker_thread = threading.Thread(
+                    target=self._realtime_sync_worker, daemon=True, name="WarService-RealtimeSync"
+                )
+                self._sync_worker_thread.start()
 
     def _subscribe_events(self) -> None:
         self.event_bus.subscribe("meseta_earned", self.on_meseta_earned)
@@ -467,10 +480,47 @@ class WarService:
         duration = time.time() - ref_time
         return calculate_live_rate(contrib, duration, min_smoothing_seconds=30.0)
 
+    def bootstrap_version_control_policy(self, timeout: float = 3.0) -> bool:
+        """
+        Auto-bootstrap canonical version_control policy on Firebase RTDB when database is empty (null).
+        Allowed by database.rules.json: ".write": "!data.exists() || auth != null".
+        """
+        if not self.firebase_url:
+            return False
+        base_url = self.firebase_url.rstrip("/")
+        url = f"{base_url}/arks_war_room/version_control.json"
+        rev_dict = {r.replace(".", "_"): True for r in self.revoked_versions}
+        payload = {
+            "latest_version": self.latest_version,
+            "min_secure_version": self.min_secure_version,
+            "revoked_versions": rev_dict,
+            "announcement": "ARKS War Room Initialized",
+            "download_url": "",
+            "last_updated": int(time.time() * 1000),
+        }
+        try:
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json", "User-Agent": f"NEKOTracker/{self.client_version}"},
+                method="PUT",
+            )
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                status = getattr(resp, "status", 200)
+                if status < 400:
+                    self.remote_policy = payload
+                    self.remote_policy_fetched = True
+                    self.add_log("ตรวจพบฐานข้อมูลว่างเปล่า — ระบบทำการ Auto-Bootstrap โครงสร้างฐานข้อมูลเริ่มต้นสำเร็จ", "sync")
+                    return True
+        except Exception as exc:
+            print(f"[WarService] Failed auto-bootstrapping version_control: {exc}")
+        return False
+
     def fetch_remote_version_policy(self, timeout: float = 3.0) -> Dict[str, Any]:
         """
         Fetch dynamic version control policy from Firebase RTDB (/arks_war_room/version_control.json).
         Updates local min_secure_version, latest_version, and revoked_versions if successfully fetched.
+        If database is empty (null), automatically bootstraps baseline version control schema.
         """
         if not self.firebase_url:
             return {}
@@ -481,7 +531,8 @@ class WarService:
                 url, headers={"User-Agent": f"NEKOTracker/{self.client_version}"}
             )
             with urllib.request.urlopen(req, timeout=timeout) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
+                raw_body = resp.read().decode("utf-8").strip()
+                data = json.loads(raw_body) if raw_body else None
                 if isinstance(data, dict):
                     self.remote_policy = data
                     if "latest_version" in data and isinstance(data["latest_version"], str):
@@ -496,6 +547,10 @@ class WarService:
                             self.revoked_versions = list(rev)
                     self.remote_policy_fetched = True
                     return data
+                elif data is None:
+                    # Database is empty (null): Auto-bootstrap version_control baseline
+                    if self.bootstrap_version_control_policy(timeout=timeout):
+                        return self.remote_policy
         except Exception:
             pass
         return {}
@@ -623,6 +678,7 @@ class WarService:
             self._is_dirty = True
         if not self.realtime_sync_enabled and not force:
             return
+        self.ensure_sync_worker()
         self._sync_event.set()
 
     def _realtime_sync_worker(self) -> None:
@@ -687,6 +743,7 @@ class WarService:
                         message=msg,
                         timestamp=self._last_sync_time,
                         contribution=active_contrib,
+                        cloud_synced=self._last_cloud_ok,
                     )
                 return ok, msg
             except Exception as exc:
@@ -744,7 +801,7 @@ class WarService:
             if c not in '.$#[]/\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f\x7f'
         ).strip() or "Operative"
 
-        # Fetch authoritative database state to support "clean close / fetch fresh" 
+        # Fetch authoritative database state to support "clean close / fetch fresh"
         # when the user deletes the database manually.
         if not self._has_fetched_cloud_stats and safe_key != "Operative":
             try:
@@ -753,23 +810,35 @@ class WarService:
                 with urllib.request.urlopen(req, timeout=timeout) as resp:
                     data = resp.read().decode("utf-8").strip()
                 if data == "null":
-                    # Database record is missing (deleted). Clean local stats to match.
+                    # Database record is missing (deleted on cloud to reset). Clean local stats to match.
                     with self._state_lock:
                         self.total_farmed = self.session_contribution
                         self._has_fetched_cloud_stats = True
                     self.add_log("ไม่พบข้อมูลเดิมบนฐานข้อมูล (เริ่มนับยอดรวมใหม่ตาม Session)", "info")
                     self._save_stats()
                 else:
-                    parsed = json.loads(data)
-                    db_meseta = int(parsed.get("meseta", 0))
-                    with self._state_lock:
-                        # Adopt DB state unconditionally as source of truth (respecting current session)
-                        self.total_farmed = max(db_meseta, self.session_contribution)
-                        self._has_fetched_cloud_stats = True
-                    self.add_log(f"ดึงข้อมูลจากฐานข้อมูล: เริ่มนับที่ {self.total_farmed:,} ℳ", "info")
+                    try:
+                        parsed = json.loads(data)
+                    except Exception:
+                        parsed = None
+
+                    if isinstance(parsed, dict):
+                        try:
+                            db_meseta = max(0, int(parsed.get("meseta", 0)))
+                        except (ValueError, TypeError):
+                            db_meseta = 0
+                        with self._state_lock:
+                            # Adopt DB state unconditionally as source of truth (respecting current session)
+                            self.total_farmed = max(db_meseta, self.session_contribution)
+                            self._has_fetched_cloud_stats = True
+                        self.add_log(f"ดึงข้อมูลจากฐานข้อมูล: เริ่มนับที่ {self.total_farmed:,} ℳ", "info")
+                    else:
+                        with self._state_lock:
+                            self._has_fetched_cloud_stats = True
             except Exception as exc:
                 print(f"[WarService] Failed fetching initial cloud stats for {safe_key}: {exc}")
-                # Don't fail the sync, just mark as fetched to prevent blocking loops
+                # Don't fail the sync, mark as fetched to prevent blocking loops.
+                # In emergency (cannot connect to DB), preserve local total_farmed in secret buffer.
                 self._has_fetched_cloud_stats = True
 
         db_payload = self.get_database_payload()
@@ -905,14 +974,22 @@ class WarService:
                 method="PATCH",
             )
             patch_ok = False
+            patch_err = None
             try:
                 with urllib.request.urlopen(req_patch, timeout=timeout) as resp:
                     patch_ok = True
-            except Exception:
+            except Exception as pe:
                 patch_ok = False
+                patch_err = pe
 
             if not patch_ok:
-                # Fallback to individual PUT calls if root PATCH is restricted
+                err_s = str(patch_err) if patch_err else ""
+                # If 404 Not Found, 401/403 Unauthorized, or network connection failure,
+                # fail-fast immediately instead of repeating timeouts across 4 more endpoints!
+                if any(code in err_s for code in ("404", "401", "403")) or isinstance(patch_err, (urllib.error.HTTPError, urllib.error.URLError)):
+                    raise patch_err
+
+                # Fallback to individual PUT calls only if root PATCH was specifically rejected (e.g. 405 Method Not Allowed)
                 url_op = f"{base_url}/arks_war_room/operatives/{urllib.parse.quote(safe_key)}.json"
                 req_op = urllib.request.Request(
                     url_op,
@@ -1036,12 +1113,18 @@ class WarService:
             self._last_synced_operative = char_name
             return True, "ส่งข้อมูลขึ้นระบบคลาวด์สำเร็จ"
         except Exception as exc:
+            err_str = str(exc)
+            if "404" in err_str:
+                return False, "ไม่พบฐานข้อมูล: กรุณาตรวจสอบ Firebase URL ใน config.py (เช่น โซน asia-southeast1)"
+            elif "401" in err_str:
+                return False, "ถูกปฏิเสธการเข้าถึง: กฎของ Firebase ไม่อนุญาตให้แก้ไขข้อมูล"
             return False, f"Cloud Sync Error: {exc}"
 
-    def sync_to_war_room(self) -> Tuple[bool, str]:
+    def sync_to_war_room(self, force_cloud: bool = False) -> Tuple[bool, str]:
         """
         Synchronize current war contribution to ARKS War Room telemetry & database storage.
-        Thread-safe execution writing to local files and remote Firebase RTDB.
+        Resilient execution writing to local files and remote Firebase RTDB.
+        Operates smoothly even when remote database is down, deleted, or corrupted.
         """
         now = time.time()
         db_payload = self.get_database_payload()
@@ -1083,54 +1166,103 @@ class WarService:
             "recentLogs": self.get_recent_logs(10),
         }
 
-        # 1. Save to ARKS War Room data directory if available
-        telemetry_dir = os.path.join(self.war_room_path, "data")
         saved_paths = []
+        # 1. Save to ARKS War Room data directory if available (atomic write)
+        telemetry_dir = os.path.join(self.war_room_path, "data")
         try:
             if os.path.exists(self.war_room_path):
                 os.makedirs(telemetry_dir, exist_ok=True)
                 sync_file = os.path.join(telemetry_dir, "live_war_telemetry.json")
-                with open(sync_file, "w", encoding="utf-8") as f:
+                tmp_sync = sync_file + f".tmp.{os.getpid()}"
+                with open(tmp_sync, "w", encoding="utf-8") as f:
                     json.dump(payload, f, ensure_ascii=False, indent=2)
+                    f.flush()
+                    try:
+                        os.fsync(f.fileno())
+                    except OSError:
+                        pass
+                os.replace(tmp_sync, sync_file)
                 saved_paths.append(sync_file)
 
                 db_file = os.path.join(telemetry_dir, "database_meseta_records.json")
-                with open(db_file, "w", encoding="utf-8") as f:
+                tmp_db = db_file + f".tmp.{os.getpid()}"
+                with open(tmp_db, "w", encoding="utf-8") as f:
                     json.dump(db_payload, f, ensure_ascii=False, indent=2)
+                    f.flush()
+                    try:
+                        os.fsync(f.fileno())
+                    except OSError:
+                        pass
+                os.replace(tmp_db, db_file)
         except Exception as exc:
             print(f"[WarService] Telemetry write to War Room failed: {exc}")
 
-        # 2. Save to local app data cache
+        # 2. Save to local app data cache (atomic write)
         try:
             os.makedirs(os.path.dirname(self.stats_file), exist_ok=True)
             self._save_stats()
             saved_paths.append(self.stats_file)
 
             local_db_file = os.path.join(os.path.dirname(self.stats_file), "database_meseta_records.json")
-            with open(local_db_file, "w", encoding="utf-8") as f:
+            tmp_local_db = local_db_file + f".tmp.{os.getpid()}"
+            with open(tmp_local_db, "w", encoding="utf-8") as f:
                 json.dump(db_payload, f, ensure_ascii=False, indent=2)
+                f.flush()
+                try:
+                    os.fsync(f.fileno())
+                except OSError:
+                    pass
+            os.replace(tmp_local_db, local_db_file)
         except Exception as exc:
             print(f"[WarService] Local stats cache write failed: {exc}")
 
-        # 3. Cloud Database Sync (Firebase Realtime Database)
+        # 3. Cloud Database Sync (Firebase Realtime Database) with Backoff & Offline Resilience
         cloud_ok = False
         cloud_msg = ""
+        now = time.time()
         if self.firebase_url:
-            try:
-                cloud_ok, cloud_msg = self.sync_to_cloud_database()
-            except Exception as exc:
-                cloud_msg = str(exc)
-                print(f"[WarService] Cloud database sync exception: {exc}")
+            in_backoff = (now < self._cloud_backoff_until) and not force_cloud
+            if in_backoff:
+                cloud_ok = False
+                wait_sec = int(self._cloud_backoff_until - now)
+                cloud_msg = f"พักการเชื่อมต่อคลาวด์ชั่วคราว (รออีก {wait_sec}s)"
+            else:
+                try:
+                    cloud_ok, cloud_msg = self.sync_to_cloud_database()
+                except Exception as exc:
+                    cloud_msg = str(exc)
+                    print(f"[WarService] Cloud database sync exception: {exc}")
 
+                completed_at = time.time()
+                if cloud_ok:
+                    self._cloud_fail_count = 0
+                    self._cloud_backoff_until = 0.0
+                else:
+                    self._cloud_fail_count += 1
+                    backoff_delay = min(60.0, 5.0 * (2 ** min(self._cloud_fail_count - 1, 4)))
+                    self._cloud_backoff_until = completed_at + backoff_delay
+
+        self._last_cloud_ok = cloud_ok
+        self._last_cloud_msg = cloud_msg
         self._last_sync_time = now
         active_contrib = payload.get("meseta", max(self.total_farmed, self.session_contribution))
+
         if saved_paths or cloud_ok:
             gx, gy, slot = self.target_coord.x, self.target_coord.y, self.target_coord.slot
-            self.add_log(f"ซิงค์ข้อมูลสำเร็จ: ส่งยอด {active_contrib:,} ℳ พิกัด [{gx}, {gy}] ช่อง #{slot} ({self.operative_name})", "sync")
             self.event_bus.emit("war_telemetry_synced", payload=payload)
+
+            # In emergency (cannot connect to cloud database):
+            # Keep buffered data secretly on disk/memory, but report connection failure to UI
+            # so user only sees error and reconnecting status.
+            if self.firebase_url and not cloud_ok:
+                err_msg = cloud_msg or "ขาดการเชื่อมต่อกับฐานข้อมูล (กำลังรอเชื่อมต่อใหม่...)"
+                return False, err_msg
+
             if cloud_ok:
+                self.add_log(f"ซิงค์ข้อมูลสำเร็จ: ส่งยอด {active_contrib:,} ℳ พิกัด [{gx}, {gy}] ช่อง #{slot} ({self.operative_name})", "sync")
                 return True, f"ซิงค์ข้อมูลเรียลไทม์สำเร็จ (+{active_contrib:,} ℳ)"
             return True, f"บันทึกข้อมูลเรียลไทม์เรียบร้อย (+{active_contrib:,} ℳ)"
+
         return False, "ไม่สามารถบันทึกข้อมูล Telemetry ได้"
 
     def _save_stats(self) -> None:
@@ -1141,9 +1273,10 @@ class WarService:
                 try:
                     with open(self.stats_file, "r", encoding="utf-8") as rf:
                         existing = json.load(rf)
-                        existing_op = str(existing.get("operative_name", "")).strip()
-                        if existing_op and existing_op != "Operative":
-                            return
+                        if isinstance(existing, dict):
+                            existing_op = str(existing.get("operative_name", "")).strip()
+                            if existing_op and existing_op != "Operative":
+                                return
                 except Exception:
                     pass
 
@@ -1155,33 +1288,64 @@ class WarService:
                     "total_farmed": self.total_farmed,
                     "last_active": time.time(),
                 }
-            with open(self.stats_file, "w", encoding="utf-8") as f:
+
+            # Resilient atomic file write: write to temp file then atomic replace
+            tmp_file = self.stats_file + f".tmp.{os.getpid()}"
+            with open(tmp_file, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
+                f.flush()
+                try:
+                    os.fsync(f.fileno())
+                except OSError:
+                    pass
+            os.replace(tmp_file, self.stats_file)
         except Exception as exc:
             print(f"[WarService] Failed saving war stats: {exc}")
 
     def _load_saved_stats(self) -> None:
         if not os.path.exists(self.stats_file):
             return
+        is_corrupted = False
+        corrupt_reason = ""
         try:
             with open(self.stats_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                saved_op = str(data.get("operative_name", "")).strip()
-                # If current operative_name is placeholder "Operative" and saved file has a named operative, adopt it!
-                if self.operative_name == "Operative" and saved_op and saved_op != "Operative":
-                    with self._state_lock:
-                        self.operative_name = saved_op
+                content = f.read().strip()
+            if not content:
+                raise ValueError("war_stats.json is empty (0 bytes)")
+            data = json.loads(content)
+            if not isinstance(data, dict):
+                raise ValueError(f"war_stats.json root is not a JSON dictionary (got {type(data).__name__})")
 
-                if data.get("operative_name") == self.operative_name or (self.operative_name == "Operative" and not saved_op):
-                    saved_total = int(data.get("total_farmed", 0) or 0)
-                    with self._state_lock:
-                        self.total_farmed = saved_total
-                # Only adopt saved target_coord if current target_coord is still at default (0, 0, 1)
-                # to prevent stomping on user-selected coordinates when loading stats.
-                if "target_coord" in data and self.target_coord == TargetCoord(0, 0, 1):
-                    self.target_coord = self.parse_coordinate(data.get("target_coord"))
+            saved_op = str(data.get("operative_name", "")).strip()
+            # If current operative_name is placeholder "Operative" and saved file has a named operative, adopt it!
+            if self.operative_name == "Operative" and saved_op and saved_op != "Operative":
+                with self._state_lock:
+                    self.operative_name = saved_op
+
+            if data.get("operative_name") == self.operative_name or (self.operative_name == "Operative" and not saved_op):
+                try:
+                    saved_total = max(0, int(data.get("total_farmed", 0) or 0))
+                except (ValueError, TypeError):
+                    saved_total = 0
+                with self._state_lock:
+                    self.total_farmed = max(saved_total, self.session_contribution)
+
+            # Target coordinate always defaults to Core (0, 0, 1) on startup regardless of previous session
         except Exception as exc:
+            is_corrupted = True
+            corrupt_reason = str(exc)
             print(f"[WarService] Failed loading war stats: {exc}")
+
+        if is_corrupted:
+            # Self-healing: Backup corrupted file and recreate a valid clean stats file
+            try:
+                corrupt_backup = self.stats_file + f".corrupt.{int(time.time())}"
+                if os.path.exists(self.stats_file):
+                    shutil.copy2(self.stats_file, corrupt_backup)
+            except Exception:
+                pass
+            self.add_log(f"ตรวจพบไฟล์ฐานข้อมูลในเครื่องเสียหาย ({corrupt_reason}) — สำรองไฟล์เดิมและกู้คืนอัตโนมัติ", "warning")
+            self._save_stats()
 
 
 if __name__ == "__main__":

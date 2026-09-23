@@ -33,6 +33,7 @@ def shared_app():
     app.update_idletasks()
     yield app
     try:
+        app.update_board_coordinate("0, 0, 1")
         if hasattr(app, "stop_monitoring"):
             app.stop_monitoring()
         app.destroy()

@@ -25,7 +25,7 @@
 ตรวจสอบความถูกต้องของไฟล์ก่อนการใช้งานด้วยค่า SHA-256:
 
 ```text
-20a0d2b72adf9428e81a1123f6e609c87c0c38ad25b96168f2488fccbe98b431  NekoTracker-Setup-v7.1.0.exe
+860f65df78b289c191fd6cff02d35c6cc867b14681c2d6b0c56b907bc3ad5581  NekoTracker-Setup-v7.1.0.exe
 ```
 
 * **ขนาดไฟล์:** ~22.19 MB

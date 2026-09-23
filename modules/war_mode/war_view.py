@@ -110,8 +110,8 @@ class WarDashboardFrame(ctk.CTkFrame):
             new_text = t("war_synced", time=t_str, contrib=f"{contrib:,}")
             new_color = "#10B981"
         else:
-            new_text = t("war_sync_waiting")
-            new_color = "#F59E0B"
+            new_text = message if message else t("war_sync_waiting")
+            new_color = "#EF4444"
 
         if self.lbl_sync_time.cget("text") != new_text or self.lbl_sync_time.cget("text_color") != new_color:
             self.lbl_sync_time.configure(
@@ -918,10 +918,11 @@ class WarDashboardFrame(ctk.CTkFrame):
                 else:
                     display_contrib = max(getattr(self.war_service, "total_farmed", 0), getattr(self.war_service, "session_contribution", 0))
                 new_text = t("war_synced", time=t_str, contrib=f"{display_contrib:,}")
-                if self.lbl_sync_time.cget("text") != new_text or self.lbl_sync_time.cget("text_color") != "#10B981":
+                new_color = "#10B981"
+                if self.lbl_sync_time.cget("text") != new_text or self.lbl_sync_time.cget("text_color") != new_color:
                     self.lbl_sync_time.configure(
                         text=new_text,
-                        text_color="#10B981",
+                        text_color=new_color,
                     )
             except Exception:
                 pass
@@ -935,17 +936,16 @@ class WarDashboardFrame(ctk.CTkFrame):
     def _do_sync(self) -> None:
         self.lbl_sync_time.configure(text=t("war_syncing"), text_color="#0284C7")
         self.update_idletasks()
-        success, msg = self.war_service.sync_to_war_room()
-        color = "#10B981" if success else "#EF4444"
+        success, msg = self.war_service.sync_to_war_room(force_cloud=True)
         now_str = time.strftime("%H:%M:%S")
         if success:
             active_c = max(getattr(self.war_service, "total_farmed", 0), getattr(self.war_service, "session_contribution", 0))
             self.lbl_sync_time.configure(
                 text=t("war_synced", time=now_str, contrib=f"{active_c:,}"),
-                text_color=color,
+                text_color="#10B981",
             )
         else:
-            self.lbl_sync_time.configure(text=msg or t("war_sync_error"), text_color=color)
+            self.lbl_sync_time.configure(text=msg or t("war_sync_error"), text_color="#EF4444")
         self.update_view()
 
 

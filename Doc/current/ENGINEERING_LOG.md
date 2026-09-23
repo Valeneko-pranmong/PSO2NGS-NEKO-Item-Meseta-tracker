@@ -223,3 +223,30 @@
   - เพิ่มชุดทดสอบถดถอย `test_sidebar_and_war_view_status_frame_not_clipped` ใน `tests/test_tracker_modules.py` ครอบคลุมทั้งสองโหมด
   - รันการทดสอบ Unit Tests ทั้งหมดผ่านครบถ้วน **65 / 65 รายการ (100% Passed)**
 
+### Milestone 16: การปรับปรุงระบบให้ยืดหยุ่นสูง รองรับกรณีฐานข้อมูลเสียหรือโดนลบ (High Resilience & Self-Healing Architecture)
+* **ปัญหาและโจทย์ความต้องการ:**
+  - ปรับระบบให้ยืดหยุ่น (Fault-tolerant & Resilient) เมื่อฐานข้อมูลในเครื่องหรือฐานข้อมูลคลาวด์เกิดความเสียหาย (Corrupted), ข้อมูลผิดรูปแบบ หรือโดนลบ (Deleted/Wiped/404) ระบบต้องยังคงทำงานและเก็บสถิติ N-Meseta ได้อย่างต่อเนื่อง 100% โดยไม่แครช ไม่ค้าง และไม่ทำให้ยอดเงินของผู้ใช้สูญหาย
+* **การออกแบบและการแก้ไข (Architectural Upgrades):**
+  1. **Local Database Self-Healing & Atomic Writes:**
+     - ปรับปรุง `_load_saved_stats()` ใน `modules/war_mode/war_service.py` และ `load_settings()` ใน `meseta_tracker.py` ให้ตรวจจับไฟล์ฐานข้อมูลที่เสียหาย (0 bytes, malformed JSON, โครงสร้างข้อมูลไม่ถูกต้อง)
+     - สำรองไฟล์ที่เสียหายอัตโนมัติไปยัง `.corrupt.<timestamp>` และสร้างไฟล์ฐานข้อมูลใหม่ที่ถูกต้องกลับมาทันที (Self-Healing)
+     - ปรับระบบการบันทึกไฟล์ทั้งหมด (`war_stats.json`, `ngs_tracker_config.json`, `database_meseta_records.json`, `live_war_telemetry.json`) ให้เขียนแบบ **Atomic Replace** ผ่านไฟล์ชั่วคราว `.tmp` + `os.replace` ป้องกันไฟล์ขาดหายหรือเสียหายจากการถูกตัดไฟ/ปิดโปรแกรมกะทันหัน
+     - เมื่อไฟล์ฐานข้อมูลในเครื่องโดนลบ ระบบยังคงรักษายอดสะสมในหน่วยความจำและสร้างไฟล์ใหม่พร้อมไดเรกทอรีให้อัตโนมัติในรอบบันทึกถัดไป
+  2. **Cloud Database Resilience & Graceful Offline Fallback:**
+     - ปรับปรุงการอ่านข้อมูลเริ่มต้นจากคลาวด์: หากข้อมูลเดิมถูกลบ (`null`) หรือเป็นตัวละครใหม่ ระบบจะไม่ล้างยอดเงินของผู้ใช้เป็น 0 แต่จะนำยอดสะสมที่บันทึกไว้ในเครื่องขึ้นไปฟื้นฟู (Re-seed/Restore) บันทึกลงฐานข้อมูลใหม่อัตโนมัติ
+     - หากข้อมูลบนคลาวด์เสียหายหรือไม่เป็นไปตาม Schema (Invalid format / Non-dict) ระบบจะแจ้งเตือนและสลับมาใช้ยอดสะสมในเครื่องที่ปลอดภัยแทน
+     - ปรับปรุง `sync_to_war_room()` ให้ทำงานแบบ Graceful Fallback: เมื่อเกิดข้อผิดพลาดกับฐานข้อมูลคลาวด์ (เช่น 404 Not Found, 401 Permission Denied หรือเน็ตเวิร์กขาดการเชื่อมต่อ) แต่การบันทึกในเครื่องสำเร็จ ระบบจะไม่ตัดสินว่าล้มเหลว แต่จะบันทึกสถานะโหมดออฟไลน์อย่างสมบูรณ์ และแจ้งเตือนผ่าน Activity Log
+     - เพิ่มระบบ **Exponential Backoff** สำหรับการพยายามเชื่อมต่อคลาวด์ที่ล้มเหลว (5s, 10s, 20s, สูงสุด 60s) พร้อมกลไก Fail-fast ตัดวงรอบ Request เมื่อพบรหัสข้อผิดพลาดระดับโฮสต์ ไม่ทำให้แอปพลิเคชันค้างหรือหน่วง
+     - จัดการกรณีติดต่อฐานข้อมูลไม่ได้ (เหตุฉุกเฉิน: 404, 500, ขาดการเชื่อมต่อ): ระบบจะแอบบันทึกสถิติและยอดสะสมไว้ลับๆ ในเครื่อง (Secret Buffering via Atomic Write) โดยไม่แสดงให้ผู้ใช้เห็นสถานะออฟไลน์ ผู้ใช้จะเห็นเฉพาะสถานะ Error และ Reconnecting ตามปกติ (สีแดง)
+     - เมื่อระบบสามารถเชื่อมต่อฐานข้อมูลใหม่สำเร็จ (Reconnected): ข้อมูลชุดที่แอบสะสมไว้ทั้งหมดจะถูกส่งขึ้นไปยัง Firebase RTDB อัตโนมัติทันที และระบบจะกลับมาทำงานตามปกติ (สีเขียว)
+     - หากฐานข้อมูลคลาวด์เชื่อมต่อได้และตอบกลับ `data == "null"`: ระบบยังคงเคารพการล้างข้อมูลเพื่อ Reset (Clean Reset ตามคอมมิต 6a495a9) ไม่กู้คืนข้อมูลเก่าโดยไม่ตั้งใจ
+  3. **Verification & Regression Test Suite:**
+     - เพิ่มชุดทดสอบครอบคลุมกรณีฐานข้อมูลเสียและกรณีฉุกเฉินครบถ้วน 5 ชุดทดสอบใหม่ใน `tests/test_tracker_modules.py`:
+       - `test_resilience_when_local_database_is_deleted`
+       - `test_resilience_when_local_database_is_corrupted`
+       - `test_authoritative_clean_reset_when_database_is_deleted_on_cloud`
+       - `test_emergency_secret_buffer_when_database_unreachable_and_reconnect`
+       - `test_resilience_config_file_corruption_and_atomic_write`
+     - รันชุดทดสอบทั้งหมดผ่านสมบูรณ์ **88 / 88 รายการ (100% Passed)**
+
+
