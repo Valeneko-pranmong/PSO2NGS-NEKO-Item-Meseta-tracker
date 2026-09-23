@@ -1,1 +1,2 @@
 330dc2da786fb88aff8f598be0621051a3c94cf8a501f0ed1e38a2f9969265d3  NekoTracker-Setup-v7.1.0.exe
+376dfd4bb7ca998c0d4b0c32046afc79473776e952e02f7b91a05a77e469daaa  NekoTracker-v7.1.0-Portable.zip

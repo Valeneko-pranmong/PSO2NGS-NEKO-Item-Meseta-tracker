@@ -11,7 +11,8 @@
 
 | ไฟล์อาร์ติแฟกต์ (Artifact Name) | สถานะ (Tier) | บทบาทและรายละเอียด |
 | :--- | :--- | :--- |
-| **`NekoTracker-Setup-v7.1.0.exe`** | `[CURRENT]` 🟢 | **ใช้งานจริงและทดสอบ (Active):** ตัวติดตั้งแบบ Single-EXE Installer สำหรับผู้ใช้งานทั่วไปและเครื่องทดสอบ (ครอบคลุมตัวแอปหลัก Python V7.1.0, คู่มือ 3 ภาษา, ระบบ Uninstaller 4 ช่องทาง) |
+| **`NekoTracker-Setup-v7.1.0.exe`** | `[CURRENT]` 🟢 | **ใช้งานจริง (Active Installer):** ตัวติดตั้งแบบ Single-EXE สำหรับผู้ใช้งานทั่วไป (ครอบคลุมตัวแอปหลัก Python V7.1.0, คู่มือ 3 ภาษา, ระบบ Uninstaller 4 ช่องทาง) |
+| **`NekoTracker-v7.1.0-Portable.zip`** | `[CURRENT]` 🟢 | **ใช้งานจริงแบบพกพา (Active Portable):** ชุดโปรแกรมหลักแบบ Standalone สำหรับผู้ที่ต้องการใช้งานทันทีโดยไม่ต้องติดตั้ง |
 | **`SHA256SUMS.txt`** | `[CURRENT]` 🟢 | **ตรวจสอบความถูกต้อง (Verification):** ค่าแฮชทางคณิตศาสตร์ SHA-256 เพื่อความโปร่งใสและตรวจสอบความสมบูรณ์ของไฟล์ |
 | **`E2E_TEST_CHECKLIST.md`** | `[CURRENT]` 🟢 | **คู่มือเช็กลิสต์ QA (Testing):** แบบฟอร์มเช็กลิสต์การทดสอบ E2E สำหรับมนุษย์/คนเทส เริ่มตั้งแต่ตัวติดตั้งจนถึงถอนการติดตั้ง |
 | **`../portable-test-v7.1.0/`** | `[REFERENCE]` 🔵 | **เก็บอ้างอิง (Reference):** โครงสร้างแพ็กเกจแบบ Portable สำหรับทดสอบก่อนคอมไพล์ตัวติดตั้ง |
@@ -26,6 +27,7 @@
 
 ```text
 330dc2da786fb88aff8f598be0621051a3c94cf8a501f0ed1e38a2f9969265d3  NekoTracker-Setup-v7.1.0.exe
+376dfd4bb7ca998c0d4b0c32046afc79473776e952e02f7b91a05a77e469daaa  NekoTracker-v7.1.0-Portable.zip
 ```
 
 * **ขนาดไฟล์:** ~22.19 MB
@@ -74,10 +76,9 @@
   2. เปิดโปรแกรมจาก Desktop หรือ Start Menu
   3. คลิกปุ่ม **"เลือกโฟลเดอร์ Log"** แล้วเลือกโฟลเดอร์ `sample_logs` (คัดลอกจากชุดทดสอบ)
   4. ป้ายสถานะ `[TEST MODE]` สีเหลืองจะปรากฏ และประมวลผลข้อมูลจำลองทันที
-* **รูปแบบที่ 2 (ทดสอบทันทีแบบไม่ต้องติดตั้ง Portable Test):**
-  1. แตกไฟล์ `NekoTracker-v7.1.0-Portable-Test.zip`
-  2. ดับเบิลคลิก `3_Quick_Test_All_In_One.bat`
-  3. ระบบจะเปิด Live Mock Streamer (`NekoLogSimulator.exe`) และเปิดตัวแอปให้พร้อมทดสอบทันทีโดยไม่ต้องติดตั้งและไม่ต้องมี Python
+* **รูปแบบที่ 2 (เวอร์ชันพกพาไม่ต้องติดตั้ง — Standalone Portable Edition):**
+  1. แตกไฟล์ `NekoTracker-v7.1.0-Portable.zip`
+  2. ดับเบิลคลิก `NekoTracker.exe` เปิดใช้งานได้ทันทีโดยไม่ต้องติดตั้ง
 
 ---
 
@@ -89,16 +90,13 @@
 3. Proceed with the setup wizard to install into `%LOCALAPPDATA%\NEKO FAMILY\NekoTracker`.
 4. Launch **NEKO Item & Meseta Tracker**; log folder will be auto-detected.
 
-#### B. Testing on Clean / Non-Game Machines
-* **Option 1 (Test Official Release Candidate Installer):**
+#### B. Portable Zero-Install Option
+* **Option 1 (Official Setup Wizard):**
   1. Run `NekoTracker-Setup-v7.1.0.exe` and complete installation.
   2. Launch from Desktop or Start Menu.
-  3. Click **"Select Log Folder"** and choose a `sample_logs` directory.
-  4. The `[TEST MODE]` yellow badge will activate and simulate telemetry cleanly.
-* **Option 2 (Instant Zero-Install Portable Test Bundle):**
-  1. Extract `NekoTracker-v7.1.0-Portable-Test.zip`.
-  2. Run `3_Quick_Test_All_In_One.bat`.
-  3. Built-in `NekoLogSimulator.exe` streams live mock drops, launching the tracker instantly without Python or NGS installed.
+* **Option 2 (Standalone Zero-Install Portable Edition):**
+  1. Extract `NekoTracker-v7.1.0-Portable.zip`.
+  2. Run `NekoTracker.exe` directly without installation!
 
 ---
 
@@ -110,13 +108,10 @@
 3. 言語選択で「日本語」を選択し、セットアップウィザードに従って `%LOCALAPPDATA%\NEKO FAMILY\NekoTracker` にインストールします。
 4. インストール完了後、**NEKO Item & Meseta Tracker** を起動します。PSO2:NGSのログフォルダ（`log_ngs`）が自動検出されます。
 
-#### B. テスト環境・非ゲーム環境での検証（ゲームやPythonがないPC）
-* **方法1（公式リリース候補インストーラーの検証）:**
+#### B. ポータブル版（インストール不要）
+* **方法1（公式インストーラー）:**
   1. `NekoTracker-Setup-v7.1.0.exe` を実行してインストールを完了します。
   2. デスクトップまたはスタートメニューから起動します。
-  3. **「ログフォルダを選択」** をクリックし、同梱の `sample_logs` フォルダを選択します。
-  4. 黄色の `[TEST MODE]` バッジが表示され、疑似ドロップデータが即座に読み込まれます。
-* **方法2（インストール不要のポータブルテスト検証）:**
-  1. `NekoTracker-v7.1.0-Portable-Test.zip` を展開します。
-  2. `3_Quick_Test_All_In_One.bat` をダブルクリックします。
-  3. 内蔵の `NekoLogSimulator.exe` が起動し、PythonやNGSがインストールされていない環境でも即座に動作検証が可能です。
+* **方法2（インストール不要のポータブル版 — Standalone Portable Edition）:**
+  1. `NekoTracker-v7.1.0-Portable.zip` を展開します。
+  2. `NekoTracker.exe` を直接ダブルクリックして即座に使用開始できます！
