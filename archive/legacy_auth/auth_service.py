@@ -17,8 +17,28 @@ except (ImportError, ValueError):
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
     from modules.event_bus import event_bus
 
-DEFAULT_SUPABASE_URL = "https://miikoutrnxsunbndecqh.supabase.co"
-DEFAULT_PUBLISHABLE_KEY = "sb_publishable_mMW9OyuaGxB6YKmiPJo7gA_FNZjDb7v"
+# SECURITY NOTICE: Do NOT hardcode production credentials in repository files.
+# If legacy Supabase connectivity is needed, inject via environment variables.
+# Any exposed legacy keys must be rotated in the Supabase Dashboard.
+DEFAULT_SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+DEFAULT_PUBLISHABLE_KEY = os.getenv("SUPABASE_PUBLISHABLE_KEY", "")
+
+
+def cleanup_legacy_auth_session() -> bool:
+    """
+    Securely removes legacy unencrypted auth_session.json left by previous releases.
+    Returns True if a legacy file was found and removed, False otherwise.
+    """
+    try:
+        app_data = os.getenv("APPDATA") or os.path.expanduser("~")
+        legacy_file = os.path.join(app_data, "NekoTrackerOffline", "auth_session.json")
+        if os.path.exists(legacy_file):
+            os.remove(legacy_file)
+            print("[AuthService] Cleaned up legacy plaintext auth_session.json")
+            return True
+    except Exception as exc:
+        print(f"[AuthService] Legacy session cleanup warning: {exc}")
+    return False
 
 
 class AuthService:
@@ -264,13 +284,17 @@ class AuthService:
         event_bus.emit("auth_state_changed", user=None)
 
     def _save_session(self) -> None:
-        """Persist session state to local app data."""
+        """Persist non-sensitive session state to local app data (tokens stripped)."""
         if not self._current_user:
             return
         try:
             os.makedirs(self.session_dir, exist_ok=True)
+            # Security hardening: Strip access_token and refresh_token from disk persistence
+            safe_user = dict(self._current_user)
+            safe_user.pop("access_token", None)
+            safe_user.pop("refresh_token", None)
             with open(self.session_file, "w", encoding="utf-8") as f:
-                json.dump(self._current_user, f, ensure_ascii=False, indent=2)
+                json.dump(safe_user, f, ensure_ascii=False, indent=2)
         except Exception as exc:
             print(f"[AuthService] Save session error: {exc}")
 

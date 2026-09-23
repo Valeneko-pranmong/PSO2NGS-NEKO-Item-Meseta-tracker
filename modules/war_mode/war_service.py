@@ -39,7 +39,10 @@ try:
         REVOKED_VERSIONS,
     )
 except Exception:
-    DEFAULT_FIREBASE_RTDB_URL = "https://arks-war-room-default-rtdb.asia-southeast1.firebasedatabase.app"
+    DEFAULT_FIREBASE_RTDB_URL = os.getenv(
+        "FIREBASE_RTDB_URL",
+        os.getenv("ARKS_FIREBASE_RTDB_URL", "")
+    )
     SECTOR_X_MIN = -12
     SECTOR_X_MAX = 25
     SECTOR_Y_MIN = -11
@@ -226,6 +229,8 @@ class WarService:
 
         app_data = os.getenv("APPDATA") or os.path.expanduser("~")
         self.stats_file = kwargs.get("stats_file") or os.path.join(app_data, "NekoTrackerOffline", "war_stats.json")
+        self._last_loaded_stats_mtime: float = 0.0
+        self._last_loaded_op: str = ""
 
         self._load_saved_stats()
         self._subscribe_events()
@@ -286,7 +291,6 @@ class WarService:
                 self._has_fetched_cloud_stats = False
             self.add_log(f"ตรวจพบชื่อในเกมจาก Log (Primary Key): {character_name}", "info")
             self._load_saved_stats()
-            self._save_stats()
             self.trigger_realtime_sync()
 
     def on_board_coord_changed(self, coord: Any = None, slot: Optional[int] = None, **kwargs) -> None:
@@ -1328,12 +1332,24 @@ class WarService:
                 except OSError:
                     pass
             os.replace(tmp_file, self.stats_file)
+            try:
+                self._last_loaded_stats_mtime = os.path.getmtime(self.stats_file)
+                self._last_loaded_op = self.operative_name
+            except OSError:
+                pass
         except Exception as exc:
             print(f"[WarService] Failed saving war stats: {exc}")
 
     def _load_saved_stats(self) -> None:
         if not os.path.exists(self.stats_file):
             return
+        try:
+            mtime = os.path.getmtime(self.stats_file)
+            if getattr(self, "_last_loaded_stats_mtime", 0.0) == mtime and getattr(self, "_last_loaded_op", "") == self.operative_name:
+                return
+        except OSError:
+            mtime = 0.0
+
         is_corrupted = False
         corrupt_reason = ""
         try:
@@ -1367,6 +1383,8 @@ class WarService:
                     if not self.slot_farmed and self.total_farmed > 0:
                         ck = f"{self.target_coord.x},{self.target_coord.y}#{self.target_coord.slot}"
                         self.slot_farmed[ck] = self.total_farmed
+            self._last_loaded_stats_mtime = mtime
+            self._last_loaded_op = self.operative_name
 
             # Target coordinate always defaults to Core (0, 0, 1) on startup regardless of previous session
         except Exception as exc:

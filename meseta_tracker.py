@@ -10,8 +10,11 @@ import re
 import json
 import ctypes
 import webbrowser
+import logging
 from PIL import Image
 from typing import Any, Optional, Tuple, Dict, List
+
+logger = logging.getLogger("NekoTracker")
 
 from config import * 
 from dashboard_ui import DashboardFrame 
@@ -26,6 +29,7 @@ from modules.utils import (
     start_native_drag,
     is_position_on_screen,
     get_secondary_monitor_origin,
+    cleanup_legacy_auth_session,
 )
 from modules.security import (
     AntiTamperGuard,
@@ -54,7 +58,10 @@ class NGSTrackerApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.overrideredirect(True) 
+        # Security cleanup: Remove legacy unencrypted auth session if present from old versions
+        cleanup_legacy_auth_session()
+
+        self.overrideredirect(True)
         self.geometry("950x640")
         self.title(t("app_window_title"))
         self.configure(fg_color=COLOR_BG_MAIN) 
@@ -247,23 +254,33 @@ class NGSTrackerApp(ctk.CTk):
         self.update_live_clock()
 
     def update_live_clock(self):
-        if not self.is_running: return
-        
+        if not self.is_running:
+            return
+
+        try:
+            is_iconic = (self.state() == "iconic")
+        except Exception:
+            is_iconic = False
+
+        has_overlay = bool(getattr(self, 'overlay_window', None) and self.overlay_window.winfo_exists())
+
         if getattr(self, 'pending_status_text', None):
             try:
-                self.lbl_file_status.configure(text=self.pending_status_text, text_color=getattr(self, 'pending_status_color', "black"))
-                if hasattr(self, "war_view") and hasattr(self.war_view, "lbl_file_status"):
-                    self.war_view.lbl_file_status.configure(text=self.pending_status_text, text_color=getattr(self, 'pending_status_color', "black"))
+                if not is_iconic:
+                    self.lbl_file_status.configure(text=self.pending_status_text, text_color=getattr(self, 'pending_status_color', "black"))
+                    if hasattr(self, "war_view") and hasattr(self.war_view, "lbl_file_status"):
+                        self.war_view.lbl_file_status.configure(text=self.pending_status_text, text_color=getattr(self, 'pending_status_color', "black"))
             except Exception:
                 pass
             self.pending_status_text = None
 
         if getattr(self, 'needs_ui_update', False):
             try:
-                self.dashboard_area.update_display()
-                if hasattr(self, "war_view") and hasattr(self.war_view, "dashboard_area"):
-                    self.war_view.dashboard_area.update_display()
-                if getattr(self, 'overlay_window', None) and self.overlay_window.winfo_exists():
+                if not is_iconic:
+                    self.dashboard_area.update_display()
+                    if hasattr(self, "war_view") and hasattr(self.war_view, "dashboard_area"):
+                        self.war_view.dashboard_area.update_display()
+                if has_overlay:
                     self.overlay_window.update_data()
             except Exception:
                 pass
@@ -271,15 +288,16 @@ class NGSTrackerApp(ctk.CTk):
 
         if self.first_drop_time is not None:
             try: 
-                self.dashboard_area.update_live_stats()
-                if hasattr(self, "war_view") and hasattr(self.war_view, "dashboard_area"):
-                    self.war_view.dashboard_area.update_live_stats()
-                if getattr(self, 'overlay_window', None) and self.overlay_window.winfo_exists():
+                if not is_iconic:
+                    self.dashboard_area.update_live_stats()
+                    if hasattr(self, "war_view") and hasattr(self.war_view, "dashboard_area"):
+                        self.war_view.dashboard_area.update_live_stats()
+                if has_overlay:
                     self.overlay_window.update_data()
             except Exception:
                 pass
 
-        if getattr(self, "current_view", "offline") == "war" and hasattr(self, "war_view") and self.war_view.winfo_ismapped():
+        if not is_iconic and getattr(self, "current_view", "offline") == "war" and hasattr(self, "war_view") and self.war_view.winfo_ismapped():
             try:
                 self.war_view.update_view()
             except Exception:
@@ -538,7 +556,8 @@ class NGSTrackerApp(ctk.CTk):
             self.anti_tamper.enforce_cadence_validation = False
             self.anti_tamper.enforce_timestamp_validation = False
             self.anti_tamper.enforce_velocity_validation = False
-            self.anti_tamper.enforce_ceiling_validation = False
+            # Retain single-drop ceiling check even in test mode to block impossible drops
+            self.anti_tamper.enforce_ceiling_validation = True
             self.anti_tamper.is_compromised = False
         if hasattr(self, "war_service"):
             self.war_service.is_tamper_compromised = False
@@ -677,60 +696,6 @@ class NGSTrackerApp(ctk.CTk):
                 pass
 
         self.trigger_update_ui()
-
-    def _on_sidebar_lang_selected(self, val: str) -> None:
-        self.set_app_language(val)
-
-    def _on_title_lang_selected(self, val: str) -> None:
-        self.set_app_language(val)
-
-    def _on_language_changed(self, language: str = "", **kwargs) -> None:
-        try:
-            self.retranslate_ui()
-        except Exception:
-            pass
-
-    def set_app_language(self, lang_code: str, save: bool = True) -> None:
-        code = i18n.set_language(lang_code)
-        self.current_language = code
-        if save:
-            self.save_settings()
-        self.retranslate_ui()
-
-    def retranslate_ui(self) -> None:
-        """Update all labels and buttons to current active language."""
-        try:
-            self.title(t("app_window_title"))
-            if hasattr(self, "btn_enter_war") and self.btn_enter_war.winfo_exists():
-                self.btn_enter_war.configure(text=t("btn_enter_war"))
-            if hasattr(self, "btn_reset") and self.btn_reset.winfo_exists():
-                self.btn_reset.configure(text=t("btn_reset"))
-            if hasattr(self, "btn_watchlist") and self.btn_watchlist.winfo_exists():
-                self.btn_watchlist.configure(text=t("btn_watchlist"))
-            if hasattr(self, "switch_filter") and self.switch_filter.winfo_exists():
-                self.switch_filter.configure(text=t("switch_filter"))
-            if hasattr(self, "btn_overlay_full") and self.btn_overlay_full.winfo_exists():
-                self.btn_overlay_full.configure(text=t("btn_overlay_full"))
-            if hasattr(self, "btn_overlay_mini") and self.btn_overlay_mini.winfo_exists():
-                self.btn_overlay_mini.configure(text=t("btn_overlay_mini"))
-            if hasattr(self, "btn_how_to_use") and self.btn_how_to_use.winfo_exists():
-                self.btn_how_to_use.configure(text=t("btn_how_to_use"))
-            if hasattr(self, "btn_discord") and self.btn_discord.winfo_exists():
-                self.btn_discord.configure(text=t("btn_discord"))
-            if hasattr(self, "lbl_sidebar_lang") and self.lbl_sidebar_lang.winfo_exists():
-                self.lbl_sidebar_lang.configure(text=f"🌐 {t('label_language')}:")
-            if hasattr(self, "seg_lang_sidebar") and self.seg_lang_sidebar.winfo_exists():
-                self.seg_lang_sidebar.set(i18n.get_button_label())
-            if hasattr(self, "btn_select") and self.btn_select.winfo_exists():
-                self.btn_select.configure(text=t("btn_select_folder"))
-            if hasattr(self, "dashboard") and hasattr(self.dashboard, "retranslate_ui"):
-                self.dashboard.retranslate_ui()
-            if hasattr(self, "war_view") and hasattr(self.war_view, "retranslate_ui"):
-                self.war_view.retranslate_ui()
-            if hasattr(self, "overlay") and self.overlay and hasattr(self.overlay, "retranslate_ui"):
-                self.overlay.retranslate_ui()
-        except Exception:
-            pass
 
     def _find_default_pso2_log_folder(self) -> str:
         user_home = os.path.expanduser("~")
@@ -1062,8 +1027,8 @@ class NGSTrackerApp(ctk.CTk):
                                         self.process_log_line(line)
                                         data_changed = True
                             if data_changed: self.trigger_update_ui()
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug(f"[LogMonitor] Error reading log file: {exc}")
             time.sleep(1)
 
     def process_log_line(self, line):
@@ -1134,8 +1099,8 @@ class NGSTrackerApp(ctk.CTk):
                     if item_name:
                         self.item_counts[item_name] = self.item_counts.get(item_name, 0) + count
 
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(f"[LogProcessor] Error processing log line: {exc}")
 
     def trigger_update_ui(self):
         self.needs_ui_update = True

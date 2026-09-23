@@ -19,13 +19,27 @@ import urllib.error
 import argparse
 from typing import Dict, Any, Optional
 
-DEFAULT_FIREBASE_RTDB_URL = "https://arks-war-room-default-rtdb.asia-southeast1.firebasedatabase.app"
-BASE_PATH = "arks_war_room"
-CLIENT_VERSION = "7.1.0"
-MIN_SECURE_VERSION = "7.1.0"
-REVOKED_VERSIONS = ["7.0.0-alpha", "7.0.0"]
-
 WORKSPACE_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if WORKSPACE_ROOT not in sys.path:
+    sys.path.insert(0, WORKSPACE_ROOT)
+
+try:
+    from config import (
+        DEFAULT_FIREBASE_RTDB_URL,
+        CLIENT_VERSION,
+        MIN_SECURE_VERSION,
+        REVOKED_VERSIONS,
+    )
+except ImportError:
+    DEFAULT_FIREBASE_RTDB_URL = os.getenv(
+        "FIREBASE_RTDB_URL",
+        os.getenv("ARKS_FIREBASE_RTDB_URL", "")
+    )
+    CLIENT_VERSION = "7.1.0"
+    MIN_SECURE_VERSION = "7.1.0"
+    REVOKED_VERSIONS = ["7.0.0-alpha", "7.0.0"]
+
+BASE_PATH = "arks_war_room"
 
 # ปรับปรุง Windows Console Output ให้รองรับ UTF-8 และสัญลักษณ์ Unicode (เช่น ℳ) ป้องกันแครชบน CP874 / CP437
 if sys.platform == "win32":
@@ -443,12 +457,21 @@ def setup_local_workspace_data() -> bool:
         "timestamp": now_ms,
     }
 
-    target_roots = [
-        WORKSPACE_ROOT,
-        r"E:\ARKS War Room",
-        r"E:\PSO2NGS-NEKO-Item-Meseta-tracker",
-        r"E:\Admin war control",
-    ]
+    target_roots = [WORKSPACE_ROOT]
+    # Dynamically locate sibling workspaces if present without hardcoding absolute paths
+    parent_dir = os.path.dirname(WORKSPACE_ROOT)
+    for sibling_name in ["ARKS War Room", "Admin war control"]:
+        sibling_path = os.path.join(parent_dir, sibling_name)
+        if os.path.exists(sibling_path):
+            target_roots.append(sibling_path)
+
+    # Optional environment variable for custom test/admin deployment paths
+    env_roots = os.environ.get("WAR_ROOM_TARGET_ROOTS", "")
+    if env_roots:
+        for r in env_roots.split(";"):
+            r = r.strip()
+            if r and os.path.exists(r):
+                target_roots.append(r)
 
     seen_dirs = set()
     for root in target_roots:

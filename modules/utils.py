@@ -316,3 +316,20 @@ class SingleInstanceGuard:
                 pass
             self.mutex = None
 
+
+def cleanup_legacy_auth_session() -> bool:
+    """
+    Securely removes legacy unencrypted auth_session.json left by previous releases.
+    Returns True if a legacy file was found and removed, False otherwise.
+    """
+    try:
+        import os
+        app_data = os.getenv("APPDATA") or os.path.expanduser("~")
+        legacy_file = os.path.join(app_data, "NekoTrackerOffline", "auth_session.json")
+        if os.path.exists(legacy_file):
+            os.remove(legacy_file)
+            return True
+    except Exception:
+        pass
+    return False
+

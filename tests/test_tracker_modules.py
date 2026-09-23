@@ -1722,13 +1722,13 @@ def test_emergency_secret_buffer_when_database_unreachable_and_reconnect(monkeyp
     war.stop()
 
 
-def test_resilience_config_file_corruption_and_atomic_write(tmp_path, monkeypatch):
+def test_resilience_config_file_corruption_and_atomic_write(tmp_path, monkeypatch, shared_app):
     """
     Test resilience of CONFIG_FILE when corrupted.
     Verifies that corrupted config is backed up to .corrupt, defaults are loaded,
     and save_settings writes atomically without error.
     """
-    from meseta_tracker import NGSTrackerApp, CONFIG_FILE
+    from meseta_tracker import CONFIG_FILE
     import meseta_tracker
     import json
 
@@ -1739,8 +1739,9 @@ def test_resilience_config_file_corruption_and_atomic_write(tmp_path, monkeypatc
     with open(test_cfg, "w", encoding="utf-8") as f:
         f.write("{invalid_json_config")
 
-    # 2. Instantiating app or loading settings should not crash
-    app = NGSTrackerApp()
+    # 2. Loading settings should not crash
+    app = shared_app
+    app.load_settings()
     app.update_idletasks()
     assert hasattr(app, "watchlist_items")
 
@@ -1754,10 +1755,6 @@ def test_resilience_config_file_corruption_and_atomic_write(tmp_path, monkeypatc
         data = json.load(f)
     assert isinstance(data, dict)
     assert "watchlist" in data
-
-    if hasattr(app, "stop_monitoring"):
-        app.stop_monitoring()
-    app.destroy()
 
 
 def test_auto_bootstrap_database_when_empty_null(monkeypatch):

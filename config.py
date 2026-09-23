@@ -82,11 +82,14 @@ DEFAULT_WAR_ROOM_URL = os.getenv(
     ),
 )
 
-# Discord Community & Credit
+# Discord Community & Credit (Configurable via environment variables)
 DEFAULT_DISCORD_URL = os.getenv("DISCORD_URL", "https://discord.gg/fkjXW9AJ6a")
-DISCORD_INVITE_SHORT = "discord.gg/fkjXW9AJ6a"
-DISCORD_COMMUNITY_NAME = "NEKO★FAMILY PSO2:NGS Community"
-DISCORD_CREDIT_FULL = "NEKO★FAMILY PSO2:NGS Community discord.gg/fkjXW9AJ6a"
+DISCORD_INVITE_SHORT = os.getenv("DISCORD_INVITE_SHORT", "discord.gg/fkjXW9AJ6a")
+DISCORD_COMMUNITY_NAME = os.getenv("DISCORD_COMMUNITY_NAME", "NEKO★FAMILY PSO2:NGS Community")
+DISCORD_CREDIT_FULL = os.getenv(
+    "DISCORD_CREDIT_FULL",
+    f"{DISCORD_COMMUNITY_NAME} {DISCORD_INVITE_SHORT}",
+)
 
 # Firebase Realtime Database
 DEFAULT_FIREBASE_RTDB_URL = os.getenv(
