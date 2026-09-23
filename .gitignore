@@ -240,3 +240,4 @@ obj/
 artifacts/**/*.exe
 artifacts/**/*.zip
 artifacts/**/NekoTracker/
+data/

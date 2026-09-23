@@ -152,6 +152,7 @@ def compute_checksums() -> str:
         (os.path.join(ARTIFACTS_DIR, "E2E_TEST_CHECKLIST.md"), r"`[0-9a-fA-F]{64}`"),
         (os.path.join(ROOT_DIR, "Doc", "current", "E2E_TEST_GUIDE.md"), r"`[0-9a-fA-F]{64}`"),
         (os.path.join(ARTIFACTS_DIR, "README.md"), r"[0-9a-fA-F]{64}(?=\s+NekoTracker-Setup-v7\.1\.0\.exe)"),
+        (os.path.join(ROOT_DIR, "Doc", "current", "ENGINEERING_LOG.md"), r"(?<=NekoTracker-Setup-v7\.1\.0\.exe`: `)[0-9a-fA-F]{64}"),
     ]
     for path, pattern in doc_sync_targets:
         if os.path.isfile(path):

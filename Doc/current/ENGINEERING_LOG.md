@@ -274,8 +274,8 @@
      - รองรับ Safe Factory Reset ล้างข้อมูลทั้งบน Google Firebase RTDB และไฟล์แคชในเครื่อง (`%APPDATA%/NekoTrackerOffline/`, `%LOCALAPPDATA%/NEKO FAMILY/NekoTracker/`)
      - รองรับคำสั่ง All-in-One (`--all`), Factory Reset (`--wipe`), Setup (`--setup`), และ Verify (`--verify`)
   4. **อัปเดตค่าแฮช Release Artifacts:**
-     - `artifacts/release-v7.1.0/NekoTracker-Setup-v7.1.0.exe`: `4b410b1b759b5798a719b97826df5103ff0c89ba8119e716d5a89e92281dd402`
-     - `artifacts/portable-test-v7.1.0/NekoTracker/NekoTracker.exe`: `d8848687ea97b2d7ef699bb9b648ac55233ece9c79a53f3c6b84f0066f349614`
+     - `artifacts/release-v7.1.0/NekoTracker-Setup-v7.1.0.exe`: `2249c30f7a048b5113e0c48af0b44f01f5e7949953ba9dbd421df2ae224bdeb9`
+     - `artifacts/portable-test-v7.1.0/NekoTracker/NekoTracker.exe`: `a50e23ff1ddeb2f3646bd2d688d05fe4441632081d5dd87279f7f683884e2886`
      - อัปเดตใน `E2E_TEST_GUIDE.md`, `E2E_TEST_CHECKLIST.md`, `README.md`, และ `SHA256SUMS.txt`
   5. **การทดสอบความถูกต้อง (Test Suite Expansion):**
      - เพิ่มชุดทดสอบใน `tests/test_tracker_modules.py`:

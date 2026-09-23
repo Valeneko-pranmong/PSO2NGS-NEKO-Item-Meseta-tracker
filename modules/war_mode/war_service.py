@@ -263,6 +263,13 @@ class WarService:
             if not enabled:
                 self._is_dirty = False
                 self._sync_event.clear()
+        if not enabled:
+            # Drain any in-flight sync cycle so no background telemetry leaks after returning to offline mode
+            with self._sync_lock:
+                pass
+            with self._state_lock:
+                self._is_dirty = False
+                self._sync_event.clear()
         if enabled:
             self.ensure_sync_worker()
             self.trigger_realtime_sync()
@@ -729,9 +736,9 @@ class WarService:
     def trigger_realtime_sync(self, force: bool = False) -> None:
         """Queue or immediately signal a realtime sync event."""
         with self._state_lock:
+            if not self.realtime_sync_enabled and not force:
+                return
             self._is_dirty = True
-        if not self.realtime_sync_enabled and not force:
-            return
         self.ensure_sync_worker()
         self._sync_event.set()
 
@@ -765,11 +772,13 @@ class WarService:
                 now = time.time()
                 time_since_sync = now - self._last_sync_time
                 with self._state_lock:
+                    if not self.realtime_sync_enabled:
+                        continue
                     is_dirty = self._is_dirty
                     has_activity = (self.session_contribution > 0 or self.total_farmed > 0 or self.operative_name != "Operative")
                 needs_heartbeat = has_activity and (time_since_sync >= self.sync_heartbeat_interval)
 
-                if self.realtime_sync_enabled and (is_dirty or needs_heartbeat):
+                if is_dirty or needs_heartbeat:
                     is_heartbeat = (not is_dirty and needs_heartbeat)
                     self._execute_realtime_cycle(is_heartbeat=is_heartbeat)
             except Exception as loop_exc:
@@ -1255,7 +1264,7 @@ class WarService:
         cloud_ok = False
         cloud_msg = ""
         now = time.time()
-        if self.firebase_url:
+        if self.firebase_url and (self.realtime_sync_enabled or force_cloud):
             in_backoff = (now < self._cloud_backoff_until) and not force_cloud
             if in_backoff:
                 cloud_ok = False
@@ -1277,6 +1286,8 @@ class WarService:
                     backoff_delay = min(60.0, 5.0 * (2 ** min(self._cloud_fail_count - 1, 4)))
                     self._cloud_backoff_until = completed_at + backoff_delay
 
+        with self._state_lock:
+            self._is_dirty = False
         self._last_cloud_ok = cloud_ok
         self._last_cloud_msg = cloud_msg
         self._last_sync_time = now
