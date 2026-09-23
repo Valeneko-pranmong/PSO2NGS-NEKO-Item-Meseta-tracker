@@ -107,7 +107,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
 
         # War Mode (Online)
         "war_op_title": "👤 Character: {name}",
-        "war_op_sub": "Primary Key from game ActionLog",
+        "war_op_sub": "This name will be used as data on ARK WAR",
         "war_coord_label": "🎯 Coord [X, Y]:",
         "war_paste_btn": "📋 Paste",
         "war_pasted_btn": "✓ Pasted",
@@ -216,7 +216,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
 
         # War Mode (Online)
         "war_op_title": "👤 ชื่อในเกม: {name}",
-        "war_op_sub": "Primary Key จาก Log ไฟล์เกม",
+        "war_op_sub": "ชื่อนี้จะถูกใช้เป็นข้อมูลบน ARK WAR",
         "war_coord_label": "🎯 พิกัด [X, Y]:",
         "war_paste_btn": "📋 วาง",
         "war_pasted_btn": "✓ วางแล้ว",
@@ -325,7 +325,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
 
         # War Mode (Online)
         "war_op_title": "👤 キャラクター名: {name}",
-        "war_op_sub": "ActionLogからのプライマリキー",
+        "war_op_sub": "この名前はARK WARのデータとして使用されます",
         "war_coord_label": "🎯 作戦座標 [X, Y]:",
         "war_paste_btn": "📋 貼付",
         "war_pasted_btn": "✓ 貼付済",

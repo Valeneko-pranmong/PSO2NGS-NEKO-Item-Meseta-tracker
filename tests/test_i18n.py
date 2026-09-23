@@ -164,6 +164,7 @@ def test_online_war_view_language_switching(shared_app):
     app.set_app_language("en")
     app.update_idletasks()
     assert "Character" in wv.lbl_op_title.cget("text")
+    assert "This name will be used as data on ARK WAR" in wv.lbl_op_sub.cget("text")
     assert wv.btn_paste_coord.cget("text") == "📋 Paste"
     assert wv.btn_save_coord.cget("text") == "💾 Save"
     assert wv.btn_back_offline.cget("text") == "🔙 Back to Offline"
@@ -173,6 +174,7 @@ def test_online_war_view_language_switching(shared_app):
     app.set_app_language("th")
     app.update_idletasks()
     assert "ชื่อในเกม" in wv.lbl_op_title.cget("text")
+    assert "ชื่อนี้จะถูกใช้เป็นข้อมูลบน ARK WAR" in wv.lbl_op_sub.cget("text")
     assert wv.btn_paste_coord.cget("text") == "📋 วาง"
     assert wv.btn_save_coord.cget("text") == "💾 บันทึก"
     assert wv.btn_back_offline.cget("text") == "🔙 กลับสู่โหมดออฟไลน์"
@@ -182,6 +184,7 @@ def test_online_war_view_language_switching(shared_app):
     app.set_app_language("ja")
     app.update_idletasks()
     assert "キャラクター名" in wv.lbl_op_title.cget("text")
+    assert "この名前はARK WARのデータとして使用されます" in wv.lbl_op_sub.cget("text")
     assert wv.btn_paste_coord.cget("text") == "📋 貼付"
     assert wv.btn_save_coord.cget("text") == "💾 保存"
     assert wv.btn_back_offline.cget("text") == "🔙 オフライン画面へ戻る"
