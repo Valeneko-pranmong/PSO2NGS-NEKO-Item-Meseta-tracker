@@ -34,7 +34,7 @@ python -m pytest -v
 # หรือรันผ่าน Batch Script
 run_test.bat
 ```
-> **เกณฑ์การยอมรับ:** ผลการทดสอบต้องผ่านทั้งหมด **65 / 65 รายการ (100% Passed)**
+> **เกณฑ์การยอมรับ:** ผลการทดสอบต้องผ่านทั้งหมด **92 / 92 รายการ (100% Passed)**
 
 ### 3. การคอมไพล์และสร้างชุดติดตั้ง Windows (Installer Build Pipeline)
 ```bash
@@ -63,6 +63,8 @@ build_installer.bat
 | **Internal EventBus** | `modules/event_bus.py` | ระบบกระจาย Event ภายใน เพื่อตัดการผูกติด (Decoupling) ระหว่าง UI และ Business Logic |
 | **ARKS War Subsystem** | `modules/war_mode/war_service.py`<br>`modules/war_mode/war_view.py` | จัดการข้อมูล Telemetry, คลาส `TargetCoord`, Smart Coordinate Parser, Background Sync Worker |
 | **Firebase Broadcaster** | `tools/firebase_war_sync.py` | ตัวส่งข้อมูลขึ้น Google Firebase Realtime Database รองรับทั้ง Admin SDK และ REST Fallback |
+| **Database Setup & Admin** | `tools/setup_database.py`<br>`setup_database.bat` | เครื่องมือ Admin และ DevOps จัดการฐานข้อมูล (Bootstrap, Factory Reset ทั้งคลาวด์และเครื่อง, Verify สถานะ) |
+| **Mock Log Streamer** | `tools/mock_log_simulator.py`<br>`run_portable_test.bat` | โปรแกรมจำลองการสตรีม Log ของเกม PSO2:NGS สำหรับการทดสอบโดยไม่ต้องเปิดเกม |
 | **Installer Pipeline** | `installer/build_installer.py`<br>`installer/NekoTracker.iss`<br>`installer/README.md`<br>`build_installer.bat` | ระบบคอมไพล์และสร้างชุดติดตั้ง Windows (Inno Setup 6) ตามมาตรฐานกลาง พร้อมทดสอบ Process Smoke อัตโนมัติ |
 | **Distribution Artifacts** | `artifacts/release-v7.1.0/` | โฟลเดอร์เก็บอาร์ติแฟกต์ทางการ (`NekoTracker-Setup-v7.1.0.exe`, `SHA256SUMS.txt`, `README.md`) |
 | **Archived Auth** | `archive/legacy_auth/` | **[ห้ามแตะต้อง]** ซอร์สโค้ดระบบล็อกอินเดิมที่ปลดระวางแล้ว ห้ามนำกลับมา import เด็ดขาด |
@@ -85,5 +87,12 @@ build_installer.bat
    - อ่านข้อมูลผ่าน Stream/Seek ของไฟล์ข้อความในดิสก์เท่านั้น
 4. **ความปลอดภัยของเธรด (Thread Safety):**
    - ใน `meseta_tracker.py` ตัวแปรเกี่ยวกับเงินและไอเทมถูกป้องกันด้วย `self.data_lock`
-   - ใน `war_service.py` การซิงค์และสถานะ Telemetry ถูกป้องกันด้วย `self._sync_lock`
+   - ใน `war_service.py` การซิงค์และสถานะ Telemetry ถูกป้องกันด้วย `self._sync_lock` และสถานะในเครื่องถูกป้องกันด้วย `self._state_lock`
    - การอัปเดต UI จาก Worker Thread ต้องสั่งผ่าน EventBus หรือ Tkinter `self.after` / Dispatcher เสมอ
+5. **Offline Mode Privacy Guarantee (ความเป็นส่วนตัว 100%):**
+   - เมื่อเปิดแอปพลิเคชันหรืออยู่ในโหมด Offline Tracker ตัวแปร `realtime_sync_enabled` ต้องเป็น `False` เสมอ และไม่มีการยิง Network Request ไปยังคลาวด์เด็ดขาด จะเริ่มซิงค์ต่อเมื่อผู้ใช้กดเข้าหน้า ARKS War Room เท่านั้น
+   - เมื่อผู้ใช้สลับกลับมาโหมด Offline เมธอด `set_realtime_sync(False)` จะต้องตัดการทำงานของ Sync Worker และเคลียร์คิวสัญญาณทันที
+6. **Multi-Slot Continuous Farming (การรักษายอดเงินข้ามช่อง):**
+   - ยอดเงิน Meseta ในแต่ละช่องย่อย (`slot_farmed: Dict[str, int]`) ต้องถูกรักษาไว้ตลอดไปเมื่อมีการสลับพิกัดหรือเปลี่ยนช่อง ห้ามย้ายเงินหรือส่งสถานะ `departed` เคลียร์เงินช่องเดิมเป็น 0 เด็ดขาด เพื่อให้ผู้เล่นสามารถฟาร์มสะสมเงินกระจายไปในหลายช่องและหลาย Sector ได้อย่างต่อเนื่อง
+7. **Startup Coordinate Defaulting:**
+   - เมื่อเปิดโปรแกรมทุกครั้ง พิกัดเริ่มต้นต้องเป็น `0, 0, 1` (Core) เสมอ โดยไม่ยึดพิกัดจากเซสชันก่อนหน้า เพื่อความสม่ำเสมอของระบบ

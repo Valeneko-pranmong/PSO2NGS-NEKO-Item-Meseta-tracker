@@ -230,6 +230,8 @@ obj/
 *.suo
 
 # Release artifacts (ignore compiled binaries, keep manifests and documentation)
+*.exe
+*.lnk
 artifacts/**/*.exe
 artifacts/**/*.zip
 artifacts/**/NekoTracker/

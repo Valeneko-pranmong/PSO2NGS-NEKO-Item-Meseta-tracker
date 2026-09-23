@@ -183,6 +183,7 @@ class WarService:
         self.team_id = ""
         self.session_contribution = 0
         self.total_farmed = 0
+        self.slot_farmed: Dict[str, int] = {}
         self.session_start_time = time.time()
         self.first_farming_time: Optional[float] = None
         self.war_logs: List[Dict[str, Any]] = []
@@ -243,6 +244,20 @@ class WarService:
                     target=self._realtime_sync_worker, daemon=True, name="WarService-RealtimeSync"
                 )
                 self._sync_worker_thread.start()
+
+    def set_realtime_sync(self, enabled: bool) -> None:
+        """
+        Enable or disable realtime cloud synchronization (e.g. switching between war mode and offline mode).
+        In offline mode, immediately clears pending sync signals to guarantee zero telemetry leakage.
+        """
+        with self._state_lock:
+            self.realtime_sync_enabled = enabled
+            if not enabled:
+                self._is_dirty = False
+                self._sync_event.clear()
+        if enabled:
+            self.ensure_sync_worker()
+            self.trigger_realtime_sync()
 
     def _subscribe_events(self) -> None:
         self.event_bus.subscribe("meseta_earned", self.on_meseta_earned)
@@ -378,10 +393,25 @@ class WarService:
                 changed = False
 
         if changed:
-            self.add_log(f"อัปเดตพิกัดบนกระดานเป็น [{gx}, {gy}] ช่อง #{cslot} ({slot_label})", "info")
+            slot_key = f"{gx},{gy}#{cslot}"
+            slot_m = self.slot_farmed.get(slot_key, 0)
+            self.add_log(f"อัปเดตพิกัดบนกระดานเป็น [{gx}, {gy}] ช่อง #{cslot} ({slot_label}) — ยอดสะสมช่องนี้: {slot_m:,} ℳ", "info")
             self._save_stats()
             self.trigger_realtime_sync()
         return self.target_coord
+
+    def get_slot_meseta(self, coord_key: Optional[str] = None, slot: Optional[int] = None) -> int:
+        """Get accumulated meseta farmed for a specific sector and quadrant slot."""
+        with self._state_lock:
+            ck = coord_key if coord_key is not None else self.target_coord.coord_key
+            sl = slot if slot is not None else self.target_coord.slot
+            return self.slot_farmed.get(f"{ck}#{sl}", 0)
+
+    def get_sector_meseta(self, coord_key: Optional[str] = None) -> int:
+        """Get total meseta farmed across all 4 sub-cells in a sector."""
+        with self._state_lock:
+            ck = coord_key if coord_key is not None else self.target_coord.coord_key
+            return sum(self.slot_farmed.get(f"{ck}#{s}", 0) for s in range(1, 5))
 
     def set_operative(self, name: str, *args: Any, **kwargs: Any) -> None:
         with self._state_lock:
@@ -425,10 +455,14 @@ class WarService:
                 self.session_contribution += amount
                 self.total_farmed += amount
                 gx, gy, slot = self.target_coord.x, self.target_coord.y, self.target_coord.slot
+                slot_key = f"{gx},{gy}#{slot}"
+                self.slot_farmed[slot_key] = self.slot_farmed.get(slot_key, 0) + amount
+                current_slot_meseta = self.slot_farmed[slot_key]
                 current_contrib = self.session_contribution
+                total_meseta = self.total_farmed
 
             self.add_log(
-                f"+{amount:,} ℳ พิกัด [{gx}, {gy}] #{slot} (ยอดสะสม: {current_contrib:,} ℳ)",
+                f"+{amount:,} ℳ พิกัด [{gx}, {gy}] #{slot} (ยอดสะสมช่องนี้: {current_slot_meseta:,} ℳ | รวม: {total_meseta:,} ℳ)",
                 "income",
             )
             self._save_stats()
@@ -648,11 +682,24 @@ class WarService:
                 sec_status = "REVOKED_VERSION_INSECURE"
 
             rate_mhr = round(self.get_live_rate()) if is_secure else 0
+            slot_key = f"{gx},{gy}#{slot}"
+            slot_m = self.slot_farmed.get(slot_key, 0)
+            counted_slot_m = slot_m if is_secure else 0
+
+            sec_m = sum(self.slot_farmed.get(f"{gx},{gy}#{s}", 0) for s in range(1, 5))
+            if sec_m == 0:
+                sec_m = slot_m
+            counted_sec_m = sec_m if is_secure else 0
 
             return {
                 "character_name": self.operative_name,
                 "meseta": counted_meseta,
                 "raw_meseta": effective_meseta,
+                "slot_meseta": counted_slot_m,
+                "raw_slot_meseta": slot_m,
+                "sector_meseta": counted_sec_m,
+                "raw_sector_meseta": sec_m,
+                "slot_farmed": dict(self.slot_farmed),
                 "session_meseta": self.session_contribution,
                 "total_farmed": self.total_farmed,
                 "client_version": self.client_version,
@@ -726,6 +773,8 @@ class WarService:
         """Execute one complete telemetry sync cycle under lock."""
         with self._sync_lock:
             with self._state_lock:
+                if not self.realtime_sync_enabled:
+                    return False, "ไม่อนุญาตให้ส่งข้อมูลในโหมดออฟไลน์ (Offline Mode)"
                 self._is_dirty = False
                 self._is_syncing = True
             if not is_heartbeat:
@@ -813,6 +862,10 @@ class WarService:
                     # Database record is missing (deleted on cloud to reset). Clean local stats to match.
                     with self._state_lock:
                         self.total_farmed = self.session_contribution
+                        self.slot_farmed.clear()
+                        if self.session_contribution > 0:
+                            ck = f"{self.target_coord.x},{self.target_coord.y}#{self.target_coord.slot}"
+                            self.slot_farmed[ck] = self.session_contribution
                         self._has_fetched_cloud_stats = True
                     self.add_log("ไม่พบข้อมูลเดิมบนฐานข้อมูล (เริ่มนับยอดรวมใหม่ตาม Session)", "info")
                     self._save_stats()
@@ -830,6 +883,9 @@ class WarService:
                         with self._state_lock:
                             # Adopt DB state unconditionally as source of truth (respecting current session)
                             self.total_farmed = max(db_meseta, self.session_contribution)
+                            if not self.slot_farmed and self.total_farmed > 0:
+                                ck = f"{self.target_coord.x},{self.target_coord.y}#{self.target_coord.slot}"
+                                self.slot_farmed[ck] = self.total_farmed
                             self._has_fetched_cloud_stats = True
                         self.add_log(f"ดึงข้อมูลจากฐานข้อมูล: เริ่มนับที่ {self.total_farmed:,} ℳ", "info")
                     else:
@@ -855,8 +911,32 @@ class WarService:
         coord_key = db_payload["coord_key"]
         slot = db_payload["slot"]
         rate_mhr = db_payload.get("farming_rate_mhr", 0)
+        slot_key = f"{coord_key}#{slot}"
 
-        # Path 1: Operative record
+        # If active slot has no local record, check Firebase for existing slot contribution
+        if slot_key not in self.slot_farmed and self.firebase_url and safe_key != "Operative":
+            try:
+                url_sub_get = f"{base_url}/arks_war_room/sectors/{urllib.parse.quote(coord_key)}/sub_cells/{slot}/challengers/{urllib.parse.quote(safe_key)}.json"
+                req_sg = urllib.request.Request(url_sub_get, method="GET", headers={"User-Agent": f"NEKOTracker/{self.client_version}"})
+                with urllib.request.urlopen(req_sg, timeout=min(2.0, timeout)) as resp_sg:
+                    sub_raw = resp_sg.read().decode("utf-8").strip()
+                if sub_raw and sub_raw != "null":
+                    sub_parsed = json.loads(sub_raw)
+                    if isinstance(sub_parsed, dict) and "meseta" in sub_parsed:
+                        with self._state_lock:
+                            self.slot_farmed[slot_key] = max(0, int(sub_parsed.get("meseta", 0)))
+            except Exception:
+                pass
+
+        slot_meseta = self.slot_farmed.get(slot_key, 0)
+        counted_slot_meseta = slot_meseta if is_secure else 0
+
+        sector_meseta = sum(self.slot_farmed.get(f"{coord_key}#{s}", 0) for s in range(1, 5))
+        if sector_meseta == 0:
+            sector_meseta = slot_meseta
+        counted_sec_meseta = sector_meseta if is_secure else 0
+
+        # Path 1: Operative record (Cumulative across galaxy)
         op_payload = {
             "character_name": char_name,
             "meseta": db_payload["meseta"],
@@ -877,13 +957,13 @@ class WarService:
             "timestamp": db_payload["timestamp"],
         }
 
-        # Path 2: Sector challengers
+        # Path 2: Sector challengers (Aggregated across sub-cells in this sector)
         sec_payload = {
             "character_name": char_name,
-            "meseta": db_payload["meseta"],
+            "meseta": counted_sec_meseta,
             "client_version": client_ver,
             "security_status": db_payload["security_status"],
-            "status": "claimed" if (is_secure and db_payload["meseta"] >= SLOT_TARGET_MESETA) else ("BLOCKED_INSECURE_VERSION" if not is_secure else "contributing"),
+            "status": "claimed" if (is_secure and counted_sec_meseta >= SLOT_TARGET_MESETA) else ("BLOCKED_INSECURE_VERSION" if not is_secure else "contributing"),
             "slot": slot,
             "farming_rate_mhr": rate_mhr,
             "farmingRateMhr": rate_mhr,
@@ -891,70 +971,18 @@ class WarService:
             "lastUpdated": now_ms,
         }
 
-        # Path 3: Sub-cell challengers
+        # Path 3: Sub-cell challengers (Per-slot continuous farming)
         sub_payload = {
             "character_name": char_name,
-            "meseta": db_payload["meseta"],
+            "meseta": counted_slot_meseta,
             "client_version": client_ver,
             "security_status": db_payload["security_status"],
+            "slot": slot,
             "farming_rate_mhr": rate_mhr,
             "farmingRateMhr": rate_mhr,
             "meseta_per_hour": rate_mhr,
             "lastUpdated": now_ms,
         }
-
-        # Check if operative relocated from a previously synced coordinate or slot
-        if self._last_synced_operative and self._last_synced_operative != char_name:
-            self._last_synced_coord_key = None
-            self._last_synced_slot = None
-
-        relocated_from = None
-        if self._last_synced_coord_key and self._last_synced_slot:
-            if (self._last_synced_coord_key != coord_key) or (self._last_synced_slot != slot):
-                relocated_from = (self._last_synced_coord_key, self._last_synced_slot)
-
-        if relocated_from:
-            old_ck, old_sl = relocated_from
-            departed_payload = {
-                "character_name": char_name,
-                "meseta": 0,
-                "raw_meseta": 0,
-                "farming_rate_mhr": 0,
-                "farmingRateMhr": 0,
-                "meseta_per_hour": 0,
-                "client_version": client_ver,
-                "security_status": "SECURE",
-                "status": "departed",
-                "lastUpdated": now_ms,
-            }
-            # Clear old sub-cell challenger
-            url_old_sub = f"{base_url}/arks_war_room/sectors/{urllib.parse.quote(old_ck)}/sub_cells/{old_sl}/challengers/{urllib.parse.quote(safe_key)}.json"
-            try:
-                req_old_sub = urllib.request.Request(
-                    url_old_sub,
-                    data=json.dumps(departed_payload).encode("utf-8"),
-                    headers={"Content-Type": "application/json", "User-Agent": f"NEKOTracker/{client_ver}"},
-                    method="PUT",
-                )
-                with urllib.request.urlopen(req_old_sub, timeout=min(2.0, timeout)) as resp:
-                    pass
-            except Exception:
-                pass
-
-            # If sector changed, also clear old sector-level challenger
-            if old_ck != coord_key:
-                url_old_sec = f"{base_url}/arks_war_room/sectors/{urllib.parse.quote(old_ck)}/challengers/{urllib.parse.quote(safe_key)}.json"
-                try:
-                    req_old_sec = urllib.request.Request(
-                        url_old_sec,
-                        data=json.dumps(departed_payload).encode("utf-8"),
-                        headers={"Content-Type": "application/json", "User-Agent": f"NEKOTracker/{client_ver}"},
-                        method="PUT",
-                    )
-                    with urllib.request.urlopen(req_old_sec, timeout=min(2.0, timeout)) as resp:
-                        pass
-                except Exception:
-                    pass
 
         try:
             # Multi-Path Atomic Update Optimization for Firebase RTDB
@@ -1286,6 +1314,7 @@ class WarService:
                     "target_coord": list(self.target_coord),
                     "session_contribution": self.session_contribution,
                     "total_farmed": self.total_farmed,
+                    "slot_farmed": dict(self.slot_farmed),
                     "last_active": time.time(),
                 }
 
@@ -1329,6 +1358,15 @@ class WarService:
                     saved_total = 0
                 with self._state_lock:
                     self.total_farmed = max(saved_total, self.session_contribution)
+                    raw_slots = data.get("slot_farmed", {})
+                    if isinstance(raw_slots, dict):
+                        self.slot_farmed = {
+                            str(k): max(0, int(v)) for k, v in raw_slots.items()
+                            if isinstance(v, (int, float)) or (isinstance(v, str) and v.isdigit())
+                        }
+                    if not self.slot_farmed and self.total_farmed > 0:
+                        ck = f"{self.target_coord.x},{self.target_coord.y}#{self.target_coord.slot}"
+                        self.slot_farmed[ck] = self.total_farmed
 
             # Target coordinate always defaults to Core (0, 0, 1) on startup regardless of previous session
         except Exception as exc:

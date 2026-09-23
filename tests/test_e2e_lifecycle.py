@@ -177,6 +177,8 @@ def test_e2e_full_application_lifecycle(e2e_environment, shared_app):
         guide.destroy()
 
     # 10. Session Data Reset Lifecycle
+    app.log_folder = ""
+    app.log_path = ""
     app.reset_data()
     app.update_idletasks()
     assert app.session_meseta == 0

@@ -2,7 +2,7 @@
 
 ![Version](https://img.shields.io/badge/Python_Version-7.1.0-FF69B4?style=for-the-badge)
 ![Platform](https://img.shields.io/badge/Platform-Windows_10%2F11-blue?style=for-the-badge)
-![Tests](https://img.shields.io/badge/Tests-65%20Passed-brightgreen?style=for-the-badge)
+![Tests](https://img.shields.io/badge/Tests-92%20Passed-brightgreen?style=for-the-badge)
 ![Languages](https://img.shields.io/badge/i18n-EN%20%7C%20TH%20%7C%20JA-purple?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-Non--Commercial-red?style=for-the-badge)
 
@@ -45,16 +45,27 @@ E:\PSO2NGS-NEKO-Item-Meseta-tracker\
 │       └── war_view.py                     # แดชบอร์ดสงคราม ARKS WarDashboardFrame
 ├── 📂 tools/                               # [CURRENT] 🟢 สคริปต์และเครื่องมือเสริม
 │   ├── __init__.py                         # Tools Package
-│   └── firebase_war_sync.py                # เครื่องมือส่งข้อมูล Telemetry สด (Admin SDK + REST)
-├── 📂 tests/                               # [CURRENT] 🟢 ชุดทดสอบ Unit Tests ของ Python
-│   └── test_tracker_modules.py             # ทดสอบ EventBus, WarService, Zero-Login, SemVer, Security (24 Tests)
+│   ├── firebase_war_sync.py                # เครื่องมือส่งข้อมูล Telemetry สด (Admin SDK + REST)
+│   ├── mock_log_simulator.py               # โปรแกรมจำลองการสตรีม Log ของเกม
+│   ├── package_test_build.py               # สคริปต์ประกอบชุด Portable Test Package
+│   ├── reset_database.py                   # สคริปต์รีเซ็ตฐานข้อมูล
+│   └── setup_database.py                   # เครื่องมือ Admin จัดการฐานข้อมูล (Bootstrap & Factory Reset)
+├── 📂 tests/                               # [CURRENT] 🟢 ชุดทดสอบความถูกต้องของระบบ (92 Tests Passed)
+│   ├── conftest.py                         # Pytest Fixtures และ Shared App Lifecycle
+│   ├── test_anti_tamper.py                 # ทดสอบระบบต่อต้านการปลอมแปลงและตรวจสอบไฟล์
+│   ├── test_e2e_lifecycle.py               # ทดสอบ End-to-End ตลอดวงจรการทำงานของแอปพลิเคชัน
+│   ├── test_guide_system.py                # ทดสอบหน้าต่างคู่มือ 3 ภาษาและการนำทาง
+│   ├── test_i18n.py                        # ทดสอบระบบแปลภาษาและความถูกต้องของคำศัพท์
+│   ├── test_test_mode_and_window.py        # ทดสอบการพับหน้าต่างและ Bypass ในโหมดทดสอบ
+│   └── test_tracker_modules.py             # ทดสอบ Core Engine, WarService, และ Firebase Sync
 ├── 📂 installer/                           # [CURRENT] 🟢 ไฟล์กำหนดค่าและสคริปต์ไปป์ไลน์ตัวติดตั้ง
 │   ├── NekoTracker.iss                     # สคริปต์ Inno Setup 6 (Per-user, 64-bit, LZMA2 Compression)
 │   ├── build_installer.py                  # สคริปต์อัตโนมัติ (Tests -> Builds -> Package -> Smoke)
 │   ├── LICENSE.txt                         # ข้อกำหนดและสิทธิ์การใช้งาน (Non-Commercial)
 │   └── README.md                           # คู่มือการทำงานของระบบตัวติดตั้ง
 ├── 📂 artifacts/                           # [CURRENT] 🟢 คลังอาร์ติแฟกต์ทางการ
-│   └── 📂 release-v7.1.0/                  # [CURRENT] 🟢 โฟลเดอร์ Release หลัก (Python Tracker Setup.exe, SHA256, Docs)
+│   ├── 📂 release-v7.1.0/                  # [CURRENT] 🟢 โฟลเดอร์ Release หลัก (Python Tracker Setup.exe, SHA256, Docs)
+│   └── 📂 portable-test-v7.1.0/            # [CURRENT] 🟢 ชุดทดสอบพกพาพร้อมไฟล์จำลอง Log
 ├── 📂 archive/                             # [ARCHIVE] 🔴 ซอร์สโค้ดเก่าที่ปลดระวาง (ห้ามใช้งาน)
 │   ├── README.md                           # บันทึกชี้แจงเหตุผลการปลดระวางโค้ด
 │   ├── 📂 legacy_auth/                     # โค้ดระบบ Login เก่าที่ยกเลิกไปแล้ว
@@ -66,6 +77,8 @@ E:\PSO2NGS-NEKO-Item-Meseta-tracker\
 ├── meseta_tracker.py                       # จุดเริ่มต้นรันหลักของ Python Application
 ├── run_app.bat                             # สคริปต์เปิดรันแอปพลิเคชันอย่างรวดเร็ว
 ├── run_test.bat                            # สคริปต์รันชุดทดสอบ Python อัตโนมัติ
+├── run_portable_test.bat                   # สคริปต์เปิดรันโหมดทดสอบพกพา
+├── setup_database.bat                      # สคริปต์เรียกเครื่องมือ Admin จัดการฐานข้อมูล (All-in-One)
 ├── build_installer.bat                     # สคริปต์สร้างไฟล์ติดตั้ง Windows Setup อัตโนมัติ
 └── README.md                               # เอกสารหลักฉบับนี้
 ```
@@ -91,13 +104,17 @@ E:\PSO2NGS-NEKO-Item-Meseta-tracker\
   - ปลดแอกสมบูรณ์ทั้ง Sector เท่ากับ **40,000,000 N-Meseta** (หากยึดครบคนเดียวจะหลอมรวมเป็น Seamless Continent)
 * **การชิงพื้นที่ (Clash):** ใครเติมเงินเกิน 10M และมากกว่าผู้นำเดิม แย่งเป็นเจ้าของทันที!
 * **Smart Coordinate Parser:** วางพิกัดได้ทันที รองรับ 7 รูปแบบอินพุต (ทั้งแบบ 3 จำนวน, วงเล็บ, JSON, และข้อความคัดลอกจากเว็บ)
+* **Multi-Slot Continuous Farming:** สลับพิกัดหรือเปลี่ยนช่องย่อยได้อย่างอิสระ เงินในช่องเดิมไม่ถูกล้างหรือย้ายตาม สะสมเงินกระจายยึดครองหลายพื้นที่ได้พร้อมกัน
+* **Startup Core Defaulting:** กำหนดพิกัดเริ่มต้นไปที่ Core `[0, 0, 1]` อัตโนมัติทุกครั้งที่เปิดโปรแกรม
+* **Offline Mode Privacy Guarantee:** โหมดออฟไลน์ปลอดการเชื่อมต่อ 100% ไม่ส่งข้อมูลออกนอกเครื่อง จะเริ่มซิงค์เมื่อเข้าสู่หน้าสงครามเท่านั้น
 * **Zero-Login Architecture & Standby Presence:** ตรวจจับชื่อตัวละครจริงในเกมจากไฟล์ Log อัตโนมัติและปรากฏในทำเนียบนักรบพร้อมรบทันที
-* **Cloud Realtime Sync:** เธรดเบื้องหลังส่ง Telemetry สดขึ้นระบบคลาวด์ War Room อัตโนมัติด้วย Debounce 0.35 วินาที พร้อม Heartbeat ทุก 5 วินาที
+* **Cloud Realtime Sync:** เธรดเบื้องหลังส่ง Telemetry สดขึ้นระบบคลาวด์ War Room อัตโนมัติด้วย Debounce 0.35 วินาที พร้อม Heartbeat ทุก 5 วินาที ผ่าน Multi-Path Atomic PATCH
 
 ### 3. 🛡️ Client Version Security & Data Gating
 * **ระบบตรวจสอบความปลอดภัยของเวอร์ชัน:** ส่งเลขเวอร์ชันไคลเอนต์ (`client_version`) ขึ้นตรวจสอบกับระบบคลาวด์อัตโนมัติทุกครั้งที่ซิงค์ข้อมูล
 * **Meseta Security Gating:** ไคลเอนต์เวอร์ชันที่มีช่องโหว่ความปลอดภัยหรือถูกเพิกถอน (Revoked) จะถูกปฏิเสธไม่นับยอดเงินเข้าสู่ฐานข้อมูล (`meseta = 0`) และบันทึกคำเตือนความปลอดภัย
 * **Pure Python Architecture:** ออกแบบด้วย Python 3.11 และ CustomTkinter น้ำหนักเบา ปลอดภัย และเสถียร
+* **All-in-One Database Administration:** เครื่องมือ `tools/setup_database.py` และ `setup_database.bat` สำหรับ Bootstrap ติดตั้งฐานข้อมูล, Safe Factory Reset คืนค่าโรงงาน, และ Verify ความพร้อมของระบบสด
 
 ---
 
@@ -127,16 +144,16 @@ build_installer.bat
 # หรือรันผ่านคำสั่ง Python
 python installer/build_installer.py
 ```
-> ระบบจะรันการทดสอบ Python (24 รายการ ผ่าน 100%) -> แพ็กเกจ Python Tracker ด้วย PyInstaller -> คอมไพล์ Inno Setup (มาตรฐาน Per-User `%LOCALAPPDATA%\NEKO FAMILY\NekoTracker`) -> สร้างแฮช SHA-256 -> ทำ Lifecycle Smoke Test ใน Sandbox ตามมาตรฐานกลาง [`Doc/reference/INSTALLER_STANDARD.md`](Doc/reference/INSTALLER_STANDARD.md)
+> ระบบจะรันการทดสอบ Python (92 รายการ ผ่าน 100%) -> แพ็กเกจ Python Tracker ด้วย PyInstaller -> คอมไพล์ Inno Setup (มาตรฐาน Per-User `%LOCALAPPDATA%\NEKO FAMILY\NekoTracker`) -> สร้างแฮช SHA-256 -> ทำ Lifecycle Smoke Test ใน Sandbox ตามมาตรฐานกลาง [`Doc/reference/INSTALLER_STANDARD.md`](Doc/reference/INSTALLER_STANDARD.md)
 
 ---
 
 ## 🧪 การรันชุดทดสอบ (Automated Testing)
 
-โครงการนี้มีชุดทดสอบ Python Unit & Integration Tests ครอบคลุม **24 การทดสอบ** ซึ่งผ่านการรับรอง 100%:
+โครงการนี้มีชุดทดสอบ Python Unit & Integration Tests ครอบคลุม **92 การทดสอบ** ซึ่งผ่านการรับรอง 100%:
 
 ```bash
-# ทดสอบระบบ Python (24 รายการ)
+# ทดสอบระบบ Python (92 รายการ)
 python -m pytest -v
 
 # หรือดับเบิลคลิก run_test.bat

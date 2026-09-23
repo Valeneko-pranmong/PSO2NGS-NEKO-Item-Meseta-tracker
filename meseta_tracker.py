@@ -108,7 +108,7 @@ class NGSTrackerApp(ctk.CTk):
             active_version=CLIENT_VERSION,
         )
         self.anti_tamper.on_violation = self._on_tamper_violation
-        self.war_service = WarService(realtime_sync=True)
+        self.war_service = WarService(realtime_sync=False)
         self.current_view = "offline"
         self.event_bus.subscribe("character_detected", self._on_character_detected)
         self.event_bus.subscribe("language_changed", self._on_language_changed)
@@ -436,7 +436,9 @@ class NGSTrackerApp(ctk.CTk):
             pass
         if hasattr(self, "war_view"):
             self.war_view.grid_remove()
-        
+        if hasattr(self, "war_service"):
+            self.war_service.set_realtime_sync(False)
+
         self.offline_container.grid(row=1, column=0, sticky="nsew")
 
     def show_war_view(self):
@@ -453,10 +455,10 @@ class NGSTrackerApp(ctk.CTk):
 
         op_name = self.character_name or "Operative"
         self.war_service.set_operative(op_name)
-        
+
         if hasattr(self, "war_service"):
-            self.war_service.realtime_sync_enabled = True
-            
+            self.war_service.set_realtime_sync(True)
+
         self.war_service.sync_to_war_room(force_cloud=True)
 
         self.war_view.grid(row=1, column=0, sticky="nsew")

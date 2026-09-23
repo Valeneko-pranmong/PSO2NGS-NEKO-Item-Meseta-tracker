@@ -249,4 +249,38 @@
        - `test_resilience_config_file_corruption_and_atomic_write`
      - รันชุดทดสอบทั้งหมดผ่านสมบูรณ์ **88 / 88 รายการ (100% Passed)**
 
-
+### Milestone 17: การพัฒนาสะสม Meseta ต่อเนื่องหลายช่องย่อย (Multi-Slot Continuous Farming), ระบบความเป็นส่วนตัวโหมดออฟไลน์ (Offline Privacy Guarantee) และเครื่องมือบริหารฐานข้อมูล All-in-One Admin Database Setup Utility
+* **ขอบเขตและความต้องการ:**
+  - ยกระดับระบบสงคราม ARKS War Room ให้ผู้เล่นสามารถสลับพิกัดและช่องย่อย (Quadrant Slots) เพื่อฟาร์มสะสมยอดเงิน N-Meseta ต่อเนื่องกระจายไปยังหลายช่องและหลาย Sector ได้ โดยไม่ทำให้ยอดเงินในช่องเดิมที่เคยฟาร์มไว้สูญหายหรือถูกรีเซ็ตเป็น 0
+  - รับประกันความปลอดภัยและความเป็นส่วนตัว 100% (Zero Telemetry Leakage): ในโหมด Offline Tracker ต้องไม่มีการส่งคำขอเน็ตเวิร์กใดๆ ไปยังคลาวด์เด็ดขาด
+  - สร้างเครื่องมือ All-in-One Admin Database Utility (`tools/setup_database.py` และ `setup_database.bat`) สำหรับ Bootstrap โครงสร้างฐานข้อมูล, คืนค่าโรงงาน (Factory Reset) ทั้งบนคลาวด์และแคชในเครื่อง, และตรวจสอบสถานะความพร้อมสด
+  - อัปเดตค่าแฮช SHA-256 สำหรับ Release Artifacts และ Portable Test Package ชุดล่าสุด
+* **การดำเนินการและการปรับปรุงสถาปัตยกรรม:**
+  1. **Multi-Slot Continuous Farming Architecture:**
+     - เพิ่มดิกชันนารี `self.slot_farmed: Dict[str, int]` ใน `WarService` เพื่อจัดเก็บยอดเงินที่ฟาร์มได้แยกตามพิกัดและช่องย่อย (`f"{coord_key}#{slot}"`)
+     - ปรับปรุงการสลับพิกัด (`set_target_coord`): ยกเลิกกลไกเดิมที่เคยส่งสถานะ `departed` และรีเซ็ตเงินช่องเดิมเป็น 0 ทำให้ผู้เล่นสามารถย้ายไปช่วยเพื่อนฟาร์มช่องอื่นหรือ Sector อื่น แล้วยอดเงินในช่องเดิมยังคงอยู่ครบถ้วน
+     - เพิ่มฟังก์ชัน `get_slot_meseta(coord_key, slot)` และ `get_sector_meseta(coord_key)` สำหรับคำนวณเงินสะสมรายช่องและราย Sector
+     - ขยาย Database Payload ให้ส่งข้อมูล `slot_meseta`, `raw_slot_meseta`, `sector_meseta`, `raw_sector_meseta`, และ `slot_farmed` ขึ้น Firebase RTDB
+     - บันทึกและกู้คืน `slot_farmed` ลงไฟล์ `war_stats.json` ในเครื่องอย่างสมบูรณ์แบบ
+  2. **Offline Mode Privacy Guarantee (Zero Telemetry Leakage):**
+     - กำหนดให้ `NGSTrackerApp` เริ่มต้นสร้าง `WarService(realtime_sync=False)` เพื่อปิดการซิงค์เน็ตเวิร์กตั้งแต่เริ่มเปิดโปรแกรม
+     - เพิ่มเมธอด `set_realtime_sync(enabled: bool)` ใน `WarService`:
+       - เมื่อเข้าสู่โหมดออฟไลน์ (`show_offline_view`): ปิด `realtime_sync_enabled = False`, เคลียร์ `_is_dirty = False` และ `_sync_event.clear()` ทันทีเพื่อป้องกันคำขอเน็ตเวิร์กที่อาจค้างอยู่ในคิว
+       - ป้องกันไม่ให้ `meseta_earned` หรือ `character_detected` ในโหมดออฟไลน์ส่งข้อมูลออกสู่ภายนอก
+       - เมื่อผู้ใช้กดเข้าหน้าสงคราม (`show_war_view`): จึงเปิด `realtime_sync_enabled = True` และเริ่ม Background Sync Worker
+  3. **All-in-One Admin Database Setup Utility:**
+     - พัฒนาเครื่องมือ `tools/setup_database.py` และไฟล์ Batch `setup_database.bat`
+     - รองรับฟังก์ชัน Bootstrap ติดตั้งโครงสร้างฐานข้อมูลเริ่มต้นเมื่อว่างเปล่า
+     - รองรับ Safe Factory Reset ล้างข้อมูลทั้งบน Google Firebase RTDB และไฟล์แคชในเครื่อง (`%APPDATA%/NekoTrackerOffline/`, `%LOCALAPPDATA%/NEKO FAMILY/NekoTracker/`)
+     - รองรับคำสั่ง All-in-One (`--all`), Factory Reset (`--wipe`), Setup (`--setup`), และ Verify (`--verify`)
+  4. **อัปเดตค่าแฮช Release Artifacts:**
+     - `artifacts/release-v7.1.0/NekoTracker-Setup-v7.1.0.exe`: `4b410b1b759b5798a719b97826df5103ff0c89ba8119e716d5a89e92281dd402`
+     - `artifacts/portable-test-v7.1.0/NekoTracker/NekoTracker.exe`: `d8848687ea97b2d7ef699bb9b648ac55233ece9c79a53f3c6b84f0066f349614`
+     - อัปเดตใน `E2E_TEST_GUIDE.md`, `E2E_TEST_CHECKLIST.md`, `README.md`, และ `SHA256SUMS.txt`
+  5. **การทดสอบความถูกต้อง (Test Suite Expansion):**
+     - เพิ่มชุดทดสอบใน `tests/test_tracker_modules.py`:
+       - `test_app_save_coordinate_preserves_slot_meseta`
+       - `test_war_service_coordinate_switching_preserves_previous_slots_and_accumulates`
+       - `test_offline_mode_privacy_guarantee_no_secret_cloud_sync`
+     - ปรับปรุงการล้างแคชใน `tests/test_e2e_lifecycle.py` และ `tests/test_test_mode_and_window.py`
+     - ผลการทดสอบผ่านสมบูรณ์ **92 / 92 รายการ (100% Passed)**

@@ -27,7 +27,7 @@ arks_war_room/
 │   ├── download_url: string
 │   └── last_updated: timestamp (ms)
 ├── operatives/
-│   └── {character_name}/             <-- สถานะและสถิติตัวละครรายบุคคล
+│   └── {character_name}/             <-- สถานะและสถิติตัวละครรายบุคคล (Cumulative across galaxy)
 │       ├── character_name: string
 │       ├── meseta: integer (0 หากเวอร์ชันไม่ปลอดภัย)
 │       ├── raw_meseta: integer
@@ -35,28 +35,54 @@ arks_war_room/
 │       ├── version: string ("7.1.0")
 │       ├── security_status: string ("SECURE" | "REVOKED_VERSION_INSECURE")
 │       ├── version_security_valid: boolean
+│       ├── farming_rate_mhr: integer (ความเร็วเงิน M/hr)
+│       ├── farmingRateMhr: integer
+│       ├── meseta_per_hour: integer
 │       ├── sector_coord: object {x, y, slot}
 │       ├── coord_key: string ("X,Y")
 │       ├── slot: integer (1..4)
+│       ├── slot_meseta: integer (ยอดเงินในช่องปัจจุบัน)
+│       ├── raw_slot_meseta: integer
+│       ├── sector_meseta: integer (ยอดเงินรวมทุกช่องใน Sector ปัจจุบัน)
+│       ├── raw_sector_meseta: integer
+│       ├── slot_farmed: object { "{X,Y}#{slot}": integer } (แผนที่เงินสะสมทุกช่องย่อย)
+│       ├── session_meseta: integer
+│       ├── total_farmed: integer
 │       └── lastUpdated: timestamp (ms)
 ├── sectors/
 │   └── {coord_key}/                  <-- ข้อมูลสถานะของแต่ละ Sector ("0,0", "3,3", ฯลฯ)
 │       ├── challengers/
 │       │   └── {character_name}/
 │       │       ├── character_name: string
-│       │       ├── meseta: integer
+│       │       ├── meseta: integer (ยอดสะสมทุกช่องใน Sector นี้)
 │       │       ├── client_version: string
+│       │       ├── security_status: string
 │       │       ├── status: string ("claimed" | "contributing" | "BLOCKED_INSECURE_VERSION")
+│       │       ├── slot: integer (ช่องปัจจุบันที่ประจำการ)
+│       │       ├── farming_rate_mhr: integer
+│       │       ├── farmingRateMhr: integer
+│       │       ├── meseta_per_hour: integer
 │       │       └── lastUpdated: timestamp (ms)
 │       ├── sub_cells/
-│       │   └── {slot}/
+│       │   └── {slot}/               <-- แต่ละช่องย่อย 1-4 (Quadrant Sub-cells)
 │       │       └── challengers/
 │       │           └── {character_name}/
 │       │               ├── character_name: string
-│       │               ├── meseta: integer
+│       │               ├── meseta: integer (ยอดเงินสะสมในช่องย่อยนี้)
 │       │               ├── client_version: string
+│       │               ├── security_status: string
+│       │               ├── slot: integer
+│       │               ├── farming_rate_mhr: integer
+│       │               ├── farmingRateMhr: integer
+│       │               ├── meseta_per_hour: integer
 │       │               └── lastUpdated: timestamp (ms)
 │       └── total_meseta: integer
+├── latest_telemetry/                 <-- สัญญาณ Telemetry ล่าสุดสำหรับ Realtime Pulse
+│   ├── character_name: string
+│   ├── meseta: integer
+│   ├── coord_key: string
+│   ├── slot: integer
+│   └── timestamp: timestamp (ms)
 └── activity_feed/ & war_logs/
     └── {auto_id}/                    <-- บันทึกกิจกรรมสด (Event Log)
         ├── character_name: string
@@ -103,17 +129,58 @@ arks_war_room/
 > - ฟิลด์ `version_security_valid` จะเป็น `false`
 > - ใน Sector และ Sub-cell Challengers ค่าเงินสะสมจะไม่ถูกเพิ่ม และสถานะจะถูกปรับเป็น `"BLOCKED_INSECURE_VERSION"`
 
-### 3.2 Sector Sub-Cell (Slot) Schema
-* **URL:** `PUT/PATCH /arks_war_room/sectors/{coord_key}/slots/{slot}.json`
-* **ตัวอย่าง JSON Payload:**
+### 3.2 Sector Sub-Cell & Challenger Schema
+* **Sub-Cell Challenger URL:** `PUT /arks_war_room/sectors/{coord_key}/sub_cells/{slot}/challengers/{character_name}.json`
+* **Sector Challenger URL:** `PUT /arks_war_room/sectors/{coord_key}/challengers/{character_name}.json`
+* **Multi-Path Atomic Optimization:** ซิงค์ผ่าน `PATCH /arks_war_room.json` รวบทุกเส้นทางเป็น 1 Request:
 ```json
 {
-  "character_name": "Vale3neko",
-  "meseta": 25000000,
-  "status": "claimed",
-  "target": 25000000,
-  "progress": 100.0,
-  "lastUpdated": 1726831200000
+  "operatives/Vale3neko": {
+    "character_name": "Vale3neko",
+    "meseta": 25000000,
+    "raw_meseta": 25000000,
+    "slot_meseta": 10000000,
+    "sector_meseta": 25000000,
+    "client_version": "7.1.0",
+    "security_status": "SECURE",
+    "version_security_valid": true,
+    "farming_rate_mhr": 3500000,
+    "farmingRateMhr": 3500000,
+    "meseta_per_hour": 3500000,
+    "coord_key": "0,0",
+    "slot": 1,
+    "lastUpdated": 1726831200000
+  },
+  "sectors/0,0/sub_cells/1/challengers/Vale3neko": {
+    "character_name": "Vale3neko",
+    "meseta": 10000000,
+    "slot": 1,
+    "client_version": "7.1.0",
+    "security_status": "SECURE",
+    "farming_rate_mhr": 3500000,
+    "farmingRateMhr": 3500000,
+    "meseta_per_hour": 3500000,
+    "lastUpdated": 1726831200000
+  },
+  "sectors/0,0/challengers/Vale3neko": {
+    "character_name": "Vale3neko",
+    "meseta": 25000000,
+    "slot": 1,
+    "status": "claimed",
+    "client_version": "7.1.0",
+    "security_status": "SECURE",
+    "farming_rate_mhr": 3500000,
+    "farmingRateMhr": 3500000,
+    "meseta_per_hour": 3500000,
+    "lastUpdated": 1726831200000
+  },
+  "latest_telemetry": {
+    "character_name": "Vale3neko",
+    "meseta": 25000000,
+    "coord_key": "0,0",
+    "slot": 1,
+    "timestamp": 1726831200000
+  }
 }
 ```
 

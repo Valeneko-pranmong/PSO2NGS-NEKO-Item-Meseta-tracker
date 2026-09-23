@@ -92,17 +92,22 @@
 * `WarService` สมัครรับข้อมูลจาก Event `meseta_earned` เพื่อสะสมเงินเข้าช่องพิกัดที่กำลังยึด
 * หน้าต่าง UI (`DashboardFrame`, `OverlayWindow`, `WarDashboardFrame`) อัปเดตตัวเลขแสดงผลผ่าน Event หรือตัวแปรสถานะอย่างปลอดภัย
 
-### ขั้นที่ 4: การส่ง Telemetry แบบ Real-time
-* เมื่อมี Event การเงินเข้ามา `WarService` จะสะสมยอดเข้า `session_contribution`
+### ขั้นที่ 4: การส่ง Telemetry แบบ Real-time และการันตีความเป็นส่วนตัวในโหมดออฟไลน์
+* **Offline Privacy Protection:** เมื่อเปิดแอปพลิเคชันหรืออยู่ในโหมด Offline ปกติ ตัวแปร `realtime_sync_enabled` จะเป็น `False` และไม่มีการส่งคำขอออกสู่เน็ตเวิร์ก 100% (Zero Telemetry Leakage)
+* **การเปิดใช้เมื่อเข้า ARKS War View:** เมื่อผู้ใช้กดเข้าหน้าสงคราม `realtime_sync_enabled` จะถูกเปิดเป็น `True`
+* เมื่อมี Event การเงินเข้ามา `WarService` จะสะสมยอดเข้า `session_contribution` และช่องย่อย `slot_farmed`
 * สั่ง Trigger ตัวจับเวลา Debounce (0.35 วินาที) ของ `_realtime_sync_worker`
-* เมื่อหมดเวลารวมคำขอ Worker Thread จะส่งคำขอ HTTP PUT/PATCH ไปยัง Firebase Realtime Database
+* เมื่อหมดเวลารวมคำขอ Worker Thread จะส่งคำขอ Multi-Path Atomic PATCH ไปยัง Firebase Realtime Database
 * เมื่อสำเร็จจะยิง Event `war_telemetry_synced` กลับมายัง UI เพื่อแสดงไฟสถานะสีเขียว
+* เมื่อสลับกลับสู่ออฟไลน์ การส่งข้อมูลจะถูกระงับทันที และสัญญาณที่ค้างอยู่จะถูกเคลียร์ออกทั้งหมด
 
 ---
 
-## 3. ความปลอดภัยของเธรด (Thread Safety Model)
+## 3. ความปลอดภัยของเธรดและการจัดเก็บไฟล์ (Thread Safety & Persistence Model)
 
 เนื่องจากระบบมีทั้ง Main UI Thread และ Background Worker Threads จึงมีการใช้ Synchronization Primitives ดังนี้:
 1. `data_lock (threading.Lock)`: อยู่ใน `NGSTrackerApp` ใช้ล็อกการเข้าถึง `session_meseta`, `current_wallet`, `item_counts`, และตัวจับเวลาเวลาดรอป
 2. `_sync_lock (threading.Lock)`: อยู่ใน `WarService` ใช้ล็อกการอ่านและเขียนข้อมูล Telemetry ที่กำลังส่งขึ้นเซิร์ฟเวอร์
-3. `_sync_event (threading.Event)`: ใช้ส่งสัญญาณกระตุ้น Background Sync Worker โดยไม่ต้องรัน Spin-wait Loop ช่วยลดการใช้ CPU ให้เหลือใกล้เคียง 0%
+3. `_state_lock (threading.RLock)`: อยู่ใน `WarService` ใช้ล็อกสถานะภายในตัวแปรเงินสะสม (`total_farmed`, `slot_farmed`), พิกัดเป้าหมาย และการเปิด/ปิด sync
+4. `_sync_event (threading.Event)`: ใช้ส่งสัญญาณกระตุ้น Background Sync Worker โดยไม่ต้องรัน Spin-wait Loop ช่วยลดการใช้ CPU ให้เหลือใกล้เคียง 0%
+5. **Atomic Replace Storage (`.tmp` + `os.replace`):** การบันทึกไฟล์สถิติและการตั้งค่า (`war_stats.json`, `ngs_tracker_config.json`, `database_meseta_records.json`) จะเขียนลงไฟล์ชั่วคราวก่อนและแทนที่ด้วย Atomic Operation เสมอ ป้องกันความเสียหายจากไฟดับหรือปิดโปรแกรมกะทันหัน พร้อมระบบ Self-Healing สำรองไฟล์ที่เสียหายอัตโนมัติ

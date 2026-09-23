@@ -46,6 +46,9 @@ def test_test_mode_anti_tamper_bypasses(tmp_path, shared_app):
     assert ok is True
     assert "สำเร็จ" in msg
 
+    app.log_path = ""
+    app.reset_data()
+
 
 def test_window_minimize_behavior(shared_app):
     """Verify that minimize_window sets iconic state and ignores premature <Map> events."""

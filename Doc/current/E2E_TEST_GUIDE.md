@@ -71,7 +71,7 @@
     Get-FileHash NekoTracker-Setup-v7.1.0.exe -Algorithm SHA256
     ```
   - **เกณฑ์การผ่าน (PASS):** ค่า Hash ต้องตรงกับไฟล์ `SHA256SUMS.txt` ทุกประการ:
-  `860f65df78b289c191fd6cff02d35c6cc867b14681c2d6b0c56b907bc3ad5581`
+  `4b410b1b759b5798a719b97826df5103ff0c89ba8119e716d5a89e92281dd402`
 
 ---
 

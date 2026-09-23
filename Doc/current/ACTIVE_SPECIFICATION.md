@@ -16,7 +16,7 @@ NEKO Item & Meseta Tracker เป็นเครื่องมือติด�
 
 ---
 
-## 2. สถาปัตยกรรม Python Tracker (V6.1.0)
+## 2. สถาปัตยกรรม Python Tracker (V7.1.0)
 
 ### 2.1 ระบบตรวจจับไฟล์และการประมวลผล ActionLog (Log Ingestion Pipeline)
 * **การตรวจจับตำแหน่งไฟล์:** ตรวจหาโฟลเดอร์อัตโนมัติที่ `Documents\SEGA\PHANTASYSTARONLINE2\log_ngs` พร้อมให้ผู้ใช้สามารถเลือกโฟลเดอร์ผ่าน File Dialog ได้
@@ -63,6 +63,12 @@ NEKO Item & Meseta Tracker เป็นเครื่องมือติด�
     - **เกณฑ์ปลดแอกสมบูรณ์ (100% Liberated):** ยึดครองครบทั้ง 4 ช่องย่อย (ยอดรวม $\ge 40,000,000\text{ N-Meseta}$)
     - **การชิงพื้นที่ (Clash):** หากผู้เล่นคนอื่นมาเติมเงินในช่องเดียวกันมากกว่าผู้นำปัจจุบัน สิทธิ์ความเป็นเจ้าของจะถูกแย่งทันที
     - **การหลอมรวมผืนแผ่นดิน (Seamless Continent):** หากทั้ง 4 ช่องย่อยถูกยึดครองโดยผู้เล่นคนเดียวกัน ระบบจะหลอมรวมเป็นผืนดินเรืองแสงผืนเดียวโดยซ่อนเส้นแบ่งภายใน
+* **การฟาร์มต่อเนื่องหลายช่องย่อย (Multi-Slot Continuous Farming):**
+  - จัดเก็บยอดเงิน Meseta แยกตามพิกัดและช่องย่อยผ่าน `slot_farmed: Dict[str, int]` (เช่น `"0,0#1": 10000000`, `"0,0#2": 5000000`)
+  - **รักษายอดเงินคงอยู่ตลอดกาล (Zero Relocation Wiping):** เมื่อผู้ใช้สลับพิกัดหรือเปลี่ยนช่องเป้าหมาย ยอดเงินในช่องเดิมจะไม่ถูกล้างหรือย้ายตาม และไม่มีการส่งสถานะ `departed` ล้างเงินช่องเดิมเป็น 0 ทำให้ผู้เล่นสามารถกระจายกำลังฟาร์มได้หลายช่องและหลาย Sector อย่างต่อเนื่อง
+  - ยอดรวมตัวละคร (`total_farmed`) และยอดรวม Sector (`sector_meseta`) จะคำนวณสะสมจากทุกช่องที่ผู้เล่นเคยฟาร์มไว้
+* **พิกัดเริ่มต้นที่เป็นกลาง (Startup Core Defaulting):**
+  - เมื่อเปิดโปรแกรมทุกครั้ง พิกัดเป้าหมายจะถูกรีเซ็ตกลับสู่พิกัดหลักของกาแล็กซีคือ Core `[0, 0, 1]` เสมอ โดยไม่ยึดพิกัดจากเซสชันเก่า เพื่อให้ผู้เล่นเลือกตำแหน่งประจำการใหม่ในแต่ละรอบ
 * **ระบบแปลพิกัดอัจฉริยะ (Coordinate Parser):**
   รองรับการป้อนพิกัด 7 รูปแบบที่พบได้จากการคัดลอกบนหน้าเว็บและอินพุตของผู้ใช้:
   1. ตัวเลข 3 จำนวน: `"0, 0, 1"`, `"3, 3, 4"`
@@ -72,11 +78,14 @@ NEKO Item & Meseta Tracker เป็นเครื่องมือติด�
   5. ข้อความคัดลอกจาก Web UI: `"คัดลอกพิกัด [8, -2] ช่อง #3 ไปใส่ในโปรแกรม"`
   6. รูปแบบทิศทาง Quadrant: `"0, 0 NW"`, `"0, 0 บนซ้าย"`
   7. Fallback 2 จำนวน: `"0, 0"`, `"[15, -8]"` (จะกำหนดช่องเริ่มต้นเป็น Slot 1)
-* **Realtime Sync Worker:**
-  - Background Thread ทำงานอัตโนมัติ มี Debounce 0.35 วินาที เพื่อรวบยอดคำขอซิงค์ และส่ง Heartbeat ทุก 5.0 วินาที
-  - ส่งข้อมูลไปยัง Google Firebase Realtime Database ตาม Wire Contract (`arks_war_room/operatives/{character_name}`)
+* **Realtime Sync Worker & การันตีความเป็นส่วนตัวในโหมดออฟไลน์ (Offline Privacy Guarantee):**
+  - **โหมดเริ่มต้นปลอดการเชื่อมต่อ (Offline by Default):** เมื่อเปิดโปรแกรม ตัวแปร `realtime_sync_enabled` จะเป็น `False` เสมอ และไม่มีการยิง Network Request ใดๆ ออกนอกเครื่อง ทำให้ผู้เล่นที่ใช้งานโหมด Offline มั่นใจได้ว่าข้อมูลจะไม่ถูกส่งขึ้นคลาวด์โดยไม่ได้รับความยินยอม (Zero Telemetry Leakage)
+  - **การทำงานเมื่อเข้าสู่สงคราม:** เมื่อผู้ใช้กดปุ่ม "เข้าสู่สงคราม (ARKS War)" ระบบจะเปิด `realtime_sync_enabled = True` เริ่ม Worker Thread ที่มี Debounce 0.35 วินาที เพื่อรวบยอดคำขอ และส่ง Heartbeat ทุก 5.0 วินาที
+  - **การตัดการเชื่อมต่อทันทีเมื่อกลับสู่ออฟไลน์:** เมื่อสลับกลับมาหน้าหลัก โหมดซิงค์จะถูกปิดทันที (`realtime_sync_enabled = False`) พร้อมเคลียร์ Event และ Dirty Flag ทันที ตัดวงจรการเชื่อมต่อเน็ตเวิร์ก 100%
+  - ส่งข้อมูลไปยัง Google Firebase Realtime Database ตาม Wire Contract (`arks_war_room/operatives/{character_name}`) ด้วยการอัปเดตแบบ Multi-Path Atomic PATCH
   - **Standby Presence Visibility:** ตรวจจับสถานะออนไลน์พร้อมรบ แม้มียอดเงิน $0\text{ ℳ}$ จะปรากฏตัวในทำเนียบนักรบพร้อมสัญลักษณ์ `📍 [+X, -Y] #Slot`
-  - สำรองข้อมูลสถานะออฟไลน์ลงไฟล์ `%APPDATA%\NekoTrackerOffline\war_stats.json`
+  - สำรองข้อมูลสถานะออฟไลน์ลงไฟล์ `%APPDATA%\NekoTrackerOffline\war_stats.json` ด้วยกลไก Atomic Replace (`.tmp` + `os.replace`)
+  - **ความยืดหยุ่นสูง (Resilience & Self-Healing):** ตรวจจับไฟล์เสียหายและกู้คืนอัตโนมัติ พร้อม Exponential Backoff เมื่อเน็ตเวิร์กมีปัญหา
 
 ### 2.5 โหมดการแสดงผล (User Interfaces)
 * **Main Dashboard:** แสดงยอดเงิน, อัตรา M/hr, เวลาที่ฟาร์ม, รายการไอเทม, ปุ่มคู่มือวิธีใช้งาน 3 ภาษา (How-To-Use Guide), และปุ่มลัดสลับโหมด
@@ -86,6 +95,16 @@ NEKO Item & Meseta Tracker เป็นเครื่องมือติด�
   - **Mini Overlay:** แสดงเฉพาะตัวเลขเงิน Meseta ในขนาดกะทัดรัด โปร่งใส ลอยอยู่เหนือหน้าจอเกม
 * **Interactive 3-Language Guide Dialog:** หน้าต่างคู่มือวิธีใช้งานแบบไดนามิกรองรับ 3 ภาษา (ไทย, English, 日本語) แบ่งเป็น 5 หมวดหมู่หลัก (🚀 เริ่มต้นใช้งาน, 💰 เมเซต้า & ไอเท็ม, 🪟 โหมด Overlay, ⚔️ ARKS War, 🌸 ชุมชน & เครดิต) พร้อมแนบลิงก์ Discord และเครดิตชุมชนทางการ `NEKO★FAMILY PSO2:NGS Community discord.gg/fkjXW9AJ6a` (`https://discord.gg/fkjXW9AJ6a`)
 
+### 2.6 เครื่องมือและระบบสนับสนุน (Tools & Administration Utilities)
+* **All-in-One Database Admin & Factory Reset (`tools/setup_database.py` & `setup_database.bat`):**
+  - เครื่องมือระดับ Admin และ DevOps สำหรับการจัดการโครงสร้างฐานข้อมูลทั้งระบบ
+  - **Bootstrap / Setup (`--setup`):** สร้างโครงสร้างเริ่มต้นบน Google Firebase RTDB เมื่อพบว่าฐานข้อมูลเป็น `null`
+  - **Safe Factory Reset (`--wipe`):** ล้างข้อมูลบนคลาวด์และในเครื่องให้สะอาด 100% (ล้างยอดเงินทุก Sector, Sub-cell, Operatives, Latest Telemetry, War Logs, และโฟลเดอร์แคชในเครื่อง)
+  - **All-in-One Fresh Reset (`--all`):** คืนค่าโรงงานและติดตั้งโครงสร้างเริ่มต้นใหม่ทันทีในคำสั่งเดียว
+  - **Verify Status (`--verify`):** ตรวจสอบสถานะการเชื่อมต่อและความสมบูรณ์ของฐานข้อมูลสด
+* **Standalone Broadcaster (`tools/firebase_war_sync.py`):** ตัวยิงข้อมูลจำลองและซิงค์ข้อมูลผ่าน REST / Firebase Admin SDK
+* **Mock Log Streamer (`tools/mock_log_simulator.py`):** จำลองการสร้างไฟล์ `ActionLog` สำหรับการทดสอบโดยไม่ต้องเปิดเกม
+* **Portable Test Packager (`tools/package_test_build.py`):** สคริปต์ประกอบชุดทดสอบพกพา `portable-test-v7.1.0` และไฟล์ ZIP พร้อมคำนวณแฮช SHA-256 อัตโนมัติ
 
 ---
 

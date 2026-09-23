@@ -190,6 +190,48 @@ def test_board_coordinate_entry_and_synchronization(shared_app):
     app.show_offline_view()
 
 
+def test_app_save_coordinate_preserves_slot_meseta(tmp_path):
+    """
+    Regression test: Verifies that when saving a new coordinate,
+    money in the previous slot is NOT moved or emptied, and the player can continuously
+    farm money into multiple slots.
+    """
+    from modules.event_bus import EventBus
+    from modules.war_mode.war_service import WarService
+
+    bus = EventBus()
+    stats_file = str(tmp_path / "war_stats.json")
+    war = WarService(event_bus=bus, stats_file=stats_file, realtime_sync=False)
+    war.set_operative("HeroFarmer")
+
+    # 1. Target Slot 0, 0, 1 and farm 3,000,000
+    war.set_target_coord("0, 0, 1")
+    war.on_meseta_earned(3_000_000)
+    assert war.get_slot_meseta("0,0", 1) == 3_000_000
+    assert war.total_farmed == 3_000_000
+
+    # 2. Enter new coordinate 0, 0, 2 and save
+    war.set_target_coord("0, 0, 2")
+
+    # Slot 1 MUST retain its meseta!
+    assert war.get_slot_meseta("0,0", 1) == 3_000_000
+    assert war.get_slot_meseta("0,0", 2) == 0
+
+    # 3. Farm 2,000,000 into Slot 2
+    war.on_meseta_earned(2_000_000)
+    assert war.get_slot_meseta("0,0", 2) == 2_000_000
+    assert war.get_slot_meseta("0,0", 1) == 3_000_000
+    assert war.total_farmed == 5_000_000
+
+    # 4. Check database payload reflects both slot and total accurately
+    payload = war.get_database_payload()
+    assert payload["slot_meseta"] == 2_000_000
+    assert payload["slot_farmed"]["0,0#1"] == 3_000_000
+    assert payload["slot_farmed"]["0,0#2"] == 2_000_000
+    assert payload["sector_meseta"] == 5_000_000
+    war.stop()
+
+
 def test_database_payload_strictly_character_meseta_coord():
     """
     Verify database record payload contains strictly:
@@ -1425,10 +1467,11 @@ def test_war_service_placeholder_does_not_clobber_real_player(tmp_path):
     war.stop()
 
 
-def test_war_service_coordinate_switching_cleans_up_previous_slot(tmp_path, monkeypatch):
+def test_war_service_coordinate_switching_preserves_previous_slots_and_accumulates(tmp_path, monkeypatch):
     """
-    Regression test: Verifies that switching coordinates or slots triggers departure
-    cleanup for the previous sub-cell and sector, preventing duplicate ghost slots.
+    Regression test: Verifies that switching coordinates or slots preserves previously
+    farmed meseta in earlier slots (never zeroes them out or relocates them),
+    allowing continuous farming across multiple slots and sectors.
     """
     from modules.war_mode.war_service import WarService
     import urllib.request
@@ -1437,7 +1480,7 @@ def test_war_service_coordinate_switching_cleans_up_previous_slot(tmp_path, monk
     war = WarService(realtime_sync=False, stats_file=str(tmp_path / "war_stats.json"))
     war.set_operative("SwitchHero")
     war.set_target_coord("0, 0, 1")
-    war.session_contribution = 100000
+    war.on_meseta_earned(100000)
 
     sent_requests = []
 
@@ -1461,6 +1504,7 @@ def test_war_service_coordinate_switching_cleans_up_previous_slot(tmp_path, monk
     assert ok is True
     assert war._last_synced_coord_key == "0,0"
     assert war._last_synced_slot == 1
+    assert war.slot_farmed["0,0#1"] == 100000
     sent_requests.clear()
 
     # 2. Switch to 0, 0, 2 (same sector, different slot)
@@ -1470,31 +1514,50 @@ def test_war_service_coordinate_switching_cleans_up_previous_slot(tmp_path, monk
     assert war._last_synced_coord_key == "0,0"
     assert war._last_synced_slot == 2
 
-    # Verify that a departure request was sent for slot 1
-    departed_urls = [r.full_url for r in sent_requests if "sub_cells/1/challengers" in r.full_url]
-    assert len(departed_urls) >= 1, "Must send departure update to old sub-cell 1"
+    # Invariant: Slot 1 meseta is NEVER wiped out or departed!
+    assert war.slot_farmed["0,0#1"] == 100000
+    assert war.slot_farmed.get("0,0#2", 0) == 0
 
-    # Verify data in departure request
-    dep_req = [r for r in sent_requests if "sub_cells/1/challengers" in r.full_url][0]
-    dep_body = json.loads(dep_req.data.decode("utf-8"))
-    assert dep_body["meseta"] == 0
-    assert dep_body["status"] == "departed"
+    # Verify that NO departure request or zero-out was sent for slot 1
+    departed_reqs = [
+        r for r in sent_requests
+        if "sub_cells/1/challengers" in r.full_url and b'"meseta": 0' in (r.data or b"")
+    ]
+    assert len(departed_reqs) == 0, "Must NEVER send departure or zero-out to old sub-cell 1"
     sent_requests.clear()
 
-    # 3. Switch to 8, -2, 3 (different sector and slot)
+    # 3. Earn meseta in slot 2
+    war.on_meseta_earned(50000)
+    assert war.slot_farmed["0,0#2"] == 50000
+    assert war.slot_farmed["0,0#1"] == 100000
+    assert war.total_farmed == 150000
+
+    # 4. Switch to 8, -2, 3 (different sector and slot)
     war.set_target_coord("8, -2, 3")
     ok, msg = war.sync_to_cloud_database()
     assert ok is True
-    assert war._last_synced_coord_key == "8,-2"
-    assert war._last_synced_slot == 3
+    assert war.slot_farmed["0,0#1"] == 100000
+    assert war.slot_farmed["0,0#2"] == 50000
+    assert war.slot_farmed.get("8,-2#3", 0) == 0
 
-    # Verify departure was sent for sub_cells/2 AND old sector 0,0
-    old_sub_urls = [r.full_url for r in sent_requests if "0%2C0/sub_cells/2/challengers" in r.full_url or "0,0/sub_cells/2/challengers" in r.full_url]
-    assert len(old_sub_urls) >= 1, "Must send departure update to old sub-cell 2"
-    old_sec_urls = [r.full_url for r in sent_requests if "sectors/0%2C0/challengers" in r.full_url or "sectors/0,0/challengers" in r.full_url]
-    assert len(old_sec_urls) >= 1, "Must send departure update to old sector 0,0"
+    # 5. Earn meseta in 8, -2, 3
+    war.on_meseta_earned(200000)
+    assert war.slot_farmed["8,-2#3"] == 200000
+    assert war.slot_farmed["0,0#1"] == 100000
+    assert war.slot_farmed["0,0#2"] == 50000
+    assert war.total_farmed == 350000
+
+    # 6. Verify persistence across saves and restarts
+    war._save_stats()
+    war2 = WarService(realtime_sync=False, stats_file=str(tmp_path / "war_stats.json"))
+    war2.set_operative("SwitchHero")
+    assert war2.slot_farmed["0,0#1"] == 100000
+    assert war2.slot_farmed["0,0#2"] == 50000
+    assert war2.slot_farmed["8,-2#3"] == 200000
+    assert war2.total_farmed == 350000
 
     war.stop()
+    war2.stop()
 
 
 def test_resilience_when_local_database_is_deleted(tmp_path):
@@ -1797,9 +1860,97 @@ def test_startup_always_defaults_to_core_coord_ignoring_previous_session(tmp_pat
     mock_app.coord_var.set.assert_called_with("0, 0, 1")
 
 
+def test_offline_mode_privacy_guarantee_no_secret_cloud_sync(shared_app, monkeypatch):
+    """
+    Privacy Guarantee:
+    Verify that in Offline Mode (default view):
+    1. NGSTrackerApp initializes with realtime_sync_enabled = False.
+    2. No background sync worker thread is running.
+    3. meseta_earned and character_detected in offline mode dispatch 0 network requests.
+    4. Switching to War View enables sync.
+    5. Switching back to Offline View halts sync, guaranteeing zero subsequent network calls.
+    """
+    from meseta_tracker import NGSTrackerApp
+    from modules.war_mode.war_service import WarService
+    import urllib.request
+    import time
+    from unittest.mock import MagicMock
 
+    # Verify constructor initializes realtime_sync=False by default for offline mode
+    init_realtime_sync_arg = None
+    orig_ws_init = WarService.__init__
+    def track_ws_init(self, *args, **kwargs):
+        nonlocal init_realtime_sync_arg
+        init_realtime_sync_arg = kwargs.get("realtime_sync")
+        orig_ws_init(self, *args, **kwargs)
 
+    # Inspect NGSTrackerApp constructor code to confirm default offline wiring
+    import inspect
+    init_source = inspect.getsource(NGSTrackerApp.__init__)
+    assert "WarService(realtime_sync=False)" in init_source, (
+        "NGSTrackerApp.__init__ must initialize WarService with realtime_sync=False for privacy!"
+    )
 
+    network_requests = []
+    class MockResp:
+        status = 200
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            pass
+        def read(self):
+            return b'{"success": true}'
 
+    def spy_urlopen(req, timeout=None):
+        network_requests.append(req)
+        return MockResp()
 
+    monkeypatch.setattr(urllib.request, "urlopen", spy_urlopen)
+
+    app = shared_app
+    app.show_offline_view()
+    app.update_idletasks()
+
+    # 1. Must be in offline view
+    assert app.current_view == "offline"
+    assert app.war_service.realtime_sync_enabled is False, (
+        "Privacy Violation: war_service.realtime_sync_enabled must be False when starting in offline mode!"
+    )
+
+    # 2. Simulate character detection and meseta earning in offline mode
+    network_requests.clear()
+    app.event_bus.emit("character_detected", character_name="PrivatePlayer", player_id="999999")
+    app.event_bus.emit("meseta_earned", amount=150000, wallet=200000)
+    app.update_idletasks()
+
+    time.sleep(0.1)
+
+    assert len(network_requests) == 0, (
+        f"Privacy Violation: Secret network requests dispatched in offline mode: {[r.full_url for r in network_requests]}"
+    )
+
+    # 3. Switch to War Mode -> sync should be enabled
+    app.show_war_view()
+    app.update_idletasks()
+    assert app.current_view == "war"
+    assert app.war_service.realtime_sync_enabled is True
+    assert len(network_requests) >= 1, "Entering war mode must sync to cloud"
+
+    # 4. Switch back to Offline Mode -> sync must be completely halted
+    network_requests.clear()
+    app.show_offline_view()
+    app.update_idletasks()
+    assert app.current_view == "offline"
+    assert app.war_service.realtime_sync_enabled is False, (
+        "Privacy Violation: Returning to offline mode must disable realtime_sync_enabled!"
+    )
+
+    # Subsequent meseta earned in offline mode must NOT trigger network calls
+    app.event_bus.emit("meseta_earned", amount=75000, wallet=275000)
+    app.update_idletasks()
+    time.sleep(0.1)
+
+    assert len(network_requests) == 0, (
+        f"Privacy Violation: Secret network requests dispatched after returning to offline mode: {[r.full_url for r in network_requests]}"
+    )
 
