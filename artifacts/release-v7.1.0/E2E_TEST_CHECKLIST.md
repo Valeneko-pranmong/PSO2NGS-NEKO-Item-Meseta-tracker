@@ -9,8 +9,9 @@
 ## 📋 เช็กลิสต์ทดสอบสำหรับผู้ทดสอบ (Tester Action Items)
 
 ### 1. การติดตั้งและการตรวจสอบไฟล์ (Installation Phase)
-- [ ] **TC-01 [Checksum]:** ตรวจสอบค่า SHA-256 ของ `NekoTracker-Setup-v7.1.0.exe` ตรงกับ `2249c30f7a048b5113e0c48af0b44f01f5e7949953ba9dbd421df2ae224bdeb9`
+- [ ] **TC-01 [Checksum]:** ตรวจสอบค่า SHA-256 ของ `NekoTracker-Setup-v7.1.0.exe` ตรงกับ `330dc2da786fb88aff8f598be0621051a3c94cf8a501f0ed1e38a2f9969265d3`
 - [ ] **TC-02 [Zero-UAC]:** ดับเบิลคลิกตัวติดตั้ง รันได้ทันทีโดย **ไม่มี** หน้าต่างเตือน UAC เด้งถามสิทธิ์ Admin
+- [ ] **TC-02b [Installer Multi-Language]:** หน้าต่างตัวติดตั้งแสดงตัวเลือกภาษา (English, ไทย, 日本語) เมื่อเลือกภาษาใด ขั้นตอนการติดตั้งและข้อความทางลัดจะเปลี่ยนเป็นภาษานั้นอย่างถูกต้อง
 - [ ] **TC-03 [Per-User Path]:** ติดตั้งลงโฟลเดอร์ `%LOCALAPPDATA%\NEKO FAMILY\NekoTracker` ถูกต้อง
 - [ ] **TC-04 [Shortcuts]:** พบบน Desktop 1 ไอคอน และ Start Menu พบโฟลเดอร์ NEKO Tracker และทางลัด Uninstall
 
@@ -34,7 +35,7 @@
 - [ ] **TC-15 [Overlay Mode]:** เปิด Gadget Mini/Full Overlay ลอยทับหน้าจออื่นได้ และลากย้ายตำแหน่งได้อิสระ
 - [ ] **TC-16 [War Room V9]:** สลับเข้าโหมดสงคราม เลือก Landmark (Core [0, 0] ฯลฯ) หรือพิมพ์พิกัด `15, -6, 2` สำเร็จ
 - [ ] **TC-17 [Cloud Sync]:** กดปุ่มซิงค์ข้อมูล ขึ้นสถานะซิงค์สำเร็จด้วย Version `7.1.0`
-- [ ] **TC-18 [Multi-Language]:** สลับภาษาอังกฤษ (EN), ไทย (TH), ญี่ปุ่น (JA) ได้สดทันที ไม่ต้องรีสตาร์ท
+- [ ] **TC-18 [Multi-Language Parity]:** สลับภาษาอังกฤษ (EN), ไทย (TH), ญี่ปุ่น (JA) ได้สดทันทีทั้งในหน้า Offline Tracker, Overlay Window, ARKS War Room, และ Guide Dialog โดยไม่มีข้อความตกหล่นหรือล้นกรอบ
 - [ ] **TC-19 [Reset]:** กดยืนยันรีเซ็ตข้อมูลรอบฟาร์ม -> เงินเซสชันกลับเป็น 0 แต่กระเป๋าและตัวตนไม่หาย
 
 ### 6. การถอนการติดตั้งอย่างสะอาดหมดจด (Clean Teardown)

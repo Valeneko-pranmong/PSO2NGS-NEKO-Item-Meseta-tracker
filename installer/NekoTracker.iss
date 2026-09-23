@@ -50,10 +50,29 @@ CloseApplications=no
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
+Name: "thai"; MessagesFile: "compiler:Languages\Thai.isl"
+Name: "japanese"; MessagesFile: "compiler:Languages\Japanese.isl"
+
+[CustomMessages]
+english.CreateDesktopIcon=Create a &desktop shortcut
+thai.CreateDesktopIcon=สร้างทางลัดบนเดสก์ท็อป (&Desktop shortcut)
+japanese.CreateDesktopIcon=デスクトップにショートカットを作成する(&D)
+
+english.CreateUninstallIcon=Create Desktop shortcut for Uninstaller
+thai.CreateUninstallIcon=สร้างทางลัดบนเดสก์ท็อปสำหรับถอนการติดตั้ง
+japanese.CreateUninstallIcon=アンインストーラーのデスクトップショートカットを作成する
+
+english.UserGuide=User Guide (HOW TO USE)
+thai.UserGuide=คู่มือการใช้งาน (HOW TO USE)
+japanese.UserGuide=使い方ガイド (HOW TO USE)
+
+english.UninstallProgram=Uninstall {#MyAppName}
+thai.UninstallProgram=ถอนการติดตั้ง {#MyAppName}
+japanese.UninstallProgram=アンインストール {#MyAppName}
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
-Name: "uninstallicon"; Description: "Create Desktop shortcut for Uninstaller (ถอนการติดตั้ง)"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+Name: "uninstallicon"; Description: "{cm:CreateUninstallIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
 ; Primary Application: Python Tracker (PyInstaller Onedir Distribution)
@@ -71,13 +90,13 @@ Source: "Uninstall.bat"; DestDir: "{app}"; Flags: ignoreversion
 [Icons]
 ; Start Menu Shortcuts
 Name: "{autoprograms}\{#MyAppName}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\icon.ico"; WorkingDir: "{app}"
-Name: "{autoprograms}\{#MyAppName}\User Guide (HOW TO USE)"; Filename: "{app}\HOW_TO_USE.md"; WorkingDir: "{app}"
-Name: "{autoprograms}\{#MyAppName}\Uninstall (ถอนการติดตั้ง) {#MyAppName}"; Filename: "{uninstallexe}"; IconFilename: "{app}\icon.ico"
-Name: "{autoprograms}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"; IconFilename: "{app}\icon.ico"
+Name: "{autoprograms}\{#MyAppName}\{cm:UserGuide}"; Filename: "{app}\HOW_TO_USE.md"; WorkingDir: "{app}"
+Name: "{autoprograms}\{#MyAppName}\{cm:UninstallProgram}"; Filename: "{uninstallexe}"; IconFilename: "{app}\icon.ico"
+Name: "{autoprograms}\{cm:UninstallProgram}"; Filename: "{uninstallexe}"; IconFilename: "{app}\icon.ico"
 
 ; Desktop Shortcuts
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\icon.ico"; WorkingDir: "{app}"; Tasks: desktopicon
-Name: "{autodesktop}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"; IconFilename: "{app}\icon.ico"; Tasks: uninstallicon
+Name: "{autodesktop}\{cm:UninstallProgram}"; Filename: "{uninstallexe}"; IconFilename: "{app}\icon.ico"; Tasks: uninstallicon
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent

@@ -176,18 +176,31 @@ def smoke_test_installer() -> None:
         shutil.rmtree(sandbox_dir, ignore_errors=True)
     os.makedirs(sandbox_dir, exist_ok=True)
     
-    # 1. Clean installation check (Per-user non-elevated sandbox)
-    log(f"1. Installing into sandbox: {sandbox_dir} ...")
-    install_cmd = [
-        OUTPUT_SETUP_EXE,
-        "/VERYSILENT",
-        "/SUPPRESSMSGBOXES",
-        f"/DIR={sandbox_dir}"
-    ]
-    res = subprocess.run(install_cmd)
-    if res.returncode != 0:
-        raise RuntimeError(f"Installer failed with returncode {res.returncode}")
-    
+    # 1. Clean installation check across all 3 languages (EN, TH, JA)
+    for lang in ("english", "thai", "japanese"):
+        lang_sandbox = os.path.join(BUILD_DIR, f"smoke_sandbox_{lang}")
+        if os.path.exists(lang_sandbox):
+            shutil.rmtree(lang_sandbox, ignore_errors=True)
+        log(f"1. Verifying clean installation with /LANG={lang} into {lang_sandbox} ...")
+        cmd = [
+            OUTPUT_SETUP_EXE,
+            "/VERYSILENT",
+            "/SUPPRESSMSGBOXES",
+            f"/LANG={lang}",
+            f"/DIR={lang_sandbox}"
+        ]
+        res = subprocess.run(cmd)
+        if res.returncode != 0:
+            raise RuntimeError(f"Installer failed for /LANG={lang} with code {res.returncode}")
+        assert os.path.isfile(os.path.join(lang_sandbox, "NekoTracker.exe")), f"Missing NekoTracker.exe for {lang}"
+        assert os.path.isfile(os.path.join(lang_sandbox, "unins000.exe")), f"Missing unins000.exe for {lang}"
+        assert os.path.isfile(os.path.join(lang_sandbox, "Uninstall.bat")), f"Missing Uninstall.bat for {lang}"
+        assert os.path.isfile(os.path.join(lang_sandbox, "HOW_TO_USE.md")), f"Missing HOW_TO_USE.md for {lang}"
+        if lang != "english":
+            shutil.rmtree(lang_sandbox, ignore_errors=True)
+        else:
+            sandbox_dir = lang_sandbox
+
     installed_main_exe = os.path.join(sandbox_dir, "NekoTracker.exe")
     uninstaller_exe = os.path.join(sandbox_dir, "unins000.exe")
     uninstall_bat = os.path.join(sandbox_dir, "Uninstall.bat")

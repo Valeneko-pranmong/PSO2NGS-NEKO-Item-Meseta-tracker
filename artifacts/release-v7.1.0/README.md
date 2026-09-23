@@ -25,7 +25,7 @@
 ตรวจสอบความถูกต้องของไฟล์ก่อนการใช้งานด้วยค่า SHA-256:
 
 ```text
-2249c30f7a048b5113e0c48af0b44f01f5e7949953ba9dbd421df2ae224bdeb9  NekoTracker-Setup-v7.1.0.exe
+330dc2da786fb88aff8f598be0621051a3c94cf8a501f0ed1e38a2f9969265d3  NekoTracker-Setup-v7.1.0.exe
 ```
 
 * **ขนาดไฟล์:** ~22.19 MB
@@ -99,3 +99,24 @@
   1. Extract `NekoTracker-v7.1.0-Portable-Test.zip`.
   2. Run `3_Quick_Test_All_In_One.bat`.
   3. Built-in `NekoLogSimulator.exe` streams live mock drops, launching the tracker instantly without Python or NGS installed.
+
+---
+
+### 🇯🇵 日本語 (JA)
+
+#### A. 通常インストール（PSO2:NGSがインストールされている環境）
+1. `NekoTracker-Setup-v7.1.0.exe` を対象のPCに配置します。
+2. インストーラーをダブルクリックして起動します（管理者権限での実行は不要です）。
+3. 言語選択で「日本語」を選択し、セットアップウィザードに従って `%LOCALAPPDATA%\NEKO FAMILY\NekoTracker` にインストールします。
+4. インストール完了後、**NEKO Item & Meseta Tracker** を起動します。PSO2:NGSのログフォルダ（`log_ngs`）が自動検出されます。
+
+#### B. テスト環境・非ゲーム環境での検証（ゲームやPythonがないPC）
+* **方法1（公式リリース候補インストーラーの検証）:**
+  1. `NekoTracker-Setup-v7.1.0.exe` を実行してインストールを完了します。
+  2. デスクトップまたはスタートメニューから起動します。
+  3. **「ログフォルダを選択」** をクリックし、同梱の `sample_logs` フォルダを選択します。
+  4. 黄色の `[TEST MODE]` バッジが表示され、疑似ドロップデータが即座に読み込まれます。
+* **方法2（インストール不要のポータブルテスト検証）:**
+  1. `NekoTracker-v7.1.0-Portable-Test.zip` を展開します。
+  2. `3_Quick_Test_All_In_One.bat` をダブルクリックします。
+  3. 内蔵の `NekoLogSimulator.exe` が起動し、PythonやNGSがインストールされていない環境でも即座に動作検証が可能です。

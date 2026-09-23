@@ -274,7 +274,7 @@
      - รองรับ Safe Factory Reset ล้างข้อมูลทั้งบน Google Firebase RTDB และไฟล์แคชในเครื่อง (`%APPDATA%/NekoTrackerOffline/`, `%LOCALAPPDATA%/NEKO FAMILY/NekoTracker/`)
      - รองรับคำสั่ง All-in-One (`--all`), Factory Reset (`--wipe`), Setup (`--setup`), และ Verify (`--verify`)
   4. **อัปเดตค่าแฮช Release Artifacts:**
-     - `artifacts/release-v7.1.0/NekoTracker-Setup-v7.1.0.exe`: `2249c30f7a048b5113e0c48af0b44f01f5e7949953ba9dbd421df2ae224bdeb9`
+     - `artifacts/release-v7.1.0/NekoTracker-Setup-v7.1.0.exe`: ``2127975aa9e4a6de6e94596b2c2dcae6a4b3c71d482438f02d9a9a0841520505``
      - `artifacts/portable-test-v7.1.0/NekoTracker/NekoTracker.exe`: `a50e23ff1ddeb2f3646bd2d688d05fe4441632081d5dd87279f7f683884e2886`
      - อัปเดตใน `E2E_TEST_GUIDE.md`, `E2E_TEST_CHECKLIST.md`, `README.md`, และ `SHA256SUMS.txt`
   5. **การทดสอบความถูกต้อง (Test Suite Expansion):**
@@ -284,3 +284,26 @@
        - `test_offline_mode_privacy_guarantee_no_secret_cloud_sync`
      - ปรับปรุงการล้างแคชใน `tests/test_e2e_lifecycle.py` และ `tests/test_test_mode_and_window.py`
      - ผลการทดสอบผ่านสมบูรณ์ **92 / 92 รายการ (100% Passed)**
+
+### Milestone 18: การเตรียมปล่อย Release แบบ 3 ภาษา (English, Thai, Japanese) และอัปเกรดตัวติดตั้ง Inno Setup ให้รองรับ Multi-Language สมบูรณ์แบบ
+* **ขอบเขต:** ยกระดับตัวติดตั้ง Inno Setup และเอกสารเผยแพร่ให้รองรับ 3 ภาษาอย่างสมบูรณ์ (English, ไทย, 日本語) ทัดเทียมกับระบบแอปพลิเคชันหลัก, แก้ไขปัญหาความเสถียรของ Test Suite, และรันไปป์ไลน์คอมไพล์อาร์ติแฟกต์ทางการ
+* **การดำเนินการ:**
+  1. **อัปเกรดตัวติดตั้ง Inno Setup (`installer/NekoTracker.iss`):**
+     - กำหนดค่า `[Languages]` รองรับ 3 ภาษา: English (`compiler:Default.isl`), Thai (`compiler:Languages\Thai.isl`), และ Japanese (`compiler:Languages\Japanese.isl`)
+     - เพิ่ม `[CustomMessages]` สำหรับสร้างทางลัดบนเดสก์ท็อป, ทางลัดถอนการติดตั้ง, ชื่อคู่มือการใช้งาน, และเมนูถอนการติดตั้งในทั้ง 3 ภาษา
+     - สลับข้อความใน `[Tasks]` และ `[Icons]` ให้ใช้แท็ก `{cm:...}` เพื่อเปลี่ยนภาษาตามที่ผู้ใช้เลือกใน Wizard ทันที
+  2. **ปรับปรุงความเสถียรของ Test Suite (`tests/test_tracker_modules.py`):**
+     - เพิ่ม Bounded Polling Loop ใน `test_offline_mode_privacy_guarantee_no_secret_cloud_sync` รอ Background Sync Thread ส่ง Request ป้องกัน Race Condition
+  3. **เพิ่มชุดทดสอบ TDD Tri-Lingual Parity (`tests/test_i18n.py`):**
+     - เพิ่ม `test_inno_setup_trilingual_configuration` ตรวจสอบความครบถ้วนของภาษาและ CustomMessages ในไฟล์ Inno Setup
+     - เพิ่ม `test_release_readme_trilingual_parity` ตรวจสอบความสมบูรณ์ของเอกสารติดตั้ง 3 ภาษา
+     - รันชุดทดสอบผ่านครบถ้วน **100 / 100 รายการ (100% Passed)**
+  4. **จัดทำเอกสารแจกจ่ายและเช็กลิสต์ QA 3 ภาษา:**
+     - เพิ่มคู่มือการติดตั้งและการทดสอบภาษาญี่ปุ่น (JA) ใน `artifacts/release-v7.1.0/README.md`
+     - เพิ่มรายการทดสอบ `TC-02b [Installer Multi-Language]` และปรับปรุง `TC-18 [Multi-Language Parity]` ใน `artifacts/release-v7.1.0/E2E_TEST_CHECKLIST.md`
+  5. **อัปเกรดระบบ Automated Build Smoke Test (`installer/build_installer.py`):**
+     - ตรวจสอบการติดตั้งแบบเงียบครอบคลุมทั้ง 3 ภาษา (`/LANG=english`, `/LANG=thai`, `/LANG=japanese`)
+     - ยืนยันว่าแอปพลิเคชันหลักเปิดทำงาน เสถียรต่อเนื่อง และถอนการติดตั้งได้อย่างหมดจด
+  6. **คอมไพล์ตัวติดตั้งและอัปเดตค่าแฮชทางการ:**
+     - `artifacts/release-v7.1.0/NekoTracker-Setup-v7.1.0.exe`: `330dc2da786fb88aff8f598be0621051a3c94cf8a501f0ed1e38a2f9969265d3` (22.23 MB)
+     - ซิงค์ค่าแฮชลงใน `SHA256SUMS.txt`, `E2E_TEST_CHECKLIST.md`, `E2E_TEST_GUIDE.md`, และ `README.md`

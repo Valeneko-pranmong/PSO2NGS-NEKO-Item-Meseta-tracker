@@ -255,3 +255,36 @@ def test_config_persistence_of_language(tmp_path, monkeypatch):
     finally:
         # Reset back to English
         i18n.set_language("en")
+
+
+def test_inno_setup_trilingual_configuration():
+    """Verify that Inno Setup script configures English, Thai, and Japanese with localized custom messages."""
+    iss_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "installer", "NekoTracker.iss"))
+    assert os.path.isfile(iss_path), f"Missing {iss_path}"
+
+    with open(iss_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    # Verify [Languages] section contains all 3 languages
+    assert 'Name: "english"; MessagesFile: "compiler:Default.isl"' in content
+    assert 'Name: "thai"; MessagesFile: "compiler:Languages\\Thai.isl"' in content
+    assert 'Name: "japanese"; MessagesFile: "compiler:Languages\\Japanese.isl"' in content
+
+    # Verify CustomMessages for all 3 languages
+    for lang in ("english", "thai", "japanese"):
+        assert f"{lang}.CreateUninstallIcon=" in content
+        assert f"{lang}.UserGuide=" in content
+        assert f"{lang}.UninstallProgram=" in content
+
+
+def test_release_readme_trilingual_parity():
+    """Verify that the release distribution README contains testing guidelines in EN, TH, and JA."""
+    readme_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "artifacts", "release-v7.1.0", "README.md"))
+    assert os.path.isfile(readme_path), f"Missing {readme_path}"
+
+    with open(readme_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    assert "### 🇹🇭 ภาษาไทย (TH)" in content
+    assert "### 🇬🇧 English (EN)" in content
+    assert "### 🇯🇵 日本語 (JA)" in content

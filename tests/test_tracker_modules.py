@@ -1931,6 +1931,12 @@ def test_offline_mode_privacy_guarantee_no_secret_cloud_sync(shared_app, monkeyp
     app.update_idletasks()
     assert app.current_view == "war"
     assert app.war_service.realtime_sync_enabled is True
+
+    # Bounded wait for background sync thread to dispatch network request
+    deadline = time.time() + 2.0
+    while time.time() < deadline and not network_requests:
+        time.sleep(0.05)
+
     assert len(network_requests) >= 1, "Entering war mode must sync to cloud"
 
     # 4. Switch back to Offline Mode -> sync must be completely halted
